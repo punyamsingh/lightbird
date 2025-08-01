@@ -38,9 +38,6 @@ export async function initFFmpeg(logCallback?: (message: string) => void): Promi
     });
     
     logCallback?.("Loading ffmpeg-core.js...");
-    // In v0.12, `load` is a part of the instance method.
-    // The core, wasm, and worker paths can be configured here if needed.
-    // We rely on the files being in the default public path.
     await instance.load();
     logCallback?.("FFmpeg core loaded.");
 
@@ -55,59 +52,67 @@ const OUTPUT_FILENAME = 'output.mp4';
 export async function probeFile(ffmpeg: FFmpeg, file: File): Promise<FfmpegFile> {
     await ffmpeg.writeFile(INPUT_FILENAME, await fetchFile(file));
 
-    // FFprobe-wasm is not part of the main ffmpeg.wasm package anymore.
-    // A common workaround is to run ffmpeg with an option that outputs stream info and parse it.
-    // However, the `probe` command is not directly available. We'll capture logs from a simple -i run.
-
     const logs: string[] = [];
     const logListener = ({ message }: { message: string }) => {
-        // Simple check to capture ffprobe-like JSON output if available or detailed stream info
-        if(message.startsWith('{') || message.includes('Stream #')) {
-          logs.push(message);
-        }
+        // Capture all logs during this specific execution
+        logs.push(message);
     };
     ffmpeg.on('log', logListener);
 
     try {
-        // Execute a command that will print stream info to stderr (which is captured by logs)
-        await ffmpeg.exec([
-            '-v', 'quiet',
-            '-print_format', 'json',
-            '-show_streams',
-            '-i', INPUT_FILENAME,
-        ]);
+        // This command forces ffmpeg to process the input and print info without creating an output file.
+        await ffmpeg.exec(['-i', INPUT_FILENAME, '-f', 'null', '-']);
     } catch(e) {
-        // This command might fail if it doesn't produce an output file, which is expected.
-        // The important part is that it logs the stream information.
+        // This command is expected to throw an error because there's no output, but it still logs the stream info.
+    } finally {
+        // IMPORTANT: Turn off the listener to avoid capturing logs from other operations.
+        ffmpeg.off('log', logListener);
     }
     
-    ffmpeg.off('log', logListener);
+    // Now parse the logs
+    const fullLog = logs.join('\n');
+    
+    const streams: FfmpegStream[] = [];
+    const streamRegex = /Stream #0:(\d+)(?:\((.*?)\))?: (\w+): (.*?)(\s|$)/g;
+    let match;
 
-    if (logs.length === 0) {
+    while ((match = streamRegex.exec(fullLog)) !== null) {
+        const streamIndex = parseInt(match[1], 10);
+        const language = match[2];
+        const streamType = match[3].toLowerCase() as 'video' | 'audio' | 'subtitle';
+        const codecInfo = match[4].split(',')[0].trim();
+
+        if (streamType === 'video' || streamType === 'audio' || streamType === 'subtitle') {
+            streams.push({
+                index: streamIndex,
+                codec_type: streamType,
+                codec_name: codecInfo,
+                codec_long_name: codecInfo,
+                tags: {
+                    language: language,
+                }
+            });
+        }
+    }
+
+
+    if (streams.length === 0) {
+        console.error("Full FFmpeg Log:", fullLog);
         throw new Error("Failed to probe file. No stream information was logged.");
     }
 
-    try {
-        const probeData = JSON.parse(logs.join(''));
-        const streams = probeData.streams as FfmpegStream[];
+    const videoStreams = streams.filter(s => s.codec_type === 'video');
+    const audioStreams = streams.filter(s => s.codec_type === 'audio');
+    const subtitleStreams = streams.filter(s => s.codec_type === 'subtitle');
 
-        const videoStreams = streams.filter(s => s.codec_type === 'video');
-        const audioStreams = streams.filter(s => s.codec_type === 'audio');
-        const subtitleStreams = streams.filter(s => s.codec_type === 'subtitle');
-
-        return {
-            name: file.name,
-            streams: {
-                video: videoStreams,
-                audio: audioStreams,
-                subtitles: subtitleStreams,
-            }
-        };
-    } catch (e) {
-        console.error("Failed to parse FFmpeg probe JSON output:", logs.join(''));
-        // Fallback or re-throw might be needed here.
-        throw new Error("Failed to parse video metadata from logs.");
-    }
+    return {
+        name: file.name,
+        streams: {
+            video: videoStreams,
+            audio: audioStreams,
+            subtitles: subtitleStreams,
+        }
+    };
 }
 
 export async function remuxFile(ffmpeg: FFmpeg, audioIndex: number, subtitleIndex: number): Promise<string> {
@@ -118,7 +123,9 @@ export async function remuxFile(ffmpeg: FFmpeg, audioIndex: number, subtitleInde
     ];
     
     if (subtitleIndex >= 0) {
-        args.push('-map', `0:s:${subtitleIndex}`);
+        const subStream = (await probeFile(ffmpeg, new File([], INPUT_FILENAME))).streams.subtitles.find(s => s.index === subtitleIndex);
+        
+        args.push('-map', `0:s:${subStream?.index}`);
         args.push('-c:s', 'mov_text'); // MP4 compatible subtitle format
     }
     
