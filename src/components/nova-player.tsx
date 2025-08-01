@@ -221,7 +221,7 @@ const NovaPlayer = () => {
   
   const handleAudioTrackChange = (id: string) => {
     setActiveAudioTrack(id);
-    if (!videoRef.current) return;
+    if (!videoRef.current || !videoRef.current.audioTracks) return;
     for (let i = 0; i < videoRef.current.audioTracks.length; i++) {
       const track = videoRef.current.audioTracks[i];
       track.enabled = track.id === id;
@@ -307,8 +307,12 @@ const NovaPlayer = () => {
     video.addEventListener("ended", onEnded);
     container?.addEventListener('fullscreenchange', onFullscreenChange);
 
-    video.textTracks.addEventListener('addtrack', onAddTextTrack);
-    video.audioTracks.addEventListener('addtrack', onAddAudioTrack);
+    if (video.textTracks) {
+        video.textTracks.addEventListener('addtrack', onAddTextTrack);
+    }
+    if (video.audioTracks) {
+        video.audioTracks.addEventListener('addtrack', onAddAudioTrack);
+    }
 
     // Initial check in case tracks are already loaded
     onAddTextTrack();
@@ -469,5 +473,3 @@ const NovaPlayer = () => {
 };
 
 export default NovaPlayer;
-
-    
