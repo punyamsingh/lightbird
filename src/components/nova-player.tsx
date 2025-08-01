@@ -8,7 +8,7 @@ import PlayerControls from "@/components/player-controls";
 import PlaylistPanel from "@/components/playlist-panel";
 import { useToast } from "@/hooks/use-toast";
 import { initFFmpeg, probeFile, remuxFile, FfmpegFile } from "@/lib/ffmpeg";
-import type { FFmpeg } from "@ffmpeg/ffmpeg";
+import type { FFmpeg } from "@ffmpeg.wasm/main";
 
 
 const NovaPlayer = () => {
