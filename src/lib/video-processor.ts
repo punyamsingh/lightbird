@@ -18,14 +18,15 @@ let muxer: MP4Muxer | null = null;
 let processedFile: ProcessedFile | null = null;
 
 export async function probeFile(file: File): Promise<ProcessedFile> {
-  demuxer = new Demuxer({
+  demuxer = new (Demuxer as any)({
     file,
     log: false,
   });
 
-  const { video, audio, subtitles } = await demuxer.probe();
+  await demuxer.init();
+  const { video, audio, subtitles } = demuxer.streams;
   
-  if (!video) {
+  if (!video || video.length === 0) {
     throw new Error("No video track found in the file.");
   }
   
@@ -85,7 +86,7 @@ export async function remuxFile(audioTrackIndex: number, subtitleTrackIndex: num
         }
     }));
 
-    if (selectedSubtitleTrack && streams.subtitles) {
+    if (selectedSubtitleTrack && streams.subtitles && streams.subtitles[subtitleTrackIndex]) {
         const subtitleStream = streams.subtitles[subtitleTrackIndex]?.pipeThrough(new TransformStream({
             transform(chunk, controller) {
                 muxer?.processSubtitle(chunk);
@@ -95,10 +96,22 @@ export async function remuxFile(audioTrackIndex: number, subtitleTrackIndex: num
         if(subtitleStream) await subtitleStream.pipeTo(new WritableStream()).catch(e => console.error("Subtitle stream error:", e));
     }
 
-    if (videoStream) await videoStream.pipeTo(new WritableStream()).catch(e => console.error("Video stream error:", e));
-    if (audioStream) await audioStream.pipeTo(new WritableStream()).catch(e => console.error("Audio stream error:", e));
+    const videoWriter = videoStream?.getWriter();
+    const audioWriter = audioStream?.getWriter();
+    
+    const pump = async (writer: ReadableStreamDefaultWriter<any> | undefined) => {
+        if (!writer) return;
+        while(true) {
+            const { done } = await writer.read();
+            if (done) break;
+        }
+    }
 
-    const { buffer } = await muxer.finish();
+    await Promise.all([pump(videoWriter), pump(audioWriter)]);
+
+    muxer.close();
+    const { buffer } = muxer.target;
+
     const blob = new Blob([buffer], { type: 'video/mp4' });
     return URL.createObjectURL(blob);
 }
