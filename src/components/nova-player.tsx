@@ -68,10 +68,15 @@ const NovaPlayer = () => {
     const videoFiles: File[] = [];
     const subtitleFiles: File[] = [];
 
+    const videoExtensions = ['.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm'];
+
     Array.from(files).forEach(file => {
-      if (file.type.startsWith("video/")) {
+      const isVideo = file.type.startsWith("video/") || videoExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+      const isSubtitle = file.name.endsWith(".vtt") || file.name.endsWith(".srt");
+
+      if (isVideo) {
         videoFiles.push(file);
-      } else if (file.name.endsWith(".vtt") || file.name.endsWith(".srt")) {
+      } else if (isSubtitle) {
         subtitleFiles.push(file);
       }
     });
