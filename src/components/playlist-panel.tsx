@@ -56,7 +56,7 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
                 ref={fileInputRef}
                 className="hidden"
                 multiple
-                accept="video/*,.vtt,.srt"
+                accept="video/*,.mkv,.avi,.mov,.wmv,.flv,.webm,.vtt,.srt"
                 onChange={(e) => e.target.files && onFilesAdded(e.target.files)}
             />
             <form onSubmit={handleStreamUrlSubmit} className="flex gap-2">
