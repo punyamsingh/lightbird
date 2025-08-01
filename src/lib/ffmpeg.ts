@@ -1,3 +1,4 @@
+
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 
@@ -32,48 +33,47 @@ export async function initFFmpeg(logCallback?: (message: string) => void): Promi
     
     const instance = new FFmpeg();
 
-    instance.on('log', ({ message }) => {
-        if (logCallback) logCallback(message);
-        console.log(message);
-    });
+    if (logCallback) {
+        instance.on('log', ({ message }) => {
+            logCallback(message);
+        });
+    }
     
-    logCallback?.("Loading ffmpeg-core.js...");
-    await instance.load();
-    logCallback?.("FFmpeg core loaded.");
+    await instance.load({
+        coreURL: '/ffmpeg-core.js',
+        wasmURL: '/ffmpeg-core.wasm',
+        workerURL: '/ffmpeg-core.worker.js',
+    });
 
     ffmpeg = instance;
     return instance;
 }
 
-const INPUT_FILENAME = 'input.mkv';
 const OUTPUT_FILENAME = 'output.mp4';
 
 
 export async function probeFile(ffmpeg: FFmpeg, file: File): Promise<FfmpegFile> {
+    const INPUT_FILENAME = file.name;
     await ffmpeg.writeFile(INPUT_FILENAME, await fetchFile(file));
 
     const logs: string[] = [];
     const logListener = ({ message }: { message: string }) => {
-        // Capture all logs during this specific execution
         logs.push(message);
     };
     ffmpeg.on('log', logListener);
 
     try {
-        // This command forces ffmpeg to process the input and print info without creating an output file.
         await ffmpeg.exec(['-i', INPUT_FILENAME, '-f', 'null', '-']);
-    } catch(e) {
-        // This command is expected to throw an error because there's no output, but it still logs the stream info.
+    } catch (e) {
+        // This can happen and is fine, the logs are still captured.
     } finally {
-        // IMPORTANT: Turn off the listener to avoid capturing logs from other operations.
         ffmpeg.off('log', logListener);
     }
     
-    // Now parse the logs
     const fullLog = logs.join('\n');
     
     const streams: FfmpegStream[] = [];
-    const streamRegex = /Stream #0:(\d+)(?:\((.*?)\))?: (\w+): (.*?)(\s|$)/g;
+    const streamRegex = /Stream #\d+:(\d+)(?:\((.*?)\))?: (\w+): (.*?)(\s|,|$)/g;
     let match;
 
     while ((match = streamRegex.exec(fullLog)) !== null) {
@@ -97,7 +97,7 @@ export async function probeFile(ffmpeg: FFmpeg, file: File): Promise<FfmpegFile>
 
 
     if (streams.length === 0) {
-        console.error("Full FFmpeg Log:", fullLog);
+        console.error("Full FFmpeg Log for probing:", fullLog);
         throw new Error("Failed to probe file. No stream information was logged.");
     }
 
@@ -115,18 +115,16 @@ export async function probeFile(ffmpeg: FFmpeg, file: File): Promise<FfmpegFile>
     };
 }
 
-export async function remuxFile(ffmpeg: FFmpeg, audioIndex: number, subtitleIndex: number): Promise<string> {
+export async function remuxFile(ffmpeg: FFmpeg, inputFilename: string, audioStreamIndex: number, subtitleStreamIndex?: number): Promise<string> {
     const args = [
-        '-i', INPUT_FILENAME,
-        '-map', '0:v:0',      // Select first video stream
-        '-map', `0:a:${audioIndex}`, // Select chosen audio stream
+        '-i', inputFilename,
+        '-map', '0:v:0',
+        '-map', `0:a:${audioStreamIndex}`,
     ];
     
-    if (subtitleIndex >= 0) {
-        const subStream = (await probeFile(ffmpeg, new File([], INPUT_FILENAME))).streams.subtitles.find(s => s.index === subtitleIndex);
-        
-        args.push('-map', `0:s:${subStream?.index}`);
-        args.push('-c:s', 'mov_text'); // MP4 compatible subtitle format
+    if (subtitleStreamIndex !== undefined && subtitleStreamIndex >= 0) {
+        args.push('-map', `0:s:${subtitleStreamIndex}`);
+        args.push('-c:s', 'mov_text'); 
     }
     
     args.push('-c:v', 'copy');
@@ -139,3 +137,5 @@ export async function remuxFile(ffmpeg: FFmpeg, audioIndex: number, subtitleInde
     const blob = new Blob([(data as Uint8Array).buffer], { type: 'video/mp4' });
     return URL.createObjectURL(blob);
 }
+
+    

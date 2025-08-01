@@ -8,7 +8,7 @@ import PlayerControls from "@/components/player-controls";
 import PlaylistPanel from "@/components/playlist-panel";
 import { useToast } from "@/hooks/use-toast";
 import { initFFmpeg, probeFile, remuxFile, FfmpegFile } from "@/lib/ffmpeg";
-import type { FFmpeg } from "@ffmpeg.wasm/main";
+import type { FFmpeg } from "@ffmpeg/ffmpeg";
 
 
 const NovaPlayer = () => {
@@ -51,7 +51,10 @@ const NovaPlayer = () => {
                 setIsLoading(true);
                 setLoadingMessage("Loading FFmpeg...");
                 const ffmpegInstance = await initFFmpeg((log) => {
-                     setLoadingMessage(log);
+                    // We only want to show certain logs to the user
+                    if (log.startsWith("ffmpeg-core")) {
+                         setLoadingMessage("Initializing FFmpeg core...");
+                    }
                 });
                 ffmpegRef.current = ffmpegInstance;
                 setLoadingMessage("");
@@ -111,18 +114,18 @@ const NovaPlayer = () => {
         
         const { audio, subtitles: probeSubs } = ffmpegFile.streams;
 
-        const newAudioTracks: AudioTrack[] = audio.map((stream) => ({
+        const newAudioTracks: AudioTrack[] = audio.map((stream, idx) => ({
           id: String(stream.index),
-          name: `Track ${stream.index} (${stream.tags?.language || stream.codec_name})`,
+          name: `Track ${idx + 1} (${stream.tags?.language || stream.codec_name})`,
           lang: stream.tags?.language || 'unknown',
         }));
         setAudioTracks(newAudioTracks);
         const firstAudioTrack = newAudioTracks[0]?.id || '0';
         setActiveAudioTrack(firstAudioTrack);
 
-        const newSubtitleTracks: Subtitle[] = probeSubs.map((stream) => ({
+        const newSubtitleTracks: Subtitle[] = probeSubs.map((stream, idx) => ({
           id: String(stream.index),
-          name: `Track ${stream.index} (${stream.tags?.language || stream.codec_name})`,
+          name: `Track ${idx + 1} (${stream.tags?.language || stream.codec_name})`,
           lang: stream.tags?.language || 'unknown',
           type: 'embedded'
         }));
@@ -152,15 +155,13 @@ const NovaPlayer = () => {
         return;
       }
       
-      // Find the *array index* for the selected stream index to pass to remuxFile
-      const audioOutputIndex = currentFileRef.current.streams.audio.findIndex(a => a.index === audioStreamIndex);
-      const subtitleOutputIndex = currentFileRef.current.streams.subtitles.findIndex(s => s.index === subtitleStreamIndex);
+      const subtitleTrack = currentFileRef.current.streams.subtitles.find(s => s.index === subtitleStreamIndex);
 
       setIsLoading(true);
       setLoadingMessage("Remuxing video...");
       
       try {
-        const outputUrl = await remuxFile(ffmpegRef.current, audioOutputIndex, subtitleOutputIndex);
+        const outputUrl = await remuxFile(ffmpegRef.current, currentFileRef.current.name, audioTrack.index, subtitleTrack?.index);
         if (videoRef.current) {
             const currentTime = videoRef.current.currentTime;
             const wasPlaying = !videoRef.current.paused;
@@ -492,3 +493,5 @@ const NovaPlayer = () => {
 };
 
 export default NovaPlayer;
+
+    
