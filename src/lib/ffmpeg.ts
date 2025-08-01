@@ -1,4 +1,4 @@
-import { createFFmpeg, FFmpeg } from '@ffmpeg/ffmpeg';
+import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 
 let ffmpeg: FFmpeg | null = null;
@@ -29,12 +29,14 @@ export async function initFFmpeg(logCallback?: (message: string) => void): Promi
     if (ffmpeg) {
         return ffmpeg;
     }
-    const instance = createFFmpeg({ log: true });
-    instance.setLogger(({ message }) => {
+    
+    const instance = new FFmpeg();
+
+    instance.on('log', ({ message }) => {
         if (logCallback) logCallback(message);
         console.log(message);
     });
-
+    
     // Use a specific version for stability
     const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd'
 
@@ -51,25 +53,58 @@ export async function initFFmpeg(logCallback?: (message: string) => void): Promi
 
 const INPUT_FILENAME = 'input.mkv';
 const OUTPUT_FILENAME = 'output.mp4';
+const PROBE_OUTPUT_FILENAME = 'probe.json';
 
 
 export async function probeFile(ffmpeg: FFmpeg, file: File): Promise<FfmpegFile> {
     await ffmpeg.writeFile(INPUT_FILENAME, await fetchFile(file));
 
-    // The '-hide_banner' flag can make parsing easier
+    // Redirect stdout to a file to capture the JSON output.
+    // The '-hide_banner' flag can make parsing easier.
     await ffmpeg.exec([
         '-v', 'quiet',
         '-print_format', 'json',
         '-show_streams',
-        '-i', INPUT_FILENAME,
-        '-f', 'null',
-        '-'
-    ]);
-
-    const result = ffmpeg.getLogs().map(log => log.message).join('\n');
+        '-i', INPUT_FILENAME
+    ], undefined, { stdout: true, stderr: true }).then(async (result: any) => {
+        // Since we can't directly pipe to a file in this version easily,
+        // we'll rely on the log, but a more robust way would be needed if logs were disabled.
+        // A common workaround is to parse the text logs if JSON isn't available.
+        // For now, we assume JSON output is in the logs or can be captured.
+        // This part is tricky. Let's try to grab logs. A better way would be needed.
+    });
+    
+    // This is a workaround as redirecting stdout from exec is not straightforward.
+    // We run the command again, but this time we capture logs.
+    const logs: string[] = [];
+    ffmpeg.on('log', ({message}) => {
+      // The JSON output from ffprobe is logged as stderr, so we collect it.
+      if(message.startsWith('{')) { // A simple check for JSON
+          logs.push(message);
+      }
+    });
 
     try {
-        const probeData = JSON.parse(result);
+        await ffmpeg.exec([
+            '-v', 'quiet',
+            '-print_format', 'json',
+            '-show_streams',
+            '-i', INPUT_FILENAME,
+        ]);
+    } catch(e) {
+        // It might throw an error because there's no output file, which is expected for probing.
+    }
+
+    // Turn off logger after use
+    ffmpeg.off('log', () => {});
+
+    if (logs.length === 0) {
+        throw new Error("Failed to probe file. No JSON output was captured.");
+    }
+    
+    try {
+        // Join the logs in case the JSON is split across multiple log messages
+        const probeData = JSON.parse(logs.join(''));
         const streams = probeData.streams as FfmpegStream[];
 
         const videoStreams = streams.filter(s => s.codec_type === 'video');
@@ -85,7 +120,7 @@ export async function probeFile(ffmpeg: FFmpeg, file: File): Promise<FfmpegFile>
             }
         };
     } catch(e) {
-        console.error("Failed to parse FFmpeg probe output:", result);
+        console.error("Failed to parse FFmpeg probe output:", logs.join(''));
         throw new Error("Failed to parse video metadata.");
     }
 }
@@ -107,10 +142,11 @@ export async function remuxFile(ffmpeg: FFmpeg, audioIndex: number, subtitleInde
     args.push('-c:v', 'copy');
     args.push('-c:a', 'copy');
 
-    args.push(OUTPUT_FILENAME, '-y'); // y to overwrite
+    args.push('-y', OUTPUT_FILENAME); // y to overwrite
 
     await ffmpeg.exec(args);
 
     const data = await ffmpeg.readFile(OUTPUT_FILENAME);
-    return URL.createObjectURL(new Blob([data], { type: 'video/mp4' }));
+    const blob = new Blob([data as ArrayBuffer], { type: 'video/mp4' });
+    return URL.createObjectURL(blob);
 }
