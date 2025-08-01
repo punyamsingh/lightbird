@@ -1,7 +1,7 @@
 
 "use client";
 import React from "react";
-import type { Subtitle, VideoFilters } from "@/types";
+import type { Subtitle, VideoFilters, AudioTrack } from "@/types";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -9,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Label } from "@/components/ui/label";
 import {
   Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward,
-  FastForward, Rewind, RotateCcw, Settings2, Subtitles, Camera
+  FastForward, Rewind, RotateCcw, Settings2, Subtitles, Camera, AudioLines
 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 
@@ -26,6 +26,8 @@ interface PlayerControlsProps {
   zoom: number;
   subtitles: Subtitle[];
   activeSubtitle: string;
+  audioTracks: AudioTrack[];
+  activeAudioTrack: string;
   onPlayPause: () => void;
   onSeek: (value: number) => void;
   onVolumeChange: (value: number) => void;
@@ -40,6 +42,7 @@ interface PlayerControlsProps {
   onFiltersChange: (filters: VideoFilters) => void;
   onZoomChange: (zoom: number) => void;
   onSubtitleChange: (id: string) => void;
+  onAudioTrackChange: (id: string) => void;
 }
 
 const formatTime = (time: number) => {
@@ -52,10 +55,10 @@ const formatTime = (time: number) => {
 
 const PlayerControls: React.FC<PlayerControlsProps> = ({
   isPlaying, progress, duration, volume, isMuted, playbackRate, loop, isFullScreen,
-  filters, zoom, subtitles, activeSubtitle,
+  filters, zoom, subtitles, activeSubtitle, audioTracks, activeAudioTrack,
   onPlayPause, onSeek, onVolumeChange, onMuteToggle, onPlaybackRateChange, onLoopToggle,
   onFullScreenToggle, onFrameStep, onScreenshot, onNext, onPrevious, onFiltersChange,
-  onZoomChange, onSubtitleChange,
+  onZoomChange, onSubtitleChange, onAudioTrackChange,
 }) => {
   return (
     <TooltipProvider>
@@ -118,6 +121,25 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                   </RadioGroup>
               </PopoverContent>
             </Popover>
+            {audioTracks.length > 1 && (
+              <Popover>
+                <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="relative">
+                        <AudioLines />
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent>
+                    <RadioGroup value={activeAudioTrack} onValueChange={onAudioTrackChange}>
+                        {audioTracks.map(track => (
+                            <div key={track.id} className="flex items-center space-x-2">
+                                <RadioGroupItem value={track.id} id={`audio-${track.id}`} />
+                                <Label htmlFor={`audio-${track.id}`}>{track.name}</Label>
+                            </div>
+                        ))}
+                    </RadioGroup>
+                </PopoverContent>
+              </Popover>
+            )}
             <Popover>
               <PopoverTrigger asChild>
                   <Button variant="ghost" size="icon" className="relative">

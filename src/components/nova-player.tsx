@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import type { PlaylistItem, Subtitle, VideoFilters } from "@/types";
+import type { PlaylistItem, Subtitle, VideoFilters, AudioTrack } from "@/types";
 import { cn } from "@/lib/utils";
 import PlayerControls from "@/components/player-controls";
 import PlaylistPanel from "@/components/playlist-panel";
@@ -13,6 +13,9 @@ const NovaPlayer = () => {
   const [currentVideoIndex, setCurrentVideoIndex] = useState<number | null>(null);
   const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
   const [activeSubtitle, setActiveSubtitle] = useState<string>("off");
+  const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
+  const [activeAudioTrack, setActiveAudioTrack] = useState<string>("");
+
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -62,13 +65,15 @@ const NovaPlayer = () => {
       setCurrentVideoIndex(index);
       setSubtitles([]);
       setActiveSubtitle("off");
+      setAudioTracks([]);
+      setActiveAudioTrack("");
     }
   };
 
   const handleFileChange = (files: FileList) => {
     const videoFiles: File[] = [];
     const subtitleFiles: File[] = [];
-
+    
     const videoExtensions = ['.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mp4'];
 
     Array.from(files).forEach(file => {
@@ -210,10 +215,18 @@ const NovaPlayer = () => {
 
     for (let i = 0; i < videoRef.current.textTracks.length; i++) {
         const track = videoRef.current.textTracks[i];
-        const trackId = `embedded-${i}-${track.language}`;
-        track.mode = trackId === id ? 'showing' : 'hidden';
+        track.mode = track.id === id ? 'showing' : 'hidden';
     }
   }
+  
+  const handleAudioTrackChange = (id: string) => {
+    setActiveAudioTrack(id);
+    if (!videoRef.current) return;
+    for (let i = 0; i < videoRef.current.audioTracks.length; i++) {
+      const track = videoRef.current.audioTracks[i];
+      track.enabled = track.id === id;
+    }
+  };
 
   useEffect(() => {
     const video = videoRef.current;
@@ -231,21 +244,6 @@ const NovaPlayer = () => {
     const onLoadedMetadata = () => {
         setDuration(video.duration);
         setIsLoading(false);
-
-        const embeddedTracks: Subtitle[] = [];
-        if (video.textTracks) {
-            for (let i = 0; i < video.textTracks.length; i++) {
-                const track = video.textTracks[i];
-                track.mode = 'hidden'; // Hide all tracks by default
-                embeddedTracks.push({
-                    id: `embedded-${i}-${track.language}`,
-                    name: track.label || `Track ${i + 1} (${track.language})`,
-                    lang: track.language,
-                    type: 'embedded'
-                });
-            }
-        }
-        setSubtitles(prev => [...prev.filter(p => p.type === 'external'), ...embeddedTracks]);
     };
     const onEnded = () => {
         if (!loop) {
@@ -254,12 +252,67 @@ const NovaPlayer = () => {
     };
     const onFullscreenChange = () => setIsFullScreen(!!document.fullscreenElement);
 
+    const onAddTextTrack = () => {
+        if (!video.textTracks) return;
+        const embeddedTracks: Subtitle[] = [];
+        for (let i = 0; i < video.textTracks.length; i++) {
+            const track = video.textTracks[i];
+            track.mode = 'hidden';
+            embeddedTracks.push({
+                id: track.id || `embedded-subtitle-${i}-${track.language}`,
+                name: track.label || `Track ${i + 1} (${track.language})`,
+                lang: track.language,
+                type: 'embedded'
+            });
+        }
+        setSubtitles(prev => [...prev.filter(p => p.type === 'external'), ...embeddedTracks]);
+    };
+
+    const onAddAudioTrack = () => {
+        if (!video.audioTracks) return;
+        const tracks: AudioTrack[] = [];
+        let hasEnabledTrack = false;
+        for (let i = 0; i < video.audioTracks.length; i++) {
+            const track = video.audioTracks[i];
+            tracks.push({
+                id: track.id || `embedded-audio-${i}-${track.language}`,
+                name: track.label || `Audio ${i + 1} (${track.language})`,
+                lang: track.language,
+            });
+            if(track.enabled) hasEnabledTrack = true;
+        }
+
+        // If no track is enabled by default, enable the first one.
+        if (!hasEnabledTrack && video.audioTracks.length > 0) {
+            video.audioTracks[0].enabled = true;
+        }
+        
+        const currentActive = tracks.find(t => {
+            const audioTrack = Array.from(video.audioTracks).find(at => at.id === t.id);
+            return audioTrack?.enabled;
+        });
+
+        setAudioTracks(tracks);
+        if (currentActive) {
+            setActiveAudioTrack(currentActive.id);
+        } else if(tracks.length > 0) {
+            setActiveAudioTrack(tracks[0].id)
+        }
+    };
+
     video.addEventListener("play", onPlay);
     video.addEventListener("pause", onPause);
     video.addEventListener("timeupdate", onTimeUpdate);
     video.addEventListener("loadedmetadata", onLoadedMetadata);
     video.addEventListener("ended", onEnded);
     container?.addEventListener('fullscreenchange', onFullscreenChange);
+
+    video.textTracks.addEventListener('addtrack', onAddTextTrack);
+    video.audioTracks.addEventListener('addtrack', onAddAudioTrack);
+
+    // Initial check in case tracks are already loaded
+    onAddTextTrack();
+    onAddAudioTrack();
 
     return () => {
       video.removeEventListener("play", onPlay);
@@ -268,6 +321,12 @@ const NovaPlayer = () => {
       video.removeEventListener("loadedmetadata", onLoadedMetadata);
       video.removeEventListener("ended", onEnded);
       container?.removeEventListener('fullscreenchange', onFullscreenChange);
+      if (video.textTracks) {
+        video.textTracks.removeEventListener('addtrack', onAddTextTrack);
+      }
+      if (video.audioTracks) {
+        video.audioTracks.removeEventListener('addtrack', onAddAudioTrack);
+      }
     };
   }, [currentVideo, loop, handleNext]);
 
@@ -325,14 +384,19 @@ const NovaPlayer = () => {
           onClick={handlePlayPause}
           crossOrigin="anonymous"
         >
-          {subtitles.filter(s => s.type === 'external').map(sub => (
+          {subtitles.filter(s => s.type === 'external' && s.url).map(sub => (
             <track
               key={sub.id}
               kind="subtitles"
               srcLang={sub.lang}
               src={sub.url}
               label={sub.name}
-              mode={activeSubtitle === sub.id ? "showing" : "hidden"}
+              onLoad={() => {
+                if (videoRef.current) {
+                  const track = Array.from(videoRef.current.textTracks).find(t => t.label === sub.name);
+                  if (track) track.mode = activeSubtitle === sub.id ? "showing" : "hidden";
+                }
+              }}
             />
           ))}
         </video>
@@ -358,6 +422,8 @@ const NovaPlayer = () => {
                 zoom={zoom}
                 subtitles={subtitles}
                 activeSubtitle={activeSubtitle}
+                audioTracks={audioTracks}
+                activeAudioTrack={activeAudioTrack}
                 onPlayPause={handlePlayPause}
                 onSeek={handleSeek}
                 onVolumeChange={handleVolumeChange}
@@ -372,6 +438,7 @@ const NovaPlayer = () => {
                 onFiltersChange={setFilters}
                 onZoomChange={setZoom}
                 onSubtitleChange={handleSubtitleChange}
+                onAudioTrackChange={handleAudioTrackChange}
              />
         )}
        
