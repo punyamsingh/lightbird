@@ -215,7 +215,7 @@ const NovaPlayer = () => {
 
     for (let i = 0; i < videoRef.current.textTracks.length; i++) {
         const track = videoRef.current.textTracks[i];
-        track.mode = track.id === id ? 'showing' : 'hidden';
+        track.mode = track.id === id || (track.label === id) ? 'showing' : 'hidden';
     }
   }
   
@@ -244,6 +244,54 @@ const NovaPlayer = () => {
     const onLoadedMetadata = () => {
         setDuration(video.duration);
         setIsLoading(false);
+
+        // Scan for text tracks
+        if (video.textTracks) {
+            const embeddedTracks: Subtitle[] = [];
+            for (let i = 0; i < video.textTracks.length; i++) {
+                const track = video.textTracks[i];
+                track.mode = 'hidden';
+                 const trackId = track.label || `embedded-subtitle-${i}-${track.language}`;
+                embeddedTracks.push({
+                    id: trackId,
+                    name: track.label || `Track ${i + 1} (${track.language})`,
+                    lang: track.language,
+                    type: 'embedded'
+                });
+            }
+            setSubtitles(prev => [...prev.filter(p => p.type === 'external'), ...embeddedTracks]);
+        }
+
+        // Scan for audio tracks
+        if (video.audioTracks) {
+            const tracks: AudioTrack[] = [];
+            let hasEnabledTrack = false;
+            for (let i = 0; i < video.audioTracks.length; i++) {
+                const track = video.audioTracks[i];
+                tracks.push({
+                    id: track.id || `embedded-audio-${i}-${track.language}`,
+                    name: track.label || `Audio ${i + 1} (${track.language})`,
+                    lang: track.language,
+                });
+                if(track.enabled) hasEnabledTrack = true;
+            }
+
+            if (!hasEnabledTrack && video.audioTracks.length > 0) {
+                video.audioTracks[0].enabled = true;
+            }
+            
+            const currentActive = tracks.find(t => {
+                const audioTrack = Array.from(video.audioTracks).find(at => at.id === t.id);
+                return audioTrack?.enabled;
+            });
+
+            setAudioTracks(tracks);
+            if (currentActive) {
+                setActiveAudioTrack(currentActive.id);
+            } else if(tracks.length > 0) {
+                setActiveAudioTrack(tracks[0].id)
+            }
+        }
     };
     const onEnded = () => {
         if (!loop) {
@@ -252,54 +300,6 @@ const NovaPlayer = () => {
     };
     const onFullscreenChange = () => setIsFullScreen(!!document.fullscreenElement);
 
-    const onAddTextTrack = () => {
-        if (!video.textTracks) return;
-        const embeddedTracks: Subtitle[] = [];
-        for (let i = 0; i < video.textTracks.length; i++) {
-            const track = video.textTracks[i];
-            track.mode = 'hidden';
-            embeddedTracks.push({
-                id: track.id || `embedded-subtitle-${i}-${track.language}`,
-                name: track.label || `Track ${i + 1} (${track.language})`,
-                lang: track.language,
-                type: 'embedded'
-            });
-        }
-        setSubtitles(prev => [...prev.filter(p => p.type === 'external'), ...embeddedTracks]);
-    };
-
-    const onAddAudioTrack = () => {
-        if (!video.audioTracks) return;
-        const tracks: AudioTrack[] = [];
-        let hasEnabledTrack = false;
-        for (let i = 0; i < video.audioTracks.length; i++) {
-            const track = video.audioTracks[i];
-            tracks.push({
-                id: track.id || `embedded-audio-${i}-${track.language}`,
-                name: track.label || `Audio ${i + 1} (${track.language})`,
-                lang: track.language,
-            });
-            if(track.enabled) hasEnabledTrack = true;
-        }
-
-        // If no track is enabled by default, enable the first one.
-        if (!hasEnabledTrack && video.audioTracks.length > 0) {
-            video.audioTracks[0].enabled = true;
-        }
-        
-        const currentActive = tracks.find(t => {
-            const audioTrack = Array.from(video.audioTracks).find(at => at.id === t.id);
-            return audioTrack?.enabled;
-        });
-
-        setAudioTracks(tracks);
-        if (currentActive) {
-            setActiveAudioTrack(currentActive.id);
-        } else if(tracks.length > 0) {
-            setActiveAudioTrack(tracks[0].id)
-        }
-    };
-
     video.addEventListener("play", onPlay);
     video.addEventListener("pause", onPause);
     video.addEventListener("timeupdate", onTimeUpdate);
@@ -307,16 +307,6 @@ const NovaPlayer = () => {
     video.addEventListener("ended", onEnded);
     container?.addEventListener('fullscreenchange', onFullscreenChange);
 
-    if (video.textTracks) {
-        video.textTracks.addEventListener('addtrack', onAddTextTrack);
-    }
-    if (video.audioTracks) {
-        video.audioTracks.addEventListener('addtrack', onAddAudioTrack);
-    }
-
-    // Initial check in case tracks are already loaded
-    onAddTextTrack();
-    onAddAudioTrack();
 
     return () => {
       video.removeEventListener("play", onPlay);
@@ -325,12 +315,6 @@ const NovaPlayer = () => {
       video.removeEventListener("loadedmetadata", onLoadedMetadata);
       video.removeEventListener("ended", onEnded);
       container?.removeEventListener('fullscreenchange', onFullscreenChange);
-      if (video.textTracks) {
-        video.textTracks.removeEventListener('addtrack', onAddTextTrack);
-      }
-      if (video.audioTracks) {
-        video.audioTracks.removeEventListener('addtrack', onAddAudioTrack);
-      }
     };
   }, [currentVideo, loop, handleNext]);
 
@@ -398,7 +382,10 @@ const NovaPlayer = () => {
               onLoad={() => {
                 if (videoRef.current) {
                   const track = Array.from(videoRef.current.textTracks).find(t => t.label === sub.name);
-                  if (track) track.mode = activeSubtitle === sub.id ? "showing" : "hidden";
+                   if (track) {
+                    const trackId = track.label || sub.id;
+                    track.mode = activeSubtitle === trackId ? "showing" : "hidden";
+                  }
                 }
               }}
             />
