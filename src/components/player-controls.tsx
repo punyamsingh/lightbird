@@ -121,7 +121,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                   </RadioGroup>
               </PopoverContent>
             </Popover>
-            {audioTracks.length > 1 && (
+            {audioTracks.length > 0 && (
               <Popover>
                 <PopoverTrigger asChild>
                     <Button variant="ghost" size="icon" className="relative">
@@ -140,17 +140,17 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                 </PopoverContent>
               </Popover>
             )}
-            <Popover>
+            {subtitles.length > 0 && <Popover>
               <PopoverTrigger asChild>
                   <Button variant="ghost" size="icon" className="relative">
                       <Subtitles />
-                      {activeSubtitle !== 'off' && <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-primary ring-2 ring-background" />}
+                      {activeSubtitle !== '-1' && <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-primary ring-2 ring-background" />}
                   </Button>
               </PopoverTrigger>
               <PopoverContent>
                   <RadioGroup value={activeSubtitle} onValueChange={onSubtitleChange}>
                       <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="off" id="sub-off" />
+                          <RadioGroupItem value="-1" id="sub-off" />
                           <Label htmlFor="sub-off">Off</Label>
                       </div>
                       {subtitles.map(sub => (
@@ -161,7 +161,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                       ))}
                   </RadioGroup>
               </PopoverContent>
-            </Popover>
+            </Popover>}
             <Popover>
               <PopoverTrigger asChild><Button variant="ghost" size="icon"><Settings2 /></Button></PopoverTrigger>
               <PopoverContent className="w-64 space-y-4">
@@ -207,5 +207,3 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
 };
 
 export default PlayerControls;
-
-    

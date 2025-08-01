@@ -4,11 +4,12 @@ export interface PlaylistItem {
   name: string;
   url: string;
   type: 'video' | 'stream';
+  file?: File;
 }
 
 export interface Subtitle {
   id: string;
-  name: string;
+  name:string;
   lang: string;
   url?: string; // For external subtitles
   type: 'embedded' | 'external';
@@ -26,5 +27,3 @@ export interface VideoFilters {
   saturate: number;
   hue: number;
 }
-
-    

@@ -18,6 +18,35 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  webpack: (config, { isServer }) => {
+    // FFmpeg.wasm requires shared array buffers
+    config.output.webassemblyModuleFilename = (isServer ? '../' : '') + 'static/wasm/[modulehash].wasm'
+    config.experiments = { ...config.experiments, asyncWebAssembly: true, layers: true, topLevelAwait: true };
+    config.module.rules.push({
+      test: /\.wasm$/,
+      type: "webassembly/async",
+    });
+    
+    config.headers = async () => {
+      return [
+        {
+          source: '/:path*',
+          headers: [
+            {
+              key: 'Cross-Origin-Opener-Policy',
+              value: 'same-origin',
+            },
+            {
+              key: 'Cross-Origin-Embedder-Policy',
+              value: 'require-corp',
+            },
+          ],
+        },
+      ];
+    }
+    
+    return config
+  },
 };
 
 export default nextConfig;
