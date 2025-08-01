@@ -1,5 +1,7 @@
 
 import type {NextConfig} from 'next';
+import CopyPlugin from 'copy-webpack-plugin';
+import path from 'path';
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -38,6 +40,21 @@ const nextConfig: NextConfig = {
   },
   webpack: (config, { isServer }) => {
     config.experiments = { ...config.experiments, asyncWebAssembly: true, layers: true };
+    
+    if (!isServer) {
+        config.plugins = config.plugins || [];
+        config.plugins.push(
+            new CopyPlugin({
+                patterns: [
+                    {
+                        from: path.join(path.dirname(require.resolve('@ffmpeg/core/package.json')), 'dist/umd'),
+                        to: path.join(__dirname, 'public/vendor/ffmpeg'),
+                    },
+                ],
+            })
+        );
+    }
+    
     return config;
   },
 };

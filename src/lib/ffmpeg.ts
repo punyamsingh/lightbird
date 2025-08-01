@@ -35,14 +35,15 @@ export async function initFFmpeg(logCallback?: (message: string) => void): Promi
 
     if (logCallback) {
         instance.on('log', ({ message }) => {
+            if (message.startsWith('frame=')) return;
             logCallback(message);
         });
     }
     
     await instance.load({
-        coreURL: '/ffmpeg-core.js',
-        wasmURL: '/ffmpeg-core.wasm',
-        workerURL: '/ffmpeg-core.worker.js',
+        coreURL: '/vendor/ffmpeg/ffmpeg-core.js',
+        wasmURL: '/vendor/ffmpeg/ffmpeg-core.wasm',
+        workerURL: '/vendor/ffmpeg/ffmpeg-core.worker.js',
     });
 
     ffmpeg = instance;
@@ -63,7 +64,7 @@ export async function probeFile(ffmpeg: FFmpeg, file: File): Promise<FfmpegFile>
     ffmpeg.on('log', logListener);
 
     try {
-        await ffmpeg.exec(['-i', INPUT_FILENAME, '-f', 'null', '-']);
+        await ffmpeg.exec(['-i', INPUT_FILENAME, '-hide_banner']);
     } catch (e) {
         // This can happen and is fine, the logs are still captured.
     } finally {
@@ -119,10 +120,14 @@ export async function remuxFile(ffmpeg: FFmpeg, inputFilename: string, audioStre
     const args = [
         '-i', inputFilename,
         '-map', '0:v:0',
-        '-map', `0:a:${audioStreamIndex}`,
     ];
+
+    // Find the correct audio stream based on its *original* index
+    // ffmpeg a: selector is by the stream's type index, not its original index
+    args.push('-map', `0:a:${audioStreamIndex}`);
     
     if (subtitleStreamIndex !== undefined && subtitleStreamIndex >= 0) {
+        // Same for subtitles
         args.push('-map', `0:s:${subtitleStreamIndex}`);
         args.push('-c:s', 'mov_text'); 
     }
@@ -137,5 +142,3 @@ export async function remuxFile(ffmpeg: FFmpeg, inputFilename: string, audioStre
     const blob = new Blob([(data as Uint8Array).buffer], { type: 'video/mp4' });
     return URL.createObjectURL(blob);
 }
-
-    
