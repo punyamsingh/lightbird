@@ -1,3 +1,4 @@
+
 "use client";
 import React from "react";
 import type { Subtitle, VideoFilters } from "@/types";
@@ -38,7 +39,7 @@ interface PlayerControlsProps {
   onPrevious: () => void;
   onFiltersChange: (filters: VideoFilters) => void;
   onZoomChange: (zoom: number) => void;
-  onSubtitleChange: (url: string) => void;
+  onSubtitleChange: (id: string) => void;
 }
 
 const formatTime = (time: number) => {
@@ -131,9 +132,9 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                           <Label htmlFor="sub-off">Off</Label>
                       </div>
                       {subtitles.map(sub => (
-                          <div key={sub.url} className="flex items-center space-x-2">
-                              <RadioGroupItem value={sub.url} id={`sub-${sub.lang}`} />
-                              <Label htmlFor={`sub-${sub.lang}`}>{sub.name}</Label>
+                          <div key={sub.id} className="flex items-center space-x-2">
+                              <RadioGroupItem value={sub.id} id={`sub-${sub.id}`} />
+                              <Label htmlFor={`sub-${sub.id}`}>{sub.name}</Label>
                           </div>
                       ))}
                   </RadioGroup>
@@ -184,3 +185,5 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
 };
 
 export default PlayerControls;
+
+    

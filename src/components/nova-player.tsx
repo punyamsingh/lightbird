@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
@@ -68,7 +69,7 @@ const NovaPlayer = () => {
     const videoFiles: File[] = [];
     const subtitleFiles: File[] = [];
 
-    const videoExtensions = ['.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm'];
+    const videoExtensions = ['.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mp4'];
 
     Array.from(files).forEach(file => {
       const isVideo = file.type.startsWith("video/") || videoExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
@@ -98,12 +99,12 @@ const NovaPlayer = () => {
         const videoName = videoFiles[0].name.split('.').slice(0, -1).join('.');
         const matchingSub = subtitleFiles.find(sub => sub.name.startsWith(videoName));
         if (matchingSub) {
-            const newSub: Subtitle = { name: matchingSub.name, lang: 'en', url: URL.createObjectURL(matchingSub) };
+            const newSub: Subtitle = { name: matchingSub.name, lang: 'en', id: URL.createObjectURL(matchingSub), url: URL.createObjectURL(matchingSub), type: 'external' };
             setSubtitles([newSub]);
-            setActiveSubtitle(newSub.url);
+            setActiveSubtitle(newSub.id);
         }
     } else {
-        const newSubs = subtitleFiles.map((sub, i) => ({name: sub.name, lang: `sub${i+1}`, url: URL.createObjectURL(sub)}));
+        const newSubs: Subtitle[] = subtitleFiles.map((sub, i) => ({name: sub.name, lang: `sub${i+1}`, id: URL.createObjectURL(sub), url: URL.createObjectURL(sub), type: 'external' }));
         setSubtitles(s => [...s, ...newSubs]);
     }
   };
@@ -203,6 +204,17 @@ const NovaPlayer = () => {
     }
   };
   
+  const handleSubtitleChange = (id: string) => {
+    setActiveSubtitle(id);
+    if (!videoRef.current) return;
+
+    for (let i = 0; i < videoRef.current.textTracks.length; i++) {
+        const track = videoRef.current.textTracks[i];
+        const trackId = `embedded-${i}-${track.language}`;
+        track.mode = trackId === id ? 'showing' : 'hidden';
+    }
+  }
+
   useEffect(() => {
     const video = videoRef.current;
     const container = playerContainerRef.current;
@@ -219,6 +231,21 @@ const NovaPlayer = () => {
     const onLoadedMetadata = () => {
         setDuration(video.duration);
         setIsLoading(false);
+
+        const embeddedTracks: Subtitle[] = [];
+        if (video.textTracks) {
+            for (let i = 0; i < video.textTracks.length; i++) {
+                const track = video.textTracks[i];
+                track.mode = 'hidden'; // Hide all tracks by default
+                embeddedTracks.push({
+                    id: `embedded-${i}-${track.language}`,
+                    name: track.label || `Track ${i + 1} (${track.language})`,
+                    lang: track.language,
+                    type: 'embedded'
+                });
+            }
+        }
+        setSubtitles(prev => [...prev.filter(p => p.type === 'external'), ...embeddedTracks]);
     };
     const onEnded = () => {
         if (!loop) {
@@ -296,15 +323,16 @@ const NovaPlayer = () => {
           className="w-full h-full object-contain transition-all duration-300"
           loop={loop}
           onClick={handlePlayPause}
+          crossOrigin="anonymous"
         >
-          {subtitles.map(sub => (
+          {subtitles.filter(s => s.type === 'external').map(sub => (
             <track
-              key={sub.url}
+              key={sub.id}
               kind="subtitles"
               srcLang={sub.lang}
               src={sub.url}
               label={sub.name}
-              mode={activeSubtitle === sub.url ? "showing" : "hidden"}
+              mode={activeSubtitle === sub.id ? "showing" : "hidden"}
             />
           ))}
         </video>
@@ -343,7 +371,7 @@ const NovaPlayer = () => {
                 onPrevious={handlePrevious}
                 onFiltersChange={setFilters}
                 onZoomChange={setZoom}
-                onSubtitleChange={setActiveSubtitle}
+                onSubtitleChange={handleSubtitleChange}
              />
         )}
        
@@ -374,3 +402,5 @@ const NovaPlayer = () => {
 };
 
 export default NovaPlayer;
+
+    
