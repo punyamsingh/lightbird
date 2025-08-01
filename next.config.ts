@@ -1,3 +1,4 @@
+
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
@@ -18,33 +19,33 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async headers() {
+    return [
+        {
+            source: '/:path*',
+            headers: [
+                {
+                    key: 'Cross-Origin-Opener-Policy',
+                    value: 'same-origin',
+                },
+                {
+                    key: 'Cross-Origin-Embedder-Policy',
+                    value: 'require-corp',
+                },
+            ],
+        },
+    ];
+  },
   webpack: (config, { isServer }) => {
-    // FFmpeg.wasm requires shared array buffers
-    config.output.webassemblyModuleFilename = (isServer ? '../' : '') + 'static/wasm/[modulehash].wasm'
+    // Fix for ffmpeg.wasm
+    config.output.webassemblyModuleFilename = isServer
+      ? '../static/wasm/[modulehash].wasm'
+      : 'static/wasm/[modulehash].wasm';
     config.experiments = { ...config.experiments, asyncWebAssembly: true, layers: true, topLevelAwait: true };
     config.module.rules.push({
       test: /\.wasm$/,
       type: "webassembly/async",
     });
-    
-    config.headers = async () => {
-      return [
-        {
-          source: '/:path*',
-          headers: [
-            {
-              key: 'Cross-Origin-Opener-Policy',
-              value: 'same-origin',
-            },
-            {
-              key: 'Cross-Origin-Embedder-Policy',
-              value: 'require-corp',
-            },
-          ],
-        },
-      ];
-    }
-    
     return config
   },
 };
