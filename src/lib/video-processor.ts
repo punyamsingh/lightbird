@@ -1,8 +1,8 @@
 
 "use client";
 
-import { Demuxer, Muxer } from "web-demuxer";
-import { MP4Muxer } from 'mp4-muxer';
+import Demuxer from "web-demuxer";
+import { Muxer as MP4Muxer } from 'mp4-muxer';
 
 export interface ProcessedFile {
     name: string;
@@ -14,7 +14,7 @@ export interface ProcessedFile {
 }
 
 let demuxer: Demuxer | null = null;
-let muxer: Muxer | null = null;
+let muxer: MP4Muxer | null = null;
 let processedFile: ProcessedFile | null = null;
 
 export async function probeFile(file: File): Promise<ProcessedFile> {
@@ -51,20 +51,20 @@ export async function remuxFile(audioTrackIndex: number, subtitleTrackIndex: num
 
     let selectedSubtitleTrack = subtitleTrackIndex !== -1 ? processedFile.subtitleTracks[subtitleTrackIndex] : null;
 
-    muxer = new Muxer({
-        target: new MP4Muxer({}),
+    muxer = new MP4Muxer({
+        target: 'buffer',
         video: {
-            codec: processedFile.videoTrack.codec,
+            codec: 'avc',
             width: processedFile.videoTrack.width,
             height: processedFile.videoTrack.height,
         },
         audio: {
-            codec: selectedAudioTrack.codec,
+            codec: 'aac',
             sampleRate: selectedAudioTrack.sampleRate,
             numberOfChannels: selectedAudioTrack.numberOfChannels,
         },
         subtitle: selectedSubtitleTrack ? {
-            codec: selectedSubtitleTrack.codec,
+            codec: 'webvtt'
         } : undefined,
         fastStart: 'fragmented',
     });
@@ -92,13 +92,11 @@ export async function remuxFile(audioTrackIndex: number, subtitleTrackIndex: num
                 controller.enqueue(chunk);
             }
         }));
-        // We don't need to do anything with the stream after muxing
-        if(subtitleStream) await subtitleStream.pipeTo(new WritableStream());
+        if(subtitleStream) await subtitleStream.pipeTo(new WritableStream()).catch(e => console.error("Subtitle stream error:", e));
     }
 
-    // These pipes must not be awaited to allow playback to start quickly
-    if (videoStream) videoStream.pipeTo(new WritableStream());
-    if (audioStream) audioStream.pipeTo(new WritableStream());
+    if (videoStream) await videoStream.pipeTo(new WritableStream()).catch(e => console.error("Video stream error:", e));
+    if (audioStream) await audioStream.pipeTo(new WritableStream()).catch(e => console.error("Audio stream error:", e));
 
     const { buffer } = await muxer.finish();
     const blob = new Blob([buffer], { type: 'video/mp4' });
