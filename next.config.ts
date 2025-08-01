@@ -37,15 +37,7 @@ const nextConfig: NextConfig = {
     ];
   },
   webpack: (config, { isServer }) => {
-    // Fix for ffmpeg.wasm
-    config.output.webassemblyModuleFilename = isServer
-      ? '../static/wasm/[modulehash].wasm'
-      : 'static/wasm/[modulehash].wasm';
-    config.experiments = { ...config.experiments, asyncWebAssembly: true, layers: true, topLevelAwait: true };
-    config.module.rules.push({
-      test: /\.wasm$/,
-      type: "webassembly/async",
-    });
+    config.experiments = { ...config.experiments, asyncWebAssembly: true, layers: true };
     return config
   },
 };

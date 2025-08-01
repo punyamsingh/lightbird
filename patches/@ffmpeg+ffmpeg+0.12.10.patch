@@ -1,0 +1,16 @@
+patch-package
+--- a/node_modules/@ffmpeg/ffmpeg/dist/esm/classes.js
++++ b/node_modules/@ffmpeg/ffmpeg/dist/esm/classes.js
+@@ -102,7 +102,12 @@
+     #load = async (options = {}) => {
+         if (!this.#worker) {
+             this.#worker = classWorkerURL ?
+-                new Worker(new URL(classWorkerURL, import.meta.url), {
++                new Worker(new URL(classWorkerURL, (typeof document !== 'undefined' ? document.baseURI : 'http://localhost')
++                    .split('/')
++                    .slice(0, -1)
++                    .join('/') +
++                    '/'), {
+                     type: "module",
+                 }) :
+                 // We need to duplicated the code here to enable webpack

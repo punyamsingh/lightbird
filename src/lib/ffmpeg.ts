@@ -37,7 +37,7 @@ export async function initFFmpeg(logCallback?: (message: string) => void): Promi
 
     const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd'
 
-    logCallback?.("Loading ffmpeg core...");
+    logCallback?.("Loading ffmpeg-core.js...");
     await instance.load({
         coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
         wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
@@ -55,17 +55,22 @@ const OUTPUT_FILENAME = 'output.mp4';
 export async function probeFile(ffmpeg: FFmpeg, file: File): Promise<FfmpegFile> {
     await ffmpeg.writeFile(INPUT_FILENAME, await fetchFile(file));
 
-    const { result, exitCode } = await ffmpeg.exec([
+    const { logs, exitCode } = await ffmpeg.exec([
         '-v', 'quiet',
         '-print_format', 'json',
         '-show_streams',
         '-i', INPUT_FILENAME
-    ]);
+    ], undefined, {
+        logger: ({message}) => console.log(message)
+    });
 
     if (exitCode !== 0) {
         throw new Error('Failed to probe file');
     }
-
+    
+    // In @ffmpeg/ffmpeg v0.12, the JSON output is in the logs, not a return value
+    const result = logs.join('\n');
+    
     const probeData = JSON.parse(result);
     const streams = probeData.streams as FfmpegStream[];
 
