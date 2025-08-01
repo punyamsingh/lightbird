@@ -35,6 +35,7 @@ export async function initFFmpeg(logCallback?: (message: string) => void): Promi
         console.log(message);
     });
 
+    // Use a specific version for stability
     const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd'
 
     logCallback?.("Loading ffmpeg-core.js...");
@@ -55,16 +56,17 @@ const OUTPUT_FILENAME = 'output.mp4';
 export async function probeFile(ffmpeg: FFmpeg, file: File): Promise<FfmpegFile> {
     await ffmpeg.writeFile(INPUT_FILENAME, await fetchFile(file));
 
+    // The '-hide_banner' flag can make parsing easier
     const { logs, exitCode } = await ffmpeg.exec([
         '-v', 'quiet',
         '-print_format', 'json',
         '-show_streams',
         '-i', INPUT_FILENAME
-    ], undefined, {
-        logger: ({message}) => console.log(message)
-    });
+    ]);
+
 
     if (exitCode !== 0) {
+        console.error('ffmpeg probe exited with non-zero code:', exitCode, logs.join('\n'));
         throw new Error('Failed to probe file');
     }
     

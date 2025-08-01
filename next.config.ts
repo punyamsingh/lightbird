@@ -38,7 +38,18 @@ const nextConfig: NextConfig = {
   },
   webpack: (config, { isServer }) => {
     config.experiments = { ...config.experiments, asyncWebAssembly: true, layers: true };
-    return config
+
+    // This is required to make ffmpeg.wasm work.
+    // It makes sure that the worker files are copied to the public folder.
+    config.module.rules.push({
+      test: /ffmpeg.*\.js$/,
+      loader: 'file-loader',
+      options: {
+        name: 'static/media/[name].[hash].[ext]',
+      },
+    });
+
+    return config;
   },
 };
 
