@@ -21,6 +21,7 @@ export async function probeFile(file: File): Promise<ProcessedFile> {
   demuxer = new (Demuxer as any)({
     file,
     log: false,
+    wasmUrl: '/vendor/web-demuxer.wasm',
   });
 
   await demuxer.init();
