@@ -1,4 +1,4 @@
-import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { createFFmpeg, FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 
 let ffmpeg: FFmpeg | null = null;
@@ -29,8 +29,8 @@ export async function initFFmpeg(logCallback?: (message: string) => void): Promi
     if (ffmpeg) {
         return ffmpeg;
     }
-    const instance = new FFmpeg();
-    instance.on('log', ({ message }) => {
+    const instance = createFFmpeg({ log: true });
+    instance.setLogger(({ message }) => {
         if (logCallback) logCallback(message);
         console.log(message);
     });
@@ -57,37 +57,37 @@ export async function probeFile(ffmpeg: FFmpeg, file: File): Promise<FfmpegFile>
     await ffmpeg.writeFile(INPUT_FILENAME, await fetchFile(file));
 
     // The '-hide_banner' flag can make parsing easier
-    const { logs, exitCode } = await ffmpeg.exec([
+    await ffmpeg.exec([
         '-v', 'quiet',
         '-print_format', 'json',
         '-show_streams',
-        '-i', INPUT_FILENAME
+        '-i', INPUT_FILENAME,
+        '-f', 'null',
+        '-'
     ]);
 
+    const result = ffmpeg.getLogs().map(log => log.message).join('\n');
 
-    if (exitCode !== 0) {
-        console.error('ffmpeg probe exited with non-zero code:', exitCode, logs.join('\n'));
-        throw new Error('Failed to probe file');
+    try {
+        const probeData = JSON.parse(result);
+        const streams = probeData.streams as FfmpegStream[];
+
+        const videoStreams = streams.filter(s => s.codec_type === 'video');
+        const audioStreams = streams.filter(s => s.codec_type === 'audio');
+        const subtitleStreams = streams.filter(s => s.codec_type === 'subtitle');
+
+        return {
+            name: file.name,
+            streams: {
+                video: videoStreams,
+                audio: audioStreams,
+                subtitles: subtitleStreams,
+            }
+        };
+    } catch(e) {
+        console.error("Failed to parse FFmpeg probe output:", result);
+        throw new Error("Failed to parse video metadata.");
     }
-    
-    // In @ffmpeg/ffmpeg v0.12, the JSON output is in the logs, not a return value
-    const result = logs.join('\n');
-    
-    const probeData = JSON.parse(result);
-    const streams = probeData.streams as FfmpegStream[];
-
-    const videoStreams = streams.filter(s => s.codec_type === 'video');
-    const audioStreams = streams.filter(s => s.codec_type === 'audio');
-    const subtitleStreams = streams.filter(s => s.codec_type === 'subtitle');
-
-    return {
-        name: file.name,
-        streams: {
-            video: videoStreams,
-            audio: audioStreams,
-            subtitles: subtitleStreams,
-        }
-    };
 }
 
 export async function remuxFile(ffmpeg: FFmpeg, audioIndex: number, subtitleIndex: number): Promise<string> {

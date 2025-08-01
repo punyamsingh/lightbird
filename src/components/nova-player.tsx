@@ -46,15 +46,21 @@ const NovaPlayer = () => {
 
     useEffect(() => {
         const loadFFmpeg = async () => {
-            setLoadingMessage("Loading FFmpeg...");
-            const ffmpegInstance = await initFFmpeg((log) => {
-                 setLoadingMessage(log);
-            });
-            ffmpegRef.current = ffmpegInstance;
-            setLoadingMessage("");
+            try {
+                setLoadingMessage("Loading FFmpeg...");
+                const ffmpegInstance = await initFFmpeg((log) => {
+                     setLoadingMessage(log);
+                });
+                ffmpegRef.current = ffmpegInstance;
+                setLoadingMessage("");
+            } catch (error) {
+                console.error("Failed to load FFmpeg", error);
+                toast({ title: "FFmpeg Failed to Load", description: "The video processor could not be started.", variant: "destructive" });
+                setLoadingMessage("Error loading FFmpeg.");
+            }
         };
         loadFFmpeg();
-    }, []);
+    }, [toast]);
 
   const applyFilters = useCallback(() => {
     if (videoRef.current) {
@@ -80,7 +86,9 @@ const NovaPlayer = () => {
         setActiveSubtitle('-1');
         setActiveAudioTrack('0');
       } else {
-        // Local file, handled by onFileChange which calls processFile
+        if (video.file) {
+            processFile(video.file);
+        }
       }
     }
   };
@@ -93,51 +101,77 @@ const NovaPlayer = () => {
     setIsLoading(true);
     setLoadingMessage("Probing file...");
     
-    const ffmpegFile = await probeFile(ffmpegRef.current, file);
-    currentFileRef.current = ffmpegFile;
-    
-    const { audio, subtitles: probeSubs } = ffmpegFile.streams;
+    try {
+        const ffmpegFile = await probeFile(ffmpegRef.current, file);
+        currentFileRef.current = ffmpegFile;
+        
+        const { audio, subtitles: probeSubs } = ffmpegFile.streams;
 
-    const newAudioTracks: AudioTrack[] = audio.map((stream, i) => ({
-      id: String(i),
-      name: `Track ${i+1} (${stream.codec_long_name}, ${stream.channel_layout})`,
-      lang: stream.tags?.language || 'unknown',
-    }));
-    setAudioTracks(newAudioTracks);
-    setActiveAudioTrack('0');
+        const newAudioTracks: AudioTrack[] = audio.map((stream, i) => ({
+          id: String(stream.index),
+          name: `Track ${stream.index} (${stream.tags?.language || stream.codec_name})`,
+          lang: stream.tags?.language || 'unknown',
+        }));
+        setAudioTracks(newAudioTracks);
+        const firstAudioTrack = newAudioTracks[0]?.id || '0';
+        setActiveAudioTrack(firstAudioTrack);
 
-    const newSubtitleTracks: Subtitle[] = probeSubs.map((stream, i) => ({
-      id: String(i),
-      name: `Track ${i+1} (${stream.tags?.language || stream.codec_name})`,
-      lang: stream.tags?.language || 'unknown',
-      type: 'embedded'
-    }));
-    setSubtitles(newSubtitleTracks);
-    setActiveSubtitle('-1'); // Default to off
+        const newSubtitleTracks: Subtitle[] = probeSubs.map((stream, i) => ({
+          id: String(stream.index),
+          name: `Track ${stream.index} (${stream.tags?.language || stream.codec_name})`,
+          lang: stream.tags?.language || 'unknown',
+          type: 'embedded'
+        }));
+        setSubtitles(newSubtitleTracks);
+        setActiveSubtitle('-1'); // Default to off
 
-    setLoadingMessage("Remuxing video...");
-    await remuxAndPlay(0, -1); // Play with first audio, no subs
+        setLoadingMessage("Remuxing video...");
+        await remuxAndPlay(Number(firstAudioTrack), -1); // Play with first audio, no subs
+    } catch(error) {
+        console.error(error);
+        toast({ title: "Failed to process video", description: "There was an error analyzing the video file.", variant: "destructive" });
+        setIsLoading(false);
+        setLoadingMessage("");
+    }
   }
   
-  const remuxAndPlay = async (audioIndex: number, subtitleIndex: number) => {
+  const remuxAndPlay = async (audioStreamIndex: number, subtitleStreamIndex: number) => {
       if(!ffmpegRef.current || !currentFileRef.current) return;
+      
+      const audioTrack = currentFileRef.current.streams.audio.find(a => a.index === audioStreamIndex);
+      const subtitleTrack = currentFileRef.current.streams.subtitles.find(s => s.index === subtitleStreamIndex);
+
+      // We need the mapping from the original stream index to the output file index (which is 0-based for each type)
+      const audioOutputIndex = currentFileRef.current.streams.audio.findIndex(a => a.index === audioStreamIndex);
+      const subtitleOutputIndex = currentFileRef.current.streams.subtitles.findIndex(s => s.index === subtitleStreamIndex);
+
+      if (!audioTrack) {
+        toast({ title: "Audio track not found", variant: "destructive" });
+        return;
+      }
       
       setIsLoading(true);
       setLoadingMessage("Remuxing video...");
       
-      const outputUrl = await remuxFile(ffmpegRef.current, audioIndex, subtitleIndex);
-      if (videoRef.current) {
-          const currentTime = videoRef.current.currentTime;
-          const isPlaying = !videoRef.current.paused;
+      try {
+        const outputUrl = await remuxFile(ffmpegRef.current, audioOutputIndex, subtitleOutputIndex);
+        if (videoRef.current) {
+            const currentTime = videoRef.current.currentTime;
+            const wasPlaying = !videoRef.current.paused;
 
-          videoRef.current.src = outputUrl;
-          videoRef.current.load();
-          videoRef.current.addEventListener('loadedmetadata', () => {
-              videoRef.current!.currentTime = currentTime;
-              if (isPlaying) videoRef.current!.play();
-              setIsLoading(false);
-              setLoadingMessage("");
-          }, { once: true });
+            videoRef.current.src = outputUrl;
+            videoRef.current.load();
+            videoRef.current.addEventListener('loadedmetadata', () => {
+                videoRef.current!.currentTime = currentTime;
+                if (wasPlaying) videoRef.current!.play().catch(console.error);
+                setIsLoading(false);
+                setLoadingMessage("");
+            }, { once: true });
+        }
+      } catch (error) {
+          console.error(error);
+          toast({ title: "Failed to remux video", description: "Could not prepare the video for playback.", variant: "destructive" });
+          setIsLoading(false);
       }
   }
 
@@ -153,7 +187,9 @@ const NovaPlayer = () => {
 
     if (videoFiles.length === 0) return;
     
-    const videoFile = videoFiles[0]; // Process one at a time for now
+    // Clear the playlist and start fresh with the new file
+    setPlaylist([]);
+    const videoFile = videoFiles[0];
 
     const newPlaylistItem: PlaylistItem = {
       name: videoFile.name,
@@ -162,9 +198,8 @@ const NovaPlayer = () => {
       file: videoFile,
     };
     
-    setPlaylist(prev => [...prev, newPlaylistItem]);
-    const newIndex = playlist.length;
-    setCurrentVideoIndex(newIndex);
+    setPlaylist([newPlaylistItem]);
+    setCurrentVideoIndex(0);
     await processFile(videoFile);
   };
 
@@ -217,14 +252,14 @@ const NovaPlayer = () => {
   }
 
   const handleNext = useCallback(() => {
-      if (currentVideoIndex !== null) {
+      if (currentVideoIndex !== null && playlist.length > 1) {
           const nextIndex = (currentVideoIndex + 1) % playlist.length;
           loadVideo(nextIndex);
       }
-  }, [currentVideoIndex, playlist.length]);
+  }, [currentVideoIndex, playlist]);
   
   const handlePrevious = () => {
-      if (currentVideoIndex !== null) {
+      if (currentVideoIndex !== null && playlist.length > 1) {
           const prevIndex = (currentVideoIndex - 1 + playlist.length) % playlist.length;
           loadVideo(prevIndex);
       }
@@ -264,16 +299,18 @@ const NovaPlayer = () => {
   };
   
   const handleSubtitleChange = (id: string) => {
+    const subIndex = Number(id);
     setActiveSubtitle(id);
     if(currentVideo?.type === 'video') {
-        remuxAndPlay(Number(activeAudioTrack), Number(id));
+        remuxAndPlay(Number(activeAudioTrack), subIndex);
     }
   }
   
   const handleAudioTrackChange = (id: string) => {
+    const audioIndex = Number(id);
     setActiveAudioTrack(id);
     if(currentVideo?.type === 'video') {
-        remuxAndPlay(Number(id), Number(activeSubtitle));
+        remuxAndPlay(audioIndex, Number(activeSubtitle));
     }
   };
 
@@ -295,7 +332,10 @@ const NovaPlayer = () => {
         setIsLoading(false);
     };
     const onEnded = () => {
-        if (!loop) {
+        if (loop) {
+            video.currentTime = 0;
+            video.play();
+        } else {
             handleNext();
         }
     };
@@ -376,14 +416,14 @@ const NovaPlayer = () => {
         <canvas ref={canvasRef} className="hidden" />
 
         {(isLoading || loadingMessage) && (
-            <div className="absolute inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center text-white">
+            <div className="absolute inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center text-white z-10">
                 <div className="w-16 h-16 border-4 border-t-transparent border-primary rounded-full animate-spin"></div>
-                {loadingMessage && <p className="mt-4 text-lg">{loadingMessage}</p>}
+                {loadingMessage && <p className="mt-4 text-lg max-w-sm text-center">{loadingMessage}</p>}
                 {!loadingMessage && isLoading && <p className="mt-4 text-lg">Processing video...</p>}
             </div>
         )}
 
-        {currentVideo && !isLoading && (
+        {currentVideo && (
              <PlayerControls
                 isPlaying={isPlaying}
                 progress={progress}
@@ -417,11 +457,11 @@ const NovaPlayer = () => {
              />
         )}
        
-        {!currentVideo && !isLoading && (
+        {!currentVideo && !isLoading && !loadingMessage && (
             <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center text-muted-foreground">
                     <p className="text-2xl font-semibold">NOVA Player</p>
-                    <p>Select a video from the playlist to begin.</p>
+                    <p>Add a local file or stream to begin.</p>
                 </div>
             </div>
         )}
@@ -430,13 +470,7 @@ const NovaPlayer = () => {
         playlist={playlist}
         currentVideoIndex={currentVideoIndex}
         onSelectVideo={(index) => {
-            const video = playlist[index];
-            if (video.file) {
-                processFile(video.file);
-            } else {
-                loadVideo(index);
-            }
-            setCurrentVideoIndex(index);
+            loadVideo(index);
         }}
         onFilesAdded={handleFileChange}
         onAddStream={(url, name) => {
