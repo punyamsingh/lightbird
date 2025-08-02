@@ -1,4 +1,4 @@
-# **App Name**: NOVA
+# **App Name**: LightBird
 
 ## Core Features:
 
