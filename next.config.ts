@@ -1,7 +1,5 @@
 
 import type {NextConfig} from 'next';
-import CopyWebpackPlugin from 'copy-webpack-plugin';
-import path from 'path';
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -40,19 +38,6 @@ const nextConfig: NextConfig = {
   },
   webpack: (config, { isServer }) => {
     config.experiments = { ...config.experiments, asyncWebAssembly: true, layers: true };
-    
-    // Copy the wasm file to the public directory
-    config.plugins.push(
-      new CopyWebpackPlugin({
-        patterns: [
-          {
-            from: path.join(__dirname, "node_modules/web-demuxer/dist/web-demuxer.wasm"),
-            to: path.join(__dirname, "public/vendor"),
-          },
-        ],
-      })
-    );
-    
     return config;
   },
 };
