@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { probeFile, remuxFile, ProcessedFile } from "@/lib/video-processor";
 
 
-const NovaPlayer = () => {
+const LightBirdPlayer = () => {
   const [playlist, setPlaylist] = useState<PlaylistItem[]>([]);
   const [currentVideoIndex, setCurrentVideoIndex] = useState<number | null>(null);
   const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
@@ -271,7 +271,7 @@ const NovaPlayer = () => {
             const dataUrl = canvas.toDataURL('image/png');
             const a = document.createElement('a');
             a.href = dataUrl;
-            a.download = `nova-screenshot-${new Date().toISOString()}.png`;
+            a.download = `lightbird-screenshot-${new Date().toISOString()}.png`;
             a.click();
             toast({ title: "Screenshot Saved" });
         }
@@ -304,7 +304,7 @@ const NovaPlayer = () => {
     const onTimeUpdate = () => {
         setProgress(video.currentTime);
         if(currentVideo) {
-            localStorage.setItem(`novaplayer-${currentVideo.name}`, String(video.currentTime));
+            localStorage.setItem(`lightbirdplayer-${currentVideo.name}`, String(video.currentTime));
         }
     };
     const onLoadedMetadata = () => {
@@ -440,7 +440,7 @@ const NovaPlayer = () => {
         {!currentVideo && !isLoading && !loadingMessage && (
             <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center text-muted-foreground">
-                    <p className="text-2xl font-semibold">NOVA Player</p>
+                    <p className="text-2xl font-semibold">LightBird Player</p>
                     <p>Add a local file or stream to begin.</p>
                 </div>
             </div>
@@ -465,4 +465,4 @@ const NovaPlayer = () => {
   );
 };
 
-export default NovaPlayer;
+export default LightBirdPlayer;
