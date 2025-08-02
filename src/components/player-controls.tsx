@@ -9,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Label } from "@/components/ui/label";
 import {
   Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward,
-  FastForward, Rewind, RotateCcw, Settings2, Subtitles, Camera, AudioLines
+  FastForward, Rewind, RotateCcw, Settings2, Subtitles, Camera, AudioLines, Plus, X
 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 
@@ -43,6 +43,8 @@ interface PlayerControlsProps {
   onZoomChange: (zoom: number) => void;
   onSubtitleChange: (id: string) => void;
   onAudioTrackChange: (id: string) => void;
+  onSubtitleUpload?: () => void;
+  onSubtitleRemove?: (id: string) => void;
 }
 
 const formatTime = (time: number) => {
@@ -58,7 +60,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   filters, zoom, subtitles, activeSubtitle, audioTracks, activeAudioTrack,
   onPlayPause, onSeek, onVolumeChange, onMuteToggle, onPlaybackRateChange, onLoopToggle,
   onFullScreenToggle, onFrameStep, onScreenshot, onNext, onPrevious, onFiltersChange,
-  onZoomChange, onSubtitleChange, onAudioTrackChange,
+  onZoomChange, onSubtitleChange, onAudioTrackChange, onSubtitleUpload, onSubtitleRemove,
 }) => {
   return (
     <TooltipProvider>
@@ -140,28 +142,61 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                 </PopoverContent>
               </Popover>
             )}
-            {subtitles.length > 0 && <Popover>
+            <Popover>
               <PopoverTrigger asChild>
                   <Button variant="ghost" size="icon" className="relative">
                       <Subtitles />
                       {activeSubtitle !== '-1' && <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-primary ring-2 ring-background" />}
                   </Button>
               </PopoverTrigger>
-              <PopoverContent>
-                  <RadioGroup value={activeSubtitle} onValueChange={onSubtitleChange}>
-                      <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="-1" id="sub-off" />
-                          <Label htmlFor="sub-off">Off</Label>
+              <PopoverContent className="w-64">
+                  <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium">Subtitles</Label>
+                          <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={onSubtitleUpload}
+                              className="h-7 px-2"
+                          >
+                              <Plus className="h-3 w-3 mr-1" />
+                              Add
+                          </Button>
                       </div>
-                      {subtitles.map(sub => (
-                          <div key={sub.id} className="flex items-center space-x-2">
-                              <RadioGroupItem value={sub.id} id={`sub-${sub.id}`} />
-                              <Label htmlFor={`sub-${sub.id}`}>{sub.name}</Label>
-                          </div>
-                      ))}
-                  </RadioGroup>
+                      
+                      {subtitles.length > 0 ? (
+                          <RadioGroup value={activeSubtitle} onValueChange={onSubtitleChange}>
+                              <div className="flex items-center space-x-2">
+                                  <RadioGroupItem value="-1" id="sub-off" />
+                                  <Label htmlFor="sub-off">Off</Label>
+                              </div>
+                              {subtitles.map(sub => (
+                                  <div key={sub.id} className="flex items-center justify-between space-x-2">
+                                      <div className="flex items-center space-x-2 flex-1">
+                                          <RadioGroupItem value={sub.id} id={`sub-${sub.id}`} />
+                                          <Label htmlFor={`sub-${sub.id}`} className="truncate">{sub.name}</Label>
+                                      </div>
+                                      {sub.type === 'external' && onSubtitleRemove && (
+                                          <Button 
+                                              variant="ghost" 
+                                              size="sm" 
+                                              onClick={() => onSubtitleRemove(sub.id)}
+                                              className="h-6 w-6 p-0"
+                                          >
+                                              <X className="h-3 w-3" />
+                                          </Button>
+                                      )}
+                                  </div>
+                              ))}
+                          </RadioGroup>
+                      ) : (
+                          <p className="text-sm text-muted-foreground text-center py-2">
+                              No subtitles available
+                          </p>
+                      )}
+                  </div>
               </PopoverContent>
-            </Popover>}
+            </Popover>
             <Popover>
               <PopoverTrigger asChild><Button variant="ghost" size="icon"><Settings2 /></Button></PopoverTrigger>
               <PopoverContent className="w-64 space-y-4">

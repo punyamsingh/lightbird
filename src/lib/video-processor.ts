@@ -1,118 +1,106 @@
-
 "use client";
 
-import Demuxer from "web-demuxer";
-import { Muxer as MP4Muxer } from 'mp4-muxer';
+import { SimplePlayer, type SimplePlayerFile } from './players/simple-player';
+import { MKVPlayer, type MKVPlayerFile } from './players/mkv-player';
+import type { AudioTrack, Subtitle } from "@/types";
 
-export interface ProcessedFile {
-    name: string;
-    videoStream?: ReadableStream<VideoFrame>;
-    audioStream?: ReadableStream<AudioFrame>;
-    videoTrack?: any;
-    audioTracks: any[];
-    subtitleTracks: any[];
+export type ProcessedFile = SimplePlayerFile | MKVPlayerFile;
+
+export interface VideoPlayer {
+  initialize(videoElement: HTMLVideoElement): Promise<ProcessedFile>;
+  getAudioTracks(): AudioTrack[];
+  getSubtitles(): Subtitle[];
+  switchAudioTrack(trackId: string): Promise<void>;
+  switchSubtitle(trackId: string): Promise<void>;
+  destroy(): void;
 }
 
-let demuxer: Demuxer | null = null;
-let muxer: MP4Muxer | null = null;
-let processedFile: ProcessedFile | null = null;
+class SimplePlayerAdapter implements VideoPlayer {
+  private player: SimplePlayer;
 
-export async function probeFile(file: File): Promise<ProcessedFile> {
-  demuxer = new (Demuxer as any)({
-    file,
-    log: false,
-    wasmUrl: '/web-demuxer.wasm',
-  });
-
-  await demuxer.init();
-  const { video, audio, subtitles } = demuxer.streams;
-  
-  if (!video || video.length === 0) {
-    throw new Error("No video track found in the file.");
+  constructor(file: File, externalSubtitles: File[] = []) {
+    this.player = new SimplePlayer(file, externalSubtitles);
   }
-  
-  processedFile = {
-    name: file.name,
-    videoTrack: video[0],
-    audioTracks: audio,
-    subtitleTracks: subtitles,
-  };
-  
-  return processedFile;
+
+  async initialize(videoElement: HTMLVideoElement): Promise<ProcessedFile> {
+    return await this.player.initialize(videoElement);
+  }
+
+  getAudioTracks(): AudioTrack[] {
+    return this.player.getAudioTracks();
+  }
+
+  getSubtitles(): Subtitle[] {
+    return this.player.getSubtitles();
+  }
+
+  async switchAudioTrack(trackId: string): Promise<void> {
+    return await this.player.switchAudioTrack(trackId);
+  }
+
+  async switchSubtitle(trackId: string): Promise<void> {
+    return await this.player.switchSubtitle(trackId);
+  }
+
+  destroy(): void {
+    this.player.destroy();
+  }
 }
 
-export async function remuxFile(audioTrackIndex: number, subtitleTrackIndex: number = -1): Promise<string> {
-    if (!demuxer || !processedFile || !processedFile.videoTrack) {
-        throw new Error("File not probed or no video track available.");
-    }
+class MKVPlayerAdapter implements VideoPlayer {
+  private player: MKVPlayer;
 
-    const selectedAudioTrack = processedFile.audioTracks[audioTrackIndex];
-    if (!selectedAudioTrack) {
-        throw new Error(`Audio track with index ${audioTrackIndex} not found.`);
-    }
+  constructor(file: File) {
+    this.player = new MKVPlayer(file);
+  }
 
-    let selectedSubtitleTrack = subtitleTrackIndex !== -1 ? processedFile.subtitleTracks[subtitleTrackIndex] : null;
+  async initialize(videoElement: HTMLVideoElement): Promise<ProcessedFile> {
+    const result = await this.player.initialize();
+    await this.player.setVideoElement(videoElement);
+    return result;
+  }
 
-    muxer = new MP4Muxer({
-        target: 'buffer',
-        video: {
-            codec: 'avc',
-            width: processedFile.videoTrack.width,
-            height: processedFile.videoTrack.height,
-        },
-        audio: {
-            codec: 'aac',
-            sampleRate: selectedAudioTrack.sampleRate,
-            numberOfChannels: selectedAudioTrack.numberOfChannels,
-        },
-        subtitle: selectedSubtitleTrack ? {
-            codec: 'webvtt'
-        } : undefined,
-        fastStart: 'fragmented',
-    });
+  getAudioTracks(): AudioTrack[] {
+    return this.player.getAudioTracks();
+  }
 
-    const streams = await demuxer.start();
+  getSubtitles(): Subtitle[] {
+    return this.player.getSubtitles();
+  }
 
-    const videoStream = streams.video?.pipeThrough(new TransformStream({
-        transform(chunk, controller) {
-            muxer?.processVideo(chunk);
-            controller.enqueue(chunk);
-        }
-    }));
-    
-    const audioStream = streams.audio[audioTrackIndex]?.pipeThrough(new TransformStream({
-        transform(chunk, controller) {
-            muxer?.processAudio(chunk);
-            controller.enqueue(chunk);
-        }
-    }));
+  async switchAudioTrack(trackId: string): Promise<void> {
+    return await this.player.switchAudioTrack(trackId);
+  }
 
-    if (selectedSubtitleTrack && streams.subtitles && streams.subtitles[subtitleTrackIndex]) {
-        const subtitleStream = streams.subtitles[subtitleTrackIndex]?.pipeThrough(new TransformStream({
-            transform(chunk, controller) {
-                muxer?.processSubtitle(chunk);
-                controller.enqueue(chunk);
-            }
-        }));
-        if(subtitleStream) await subtitleStream.pipeTo(new WritableStream()).catch(e => console.error("Subtitle stream error:", e));
-    }
+  async switchSubtitle(trackId: string): Promise<void> {
+    return await this.player.switchSubtitle(trackId);
+  }
 
-    const videoWriter = videoStream?.getWriter();
-    const audioWriter = audioStream?.getWriter();
-    
-    const pump = async (writer: ReadableStreamDefaultWriter<any> | undefined) => {
-        if (!writer) return;
-        while(true) {
-            const { done } = await writer.read();
-            if (done) break;
-        }
-    }
+  destroy(): void {
+    this.player.destroy();
+  }
+}
 
-    await Promise.all([pump(videoWriter), pump(audioWriter)]);
+export function createVideoPlayer(file: File, externalSubtitles: File[] = []): VideoPlayer {
+  // Smart format detection
+  if (MKVPlayer.isCompatible(file)) {
+    return new MKVPlayerAdapter(file);
+  } else if (SimplePlayer.isCompatible(file)) {
+    return new SimplePlayerAdapter(file, externalSubtitles);
+  } else {
+    // Fallback to simple player for unknown formats
+    return new SimplePlayerAdapter(file, externalSubtitles);
+  }
+}
 
-    muxer.close();
-    const { buffer } = muxer.target;
+// Legacy functions for backward compatibility (will be removed)
+export async function probeFile(file: File): Promise<any> {
+  console.warn('probeFile is deprecated. Use createVideoPlayer instead.');
+  const player = createVideoPlayer(file);
+  return { name: file.name, audioTracks: [], subtitleTracks: [] };
+}
 
-    const blob = new Blob([buffer], { type: 'video/mp4' });
-    return URL.createObjectURL(blob);
+export async function remuxFile(audioTrackIndex: number, subtitleTrackIndex: number): Promise<string> {
+  console.warn('remuxFile is deprecated. Use createVideoPlayer instead.');
+  throw new Error('remuxFile is no longer supported. Use the new player system.');
 }

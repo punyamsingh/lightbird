@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
@@ -7,8 +6,8 @@ import { cn } from "@/lib/utils";
 import PlayerControls from "@/components/player-controls";
 import PlaylistPanel from "@/components/playlist-panel";
 import { useToast } from "@/hooks/use-toast";
-import { probeFile, remuxFile, ProcessedFile } from "@/lib/video-processor";
-
+import { createVideoPlayer, type VideoPlayer } from "@/lib/video-processor";
+import { UniversalSubtitleManager } from "@/lib/subtitle-manager";
 
 const LightBirdPlayer = () => {
   const [playlist, setPlaylist] = useState<PlaylistItem[]>([]);
@@ -17,7 +16,6 @@ const LightBirdPlayer = () => {
   const [activeSubtitle, setActiveSubtitle] = useState<string>("-1"); // -1 for off
   const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
   const [activeAudioTrack, setActiveAudioTrack] = useState<string>("0");
-
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -36,23 +34,13 @@ const LightBirdPlayer = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const currentFileRef = useRef<ProcessedFile | null>(null);
+  const currentPlayerRef = useRef<VideoPlayer | null>(null);
+  const subtitleManagerRef = useRef<UniversalSubtitleManager | null>(null);
+  const subtitleInputRef = useRef<HTMLInputElement>(null);
 
   const { toast } = useToast();
 
   const currentVideo = currentVideoIndex !== null ? playlist[currentVideoIndex] : null;
-
-    useEffect(() => {
-        // Compatibility check
-        if (!window.VideoDecoder || !window.AudioDecoder) {
-            toast({
-                title: "Browser Not Supported",
-                description: "Your browser does not support WebCodecs. Please use a modern browser like Chrome, Edge, or Opera.",
-                variant: "destructive",
-                duration: Infinity
-            });
-        }
-    }, [toast]);
 
   const applyFilters = useCallback(() => {
     if (videoRef.current) {
@@ -70,6 +58,12 @@ const LightBirdPlayer = () => {
       setCurrentVideoIndex(index);
       const video = playlist[index];
       if (video.type === 'stream') {
+        // Clean up old player
+        if (currentPlayerRef.current) {
+          currentPlayerRef.current.destroy();
+          currentPlayerRef.current = null;
+        }
+        
         if(videoRef.current) {
             videoRef.current.src = video.url;
         }
@@ -85,84 +79,84 @@ const LightBirdPlayer = () => {
     }
   };
 
-  const processFile = async (file: File) => {
+  const processFile = async (file: File, subtitleFiles: File[] = []) => {
     setIsLoading(true);
-    setLoadingMessage("Probing file...");
+    setLoadingMessage("Initializing player...");
     
     try {
-        const probedFile = await probeFile(file);
-        currentFileRef.current = probedFile;
+        // Clean up old player and subtitle manager
+        if (currentPlayerRef.current) {
+          currentPlayerRef.current.destroy();
+        }
+        if (subtitleManagerRef.current) {
+          subtitleManagerRef.current.destroy();
+        }
+
+        // Create new player based on file type
+        const player = createVideoPlayer(file, subtitleFiles);
+        currentPlayerRef.current = player;
+
+        if (!videoRef.current) {
+          throw new Error("Video element not available");
+        }
+
+        setLoadingMessage("Loading video...");
         
-        const newAudioTracks: AudioTrack[] = probedFile.audioTracks.map((track, idx) => ({
-          id: String(idx),
-          name: `Track ${idx + 1} (${track.tags?.language || track.codec})`,
-          lang: track.tags?.language || 'unknown',
-        }));
+        // Initialize the player
+        await player.initialize(videoRef.current);
+        
+        // Initialize universal subtitle manager
+        const subtitleManager = new UniversalSubtitleManager(videoRef.current);
+        subtitleManagerRef.current = subtitleManager;
+        
+        // Get tracks from the player
+        const newAudioTracks = player.getAudioTracks();
+        const playerSubtitleTracks = player.getSubtitles();
+        
+        // Import player subtitles into subtitle manager
+        subtitleManager.importSubtitles(playerSubtitleTracks);
+        
+        // Get combined subtitles from manager
+        const allSubtitles = subtitleManager.getSubtitles();
+        
         setAudioTracks(newAudioTracks);
+        setSubtitles(allSubtitles);
+        
+        // Set default active tracks
         const firstAudioTrackId = newAudioTracks[0]?.id || '0';
         setActiveAudioTrack(firstAudioTrackId);
-
-        const newSubtitleTracks: Subtitle[] = probedFile.subtitleTracks.map((track, idx) => ({
-          id: String(idx),
-          name: `Track ${idx + 1} (${track.tags?.language || track.codec})`,
-          lang: track.tags?.language || 'unknown',
-          type: 'embedded'
-        }));
-        setSubtitles(newSubtitleTracks);
         setActiveSubtitle('-1'); // Default to off
 
-        setLoadingMessage("Preparing video for playback...");
-        await remuxAndPlay(Number(firstAudioTrackId), -1);
+        setIsLoading(false);
+        setLoadingMessage("");
     } catch(error) {
         console.error(error);
-        toast({ title: "Failed to process video", description: "There was an error analyzing the video file. It might be an unsupported format.", variant: "destructive" });
+        toast({ 
+          title: "Failed to process video", 
+          description: "There was an error loading the video file. It might be an unsupported format.", 
+          variant: "destructive" 
+        });
         setIsLoading(false);
         setLoadingMessage("");
     }
-  }
-  
-  const remuxAndPlay = async (audioTrackIndex: number, subtitleTrackIndex: number) => {
-      if(!currentFileRef.current) return;
-
-      setIsLoading(true);
-      setLoadingMessage("Remuxing video...");
-      
-      try {
-        const outputUrl = await remuxFile(audioTrackIndex, subtitleTrackIndex);
-        if (videoRef.current) {
-            const currentTime = videoRef.current.currentTime;
-            const wasPlaying = !videoRef.current.paused;
-            
-            // Revoke old URL to free memory
-            const oldUrl = videoRef.current.src;
-            if (oldUrl.startsWith('blob:')) {
-                URL.revokeObjectURL(oldUrl);
-            }
-
-            videoRef.current.src = outputUrl;
-            videoRef.current.load();
-            videoRef.current.addEventListener('loadedmetadata', () => {
-                videoRef.current!.currentTime = currentTime;
-                if (wasPlaying) videoRef.current!.play().catch(console.error);
-                setIsLoading(false);
-                setLoadingMessage("");
-            }, { once: true });
-        }
-      } catch (error) {
-          console.error(error);
-          toast({ title: "Failed to remux video", description: "Could not prepare the video for playback.", variant: "destructive" });
-          setIsLoading(false);
-      }
-  }
-
+  };
 
   const handleFileChange = async (files: FileList) => {
     const videoFiles: File[] = [];
+    const subtitleFiles: File[] = [];
     const videoExtensions = ['.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mp4'];
+    const subtitleExtensions = ['.srt', '.vtt', '.ass', '.ssa'];
 
     Array.from(files).forEach(file => {
-      const isVideo = file.type.startsWith("video/") || videoExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
-      if (isVideo) videoFiles.push(file);
+      const fileName = file.name.toLowerCase();
+      const isVideo = file.type.startsWith("video/") || videoExtensions.some(ext => fileName.endsWith(ext));
+      const isSubtitle = subtitleExtensions.some(ext => fileName.endsWith(ext));
+      
+      if (isVideo) {
+        videoFiles.push(file);
+      } else if (isSubtitle) {
+        subtitleFiles.push(file);
+      }
     });
 
     if (videoFiles.length === 0) return;
@@ -180,7 +174,52 @@ const LightBirdPlayer = () => {
     
     setPlaylist([newPlaylistItem]);
     setCurrentVideoIndex(0);
-    await processFile(videoFile);
+    
+    // Create player with external subtitles if provided
+    await processFile(videoFile, subtitleFiles);
+  };
+
+  const handleSubtitlesAdded = async (files: FileList, videoIndex: number) => {
+    const targetVideo = playlist[videoIndex];
+    
+    if (!targetVideo?.file) {
+      toast({
+        title: "Invalid video",
+        description: "Cannot add subtitles to this video.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const subtitleFiles: File[] = [];
+    const subtitleExtensions = ['.srt', '.vtt', '.ass', '.ssa'];
+
+    Array.from(files).forEach(file => {
+      const fileName = file.name.toLowerCase();
+      const isSubtitle = subtitleExtensions.some(ext => fileName.endsWith(ext));
+      if (isSubtitle) {
+        subtitleFiles.push(file);
+      }
+    });
+
+    if (subtitleFiles.length === 0) {
+      toast({
+        title: "No valid subtitle files",
+        description: "Please select .srt, .vtt, .ass, or .ssa files.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // If this is the currently playing video, reload it with subtitles
+    if (videoIndex === currentVideoIndex) {
+      await processFile(targetVideo.file, subtitleFiles);
+    }
+    
+    toast({
+      title: "Subtitles added",
+      description: `Added ${subtitleFiles.length} subtitle file(s) to ${targetVideo.name}.`
+    });
   };
 
   const handlePlayPause = useCallback(() => {
@@ -220,7 +259,7 @@ const LightBirdPlayer = () => {
           videoRef.current.playbackRate = rate;
           setPlaybackRate(rate);
       }
-  }
+  };
 
   const handleFrameStep = (direction: 'forward' | 'backward') => {
       if(videoRef.current) {
@@ -229,14 +268,14 @@ const LightBirdPlayer = () => {
         const frameTime = 1 / (playbackRate * 30); // Assume 30fps
         videoRef.current.currentTime += direction === 'forward' ? frameTime : -frameTime;
       }
-  }
+  };
 
   const handleNext = useCallback(() => {
       if (currentVideoIndex !== null && playlist.length > 1) {
           const nextIndex = (currentVideoIndex + 1) % playlist.length;
           loadVideo(nextIndex);
       }
-  }, [currentVideoIndex, playlist, loadVideo]);
+  }, [currentVideoIndex, playlist]);
   
   const handlePrevious = () => {
       if (currentVideoIndex !== null && playlist.length > 1) {
@@ -278,20 +317,106 @@ const LightBirdPlayer = () => {
     }
   };
   
-  const handleSubtitleChange = (id: string) => {
-    const subIndex = Number(id);
+  const handleSubtitleChange = async (id: string) => {
     setActiveSubtitle(id);
-    if(currentVideo?.type === 'video') {
-        remuxAndPlay(Number(activeAudioTrack), subIndex);
+    
+    // Use subtitle manager for universal subtitle switching
+    if (subtitleManagerRef.current) {
+      subtitleManagerRef.current.switchSubtitle(id);
     }
-  }
+    
+    // For embedded subtitles (MKV), also use the player
+    if (currentPlayerRef.current) {
+      try {
+        await currentPlayerRef.current.switchSubtitle(id);
+      } catch (error) {
+        console.error("Player subtitle switch failed:", error);
+      }
+    }
+  };
   
-  const handleAudioTrackChange = (id: string) => {
-    const audioIndex = Number(id);
+  const handleAudioTrackChange = async (id: string) => {
     setActiveAudioTrack(id);
-    if(currentVideo?.type === 'video') {
-        remuxAndPlay(audioIndex, Number(activeSubtitle));
+    if (currentPlayerRef.current) {
+      try {
+        setIsLoading(true);
+        setLoadingMessage("Switching audio track...");
+        await currentPlayerRef.current.switchAudioTrack(id);
+        setIsLoading(false);
+        setLoadingMessage("");
+      } catch (error) {
+        console.error("Failed to switch audio track:", error);
+        toast({ title: "Failed to switch audio track", variant: "destructive" });
+        setIsLoading(false);
+        setLoadingMessage("");
+      }
     }
+  };
+
+  const handleSubtitleUpload = () => {
+    subtitleInputRef.current?.click();
+  };
+
+  const handleSubtitleRemove = async (id: string) => {
+    if (!subtitleManagerRef.current) return;
+    
+    const success = subtitleManagerRef.current.removeSubtitle(id);
+    if (success) {
+      // Update state
+      const updatedSubtitles = subtitleManagerRef.current.getSubtitles();
+      setSubtitles(updatedSubtitles);
+      
+      // If the removed subtitle was active, turn off subtitles
+      if (activeSubtitle === id) {
+        setActiveSubtitle('-1');
+        subtitleManagerRef.current.switchSubtitle('-1');
+      }
+      
+      toast({
+        title: "Subtitle removed",
+        description: "The subtitle track has been removed."
+      });
+    }
+  };
+
+  const handleSubtitleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || !subtitleManagerRef.current) return;
+
+    const subtitleFiles = Array.from(files).filter(file => {
+      const fileName = file.name.toLowerCase();
+      return ['.srt', '.vtt', '.ass', '.ssa'].some(ext => fileName.endsWith(ext));
+    });
+
+    if (subtitleFiles.length === 0) {
+      toast({
+        title: "No valid subtitle files",
+        description: "Please select .srt, .vtt, .ass, or .ssa files.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      await subtitleManagerRef.current.addSubtitleFiles(subtitleFiles);
+      const updatedSubtitles = subtitleManagerRef.current.getSubtitles();
+      setSubtitles(updatedSubtitles);
+      
+      toast({
+        title: "Subtitles added",
+        description: `Added ${subtitleFiles.length} subtitle file(s).`
+      });
+    } catch (error) {
+      console.error("Failed to add subtitles:", error);
+      toast({
+        title: "Failed to add subtitles",
+        description: "There was an error adding the subtitle files.",
+        variant: "destructive"
+      });
+    }
+
+    // Reset input
+    e.target.value = '';
   };
 
   useEffect(() => {
@@ -328,7 +453,6 @@ const LightBirdPlayer = () => {
     video.addEventListener("ended", onEnded);
     container?.addEventListener('fullscreenchange', onFullscreenChange);
 
-
     return () => {
       video.removeEventListener("play", onPlay);
       video.removeEventListener("pause", onPause);
@@ -338,7 +462,6 @@ const LightBirdPlayer = () => {
       container?.removeEventListener('fullscreenchange', onFullscreenChange);
     };
   }, [currentVideo, loop, handleNext]);
-
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -379,6 +502,14 @@ const LightBirdPlayer = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handlePlayPause, progress, volume]);
 
+  // Cleanup player on unmount
+  useEffect(() => {
+    return () => {
+      if (currentPlayerRef.current) {
+        currentPlayerRef.current.destroy();
+      }
+    };
+  }, []);
 
   return (
     <div className="flex flex-1 w-full h-full">
@@ -434,8 +565,20 @@ const LightBirdPlayer = () => {
                 onZoomChange={setZoom}
                 onSubtitleChange={handleSubtitleChange}
                 onAudioTrackChange={handleAudioTrackChange}
+                onSubtitleUpload={handleSubtitleUpload}
+                onSubtitleRemove={handleSubtitleRemove}
              />
         )}
+       
+        {/* Hidden subtitle upload input */}
+        <input
+          type="file"
+          ref={subtitleInputRef}
+          className="hidden"
+          multiple
+          accept=".vtt,.srt,.ass,.ssa"
+          onChange={handleSubtitleFilesSelected}
+        />
        
         {!currentVideo && !isLoading && !loadingMessage && (
             <div className="absolute inset-0 flex items-center justify-center">

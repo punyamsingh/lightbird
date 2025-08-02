@@ -1,32 +1,30 @@
 # LightBird Video Player
 
-LightBird is a modern, powerful, and feature-rich video player built with Next.js and WebCodecs. It's designed for high-performance playback of local video files directly in your browser, offering a seamless experience without relying on heavy libraries like FFmpeg.
+LightBird is a modern, lightweight, and feature-rich video player built with Next.js. It uses a smart two-player architecture: a simple native HTML5 player for common formats and an advanced FFmpeg.wasm-powered player specifically for complex containers like MKV with embedded tracks.
 
 ## Features
 
-- **Local File Playback**: Play a wide variety of video formats like `.mkv`, `.mp4`, `.avi`, and more.
-- **In-Browser Processing**: Uses modern browser APIs like WebCodecs and WebAssembly for efficient video demuxing and remuxing.
-- **Audio Track Selection**: Easily switch between different audio tracks embedded in your video files.
-- **Subtitle Support**: Select and display embedded subtitle tracks.
-- **Advanced Player Controls**: Includes controls for playback speed, volume, fullscreen, frame-by-frame stepping, and looping.
-- **Video Adjustments**: Fine-tune brightness, contrast, saturation, hue, and zoom.
-- **Playlist Management**: Add local files or online streams to a playlist.
-- **Screenshot Capture**: Instantly capture a frame from the video.
-- **Keyboard Shortcuts**: Control playback with familiar keyboard shortcuts.
+- **Dual Player Architecture**: Smart format detection for optimal performance
+- **MKV Master**: Advanced MKV support with instant embedded track switching
+- **Universal Playback**: Native HTML5 support for MP4, WebM, AVI, and more
+- **External Subtitle Support**: Drag & drop .srt, .vtt subtitle files
+- **Instant Track Switching**: Zero-delay audio and subtitle track changes for MKV
+- **Advanced Player Controls**: Speed control, volume, fullscreen, frame stepping, looping
+- **Video Adjustments**: Brightness, contrast, saturation, hue, and zoom controls
+- **Playlist Management**: Local files and online streaming support
+- **Screenshot Capture**: One-click frame capture
+- **Keyboard Shortcuts**: Full keyboard control support
 
 ## Tech Stack
 
 - **Framework**: [Next.js](https://nextjs.org/) (with React)
 - **Video Processing**:
-  - [web-demuxer](https://github.com/bilibili/web-demuxer): For demuxing media containers.
-  - [mp4-muxer](https://github.com/Vanilagy/mp4-muxer): For muxing video and audio streams into a playable format.
-  - [WebCodecs API](https://developer.mozilla.org/en-US/docs/Web/API/WebCodecs_API): For high-performance, browser-native video decoding.
+  - **Simple Player**: Native HTML5 `<video>` element for maximum compatibility
+  - **MKV Player**: [FFmpeg.wasm](https://ffmpegwasm.netlify.app/) for advanced container parsing
 - **UI**: [ShadCN UI](https://ui.shadcn.com/) & [Tailwind CSS](https://tailwindcss.com/)
 - **Icons**: [Lucide React](https://lucide.dev/guide/packages/lucide-react)
 
 ## Getting Started
-
-To get started with LightBird, follow these steps:
 
 1.  **Install dependencies**:
     ```bash
@@ -42,9 +40,17 @@ To get started with LightBird, follow these steps:
 
 ## How It Works
 
-LightBird leverages modern web technologies to process video files entirely within the browser.
+LightBird uses intelligent format detection to choose the optimal playback method:
 
-1.  When a user uploads a video file (e.g., an `.mkv`), `web-demuxer` is used to demultiplex the container into its constituent video, audio, and subtitle streams.
-2.  The user is presented with UI options to select their desired audio and subtitle tracks.
-3.  Based on the selection, `mp4-muxer` remuxes the chosen streams into a standard MP4 format.
-4.  The resulting MP4 is converted into a Blob URL, which is then passed to a standard HTML `<video>` element for playback, with all processing handled efficiently on the client side.
+### Simple Player (MP4, WebM, AVI, etc.)
+- Uses native HTML5 `<video>` element for instant playback
+- Supports external subtitle files via drag & drop
+- Zero processing overhead, maximum compatibility
+
+### MKV Player (Advanced)
+- FFmpeg.wasm extracts all embedded track metadata (2-3 second initial load)
+- Pre-caches subtitle tracks for instant switching
+- Creates audio switching points for near-instant audio track changes
+- User Experience: Initial load ~2-3 seconds, then all track switching is instant
+
+The system automatically detects file format and routes to the appropriate player, giving you the best of both worlds: instant playback for common formats and advanced features for complex containers.
