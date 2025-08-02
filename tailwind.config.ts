@@ -10,8 +10,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        body: ['"Source Sans Pro"', 'sans-serif'],
-        headline: ['"Source Sans Pro"', 'sans-serif'],
+        body: ['Roboto', 'sans-serif'],
+        headline: ['Orbitron', 'sans-serif'],
         code: ['monospace'],
       },
       colors: {
