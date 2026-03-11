@@ -1,4 +1,21 @@
-# Plan 07 — Advanced Subtitle Support
+# Plan 07 — Advanced Subtitle Support [DONE]
+
+## Implementation Summary (2026-03-11)
+
+All four goals implemented:
+
+1. **Encoding detection** (`chardet` package) — `readSubtitleFile()` in `subtitle-manager.ts` reads any subtitle file's raw bytes, detects encoding via `chardet.detect()`, and decodes with the correct `TextDecoder`. Fixes Windows-1252 / ISO-8859-1 / Shift-JIS garbled text.
+
+2. **Subtitle sync offset** — New `src/lib/subtitle-offset.ts` provides `shiftTimestamp()` and `applyOffsetToVtt()`. `UniversalSubtitleManager.setOffset(id, seconds)` regenerates the blob URL with shifted timestamps. A ±30 s slider in the subtitles popover (shown only for non-ASS active subtitles) calls `onSubtitleOffsetChange` → `handleSubtitleOffsetChange` → `setOffset`.
+
+3. **ASS/SSA canvas renderer** — New `src/lib/ass-renderer.ts` uses `ass-compiler` (`compile()`) to render styled subtitles on a `<canvas>` overlay (absolute-positioned over the video). `LightBirdPlayer` starts/stops an `ASSRenderer` instance when ASS/SSA subtitles are activated. No `<track>` element is created for these files.
+
+4. **Subtitle cue search** — `parseVttCues()` in `subtitle-manager.ts` builds a `SubtitleCue[]` index from VTT text. The subtitles popover includes a search field that `useMemo`-filters cues case-insensitively; each result shows the timestamp and, when clicked, seeks the video via `onSubtitleSeek`.
+
+New files: `src/lib/subtitle-offset.ts`, `src/lib/ass-renderer.ts`
+Modified: `src/lib/subtitle-manager.ts`, `src/components/player-controls.tsx`, `src/components/lightbird-player.tsx`, `src/types/index.ts`, `jest.setup.ts`
+New tests: `src/lib/__tests__/subtitle-offset.test.ts`, `src/lib/__tests__/subtitle-manager-advanced.test.ts`
+New dependencies: `chardet`, `ass-compiler`
 
 ## Problem
 

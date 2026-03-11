@@ -1,5 +1,14 @@
 import '@testing-library/jest-dom';
 
+// Make Node's TextEncoder/TextDecoder available in the jsdom test environment
+import { TextEncoder, TextDecoder } from 'util';
+if (typeof global.TextDecoder === 'undefined') {
+  (global as any).TextDecoder = TextDecoder;
+}
+if (typeof global.TextEncoder === 'undefined') {
+  (global as any).TextEncoder = TextEncoder;
+}
+
 // Mock URL methods unavailable in jsdom
 Object.defineProperty(global.URL, 'createObjectURL', {
   value: jest.fn(() => `blob:mock-${Math.random()}`),
@@ -39,6 +48,18 @@ if (typeof Blob !== 'undefined' && !Blob.prototype.text) {
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = reject;
       reader.readAsText(this);
+    });
+  };
+}
+
+// Polyfill Blob.arrayBuffer() — jsdom 26 does not implement it
+if (typeof Blob !== 'undefined' && !Blob.prototype.arrayBuffer) {
+  Blob.prototype.arrayBuffer = function (): Promise<ArrayBuffer> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as ArrayBuffer);
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(this);
     });
   };
 }
