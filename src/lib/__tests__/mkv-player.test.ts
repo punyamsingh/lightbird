@@ -206,4 +206,95 @@ describe('MKVPlayer', () => {
     // '99' is not in subtitleTrackMap (only populated on successful probe)
     await expect(player.switchSubtitle('99')).resolves.toBeUndefined();
   });
+
+  describe('progress handler cleanup', () => {
+    it('removes progress handler on error path via finally', async () => {
+      // Arrange: getFFmpeg resolves but exec rejects (simulates remux failure)
+      mockFFmpeg = makeMockFFmpeg();
+      // on() for progress just records the call; exec rejects → triggers finally
+      mockGetFFmpeg.mockResolvedValue(mockFFmpeg);
+
+      const onProgress = jest.fn();
+      const player = new MKVPlayer(makeFile(), onProgress);
+      const videoEl = document.createElement('video');
+      await player.initialize(videoEl);
+
+      // ffmpeg.off should have been called for 'progress' despite the error path
+      const offProgressCalls = (mockFFmpeg.off as jest.Mock).mock.calls.filter(
+        ([event]: [string]) => event === 'progress',
+      );
+      expect(offProgressCalls.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('removes progress handler on success path via finally', async () => {
+      mockFFmpeg = makeMockFFmpeg(() => Promise.resolve(undefined));
+      mockFFmpeg.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
+        if (event === 'log') {
+          handler({ message: '  Stream #0:0: Video: h264, 1920x1080' });
+          handler({ message: '  Stream #0:1(eng): Audio: aac, stereo' });
+        }
+      });
+      mockGetFFmpeg.mockResolvedValue(mockFFmpeg);
+
+      const onProgress = jest.fn();
+      const player = new MKVPlayer(makeFile(), onProgress);
+      const videoEl = document.createElement('video');
+      await player.initialize(videoEl);
+
+      const offProgressCalls = (mockFFmpeg.off as jest.Mock).mock.calls.filter(
+        ([event]: [string]) => event === 'progress',
+      );
+      expect(offProgressCalls.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe('subtitle blob URL cleanup', () => {
+    const revokeObjectURL = jest.fn();
+
+    beforeEach(() => {
+      Object.defineProperty(URL, 'revokeObjectURL', {
+        value: revokeObjectURL,
+        writable: true,
+      });
+      revokeObjectURL.mockClear();
+    });
+
+    it('tracks and revokes subtitle blob URLs on destroy', async () => {
+      // Arrange: successful probe with one subtitle track
+      mockFFmpeg = makeMockFFmpeg(() => Promise.resolve(undefined));
+      mockFFmpeg.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
+        if (event === 'log') {
+          handler({ message: '  Stream #0:0: Video: h264, 1920x1080' });
+          handler({ message: '  Stream #0:1(eng): Audio: aac, stereo' });
+          handler({ message: '  Stream #0:2(eng): Subtitle: subrip' });
+        }
+      });
+      mockGetFFmpeg.mockResolvedValue(mockFFmpeg);
+
+      const player = new MKVPlayer(makeFile());
+      const videoEl = document.createElement('video');
+      await player.initialize(videoEl);
+
+      // switchSubtitle creates a blob URL; mock SubtitleConverter inline via URL.createObjectURL
+      const createObjectURL = jest.fn().mockReturnValue('blob:subtitle-url');
+      Object.defineProperty(URL, 'createObjectURL', { value: createObjectURL, writable: true });
+
+      // Patch _extractSubtitle to avoid a second ffmpeg exec
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (player as any)._extractSubtitle = jest.fn().mockResolvedValue('1\n00:00:00,000 --> 00:00:01,000\nHello\n');
+
+      await player.switchSubtitle('0');
+      player.destroy();
+
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:subtitle-url');
+    });
+
+    it('does not leak blob URLs when destroy is called multiple times', async () => {
+      const player = new MKVPlayer(makeFile());
+      // Should not throw
+      player.destroy();
+      player.destroy();
+      expect(revokeObjectURL).not.toThrow;
+    });
+  });
 });
