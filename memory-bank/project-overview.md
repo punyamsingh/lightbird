@@ -1,7 +1,7 @@
 # LightBird — Project Overview
 
 > **Last updated:** 2026-03-11
-> **Branch context:** Plans 01 (Test Suite), 02 (MKV / FFmpeg.wasm), 03 (Refactor), and 04 (Performance Optimisation) implemented.
+> **Branch context:** Plans 01 (Test Suite), 02 (MKV / FFmpeg.wasm), 03 (Refactor), 04 (Performance Optimisation), and 05 (Error Handling) implemented.
 
 ---
 
@@ -26,10 +26,12 @@ The factory function `createVideoPlayer(file)` in `src/lib/video-processor.ts` s
 
 ```
 src/app/page.tsx
-└── src/components/lightbird-player.tsx   (thin coordinator, ~220 lines after Plan 03)
-    ├── src/components/player-controls.tsx
-    ├── src/components/playlist-panel.tsx
-    └── src/components/video-overlay.tsx  (NEW — loading spinner overlay)
+└── src/components/player-error-boundary.tsx  (React error boundary, Plan 05)
+    └── src/components/lightbird-player.tsx   (thin coordinator)
+        ├── src/components/player-controls.tsx
+        ├── src/components/playlist-panel.tsx
+        ├── src/components/video-overlay.tsx  (loading spinner overlay)
+        └── src/components/player-error-display.tsx  (error overlay, Plan 05)
 ```
 
 ### Custom Hooks (added in Plan 03)
@@ -55,6 +57,9 @@ src/app/page.tsx
 | `src/lib/ffmpeg-singleton.ts` | Lazy-loaded shared FFmpeg.wasm instance (CDN fetch on first MKV load) |
 | `src/types/index.ts` | Shared TypeScript interfaces |
 | `src/components/video-overlay.tsx` | Loading/processing overlay component |
+| `src/lib/media-error.ts` | `parseMediaError` + `validateFile` (Plan 05) |
+| `src/components/player-error-display.tsx` | Error overlay with Retry/Skip/Dismiss (Plan 05) |
+| `src/components/player-error-boundary.tsx` | React class Error Boundary (Plan 05) |
 
 ---
 
@@ -72,7 +77,7 @@ src/app/page.tsx
 
 ### Known limitations / not yet implemented
 - **MKV FFmpeg.wasm** — implemented (Plan 02); FFmpeg core loaded from unpkg CDN (~31 MB); for production, copy assets to `/public/ffmpeg/` to avoid CDN dependency.
-- **No error handling** — media errors are not surfaced to the user (Plan 05).
+- **Error handling implemented** — Plan 05 done; see `src/lib/media-error.ts`, `PlayerErrorDisplay`, `PlayerErrorBoundary`.
 - **No playlist persistence** — playlist is lost on page refresh (Plan 06).
 - **No advanced subtitle formats** — ASS/SSA not supported; no sync offset (Plan 07).
 - **No keyboard customisation** — shortcuts are hardcoded (Plan 08).
@@ -100,8 +105,11 @@ npm run test:coverage # with coverage report
 | `src/lib/__tests__/subtitle-manager.test.ts` | Add/remove/clear subtitles, DOM track elements |
 | `src/lib/__tests__/ffmpeg-singleton.test.ts` | Singleton lifecycle, lazy loading, reset |
 | `src/lib/__tests__/mkv-player.test.ts` | parseStreamInfo, MKVPlayer fallback, progress, embedded subs |
+| `src/lib/__tests__/media-error.test.ts` | parseMediaError all codes, validateFile extension/size checks |
 | `src/components/__tests__/player-controls.test.tsx` | Control buttons, speed selector, callbacks |
 | `src/components/__tests__/playlist-panel.test.tsx` | Empty state, item rendering, selection, stream URL |
+| `src/components/__tests__/player-error-display.test.tsx` | Error display rendering, button callbacks |
+| `src/components/__tests__/player-error-boundary.test.tsx` | Error boundary fallback UI, reset |
 
 CI runs on every push and PR via `.github/workflows/test.yml`.
 
@@ -115,7 +123,7 @@ CI runs on every push and PR via `.github/workflows/test.yml`.
 | 02 | MKV / FFmpeg.wasm Integration | **DONE** |
 | 03 | Refactor `lightbird-player.tsx` | **DONE** |
 | 04 | Performance Optimisation | **DONE** |
-| 05 | Error Handling & Recovery | Pending |
+| 05 | Error Handling & Recovery | **DONE** |
 | 06 | Playlist Management (DnD, M3U8, persistence) | Pending |
 | 07 | Advanced Subtitle Support (ASS/SSA, offset) | Pending |
 | 08 | Keyboard Customisation | Pending |
