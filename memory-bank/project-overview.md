@@ -1,7 +1,7 @@
 # LightBird — Project Overview
 
 > **Last updated:** 2026-03-11
-> **Branch context:** Plans 01 (Test Suite) and 02 (MKV / FFmpeg.wasm) implemented.
+> **Branch context:** Plans 01 (Test Suite), 02 (MKV / FFmpeg.wasm), and 03 (Refactor) implemented.
 
 ---
 
@@ -26,10 +26,23 @@ The factory function `createVideoPlayer(file)` in `src/lib/video-processor.ts` s
 
 ```
 src/app/page.tsx
-└── src/components/lightbird-player.tsx   (main, 612 lines — refactor planned in Plan 03)
+└── src/components/lightbird-player.tsx   (thin coordinator, ~220 lines after Plan 03)
     ├── src/components/player-controls.tsx
-    └── src/components/playlist-panel.tsx
+    ├── src/components/playlist-panel.tsx
+    └── src/components/video-overlay.tsx  (NEW — loading spinner overlay)
 ```
+
+### Custom Hooks (added in Plan 03)
+
+| Hook | Responsibility |
+|---|---|
+| `src/hooks/use-video-playback.ts` | Play/pause/seek/volume/rate state + video event listeners |
+| `src/hooks/use-video-filters.ts` | Brightness/contrast/saturation/hue/zoom state + CSS application |
+| `src/hooks/use-subtitles.ts` | Subtitle list, UniversalSubtitleManager lifecycle, add/remove/switch |
+| `src/hooks/use-playlist.ts` | Playlist array, current index, file parsing |
+| `src/hooks/use-keyboard-shortcuts.ts` | Keyboard event registration (Space/Arrows/M/F) |
+| `src/hooks/use-fullscreen.ts` | Fullscreen enter/exit/detect |
+| `src/hooks/use-progress-persistence.ts` | localStorage save (debounced 5s) and restore |
 
 ### Supporting Libraries
 
@@ -41,6 +54,7 @@ src/app/page.tsx
 | `src/lib/players/mkv-player.ts` | MKV player — probes with FFmpeg, remuxes to MP4, extracts embedded subtitles |
 | `src/lib/ffmpeg-singleton.ts` | Lazy-loaded shared FFmpeg.wasm instance (CDN fetch on first MKV load) |
 | `src/types/index.ts` | Shared TypeScript interfaces |
+| `src/components/video-overlay.tsx` | Loading/processing overlay component |
 
 ---
 
@@ -99,7 +113,7 @@ CI runs on every push and PR via `.github/workflows/test.yml`.
 |---|---|---|
 | 01 | Test Suite (Jest + RTL) | **DONE** |
 | 02 | MKV / FFmpeg.wasm Integration | **DONE** |
-| 03 | Refactor `lightbird-player.tsx` | Pending |
+| 03 | Refactor `lightbird-player.tsx` | **DONE** |
 | 04 | Performance Optimisation | Pending |
 | 05 | Error Handling & Recovery | Pending |
 | 06 | Playlist Management (DnD, M3U8, persistence) | Pending |
@@ -131,7 +145,7 @@ Full plan details: `memory-bank/plans/01-test-suite.md` … `10-codebase-cleanup
 
 ## Key Architectural Decisions
 
-1. **No Redux/Zustand** — all state managed via React hooks in `lightbird-player.tsx`. Plan 03 will extract state into custom hooks.
+1. **No Redux/Zustand** — state is managed via focused custom hooks (Plan 03). Each domain (playback, filters, subtitles, playlist, fullscreen) has its own hook; `lightbird-player.tsx` is a thin coordinator.
 
 2. **Client-side only** — all video processing and playback happens in the browser. No server-side video handling.
 
