@@ -1,7 +1,7 @@
 # LightBird — Project Overview
 
 > **Last updated:** 2026-03-11
-> **Branch context:** Plans 01 (Test Suite), 02 (MKV / FFmpeg.wasm), and 03 (Refactor) implemented.
+> **Branch context:** Plans 01 (Test Suite), 02 (MKV / FFmpeg.wasm), 03 (Refactor), and 04 (Performance Optimisation) implemented.
 
 ---
 
@@ -114,7 +114,7 @@ CI runs on every push and PR via `.github/workflows/test.yml`.
 | 01 | Test Suite (Jest + RTL) | **DONE** |
 | 02 | MKV / FFmpeg.wasm Integration | **DONE** |
 | 03 | Refactor `lightbird-player.tsx` | **DONE** |
-| 04 | Performance Optimisation | Pending |
+| 04 | Performance Optimisation | **DONE** |
 | 05 | Error Handling & Recovery | Pending |
 | 06 | Playlist Management (DnD, M3U8, persistence) | Pending |
 | 07 | Advanced Subtitle Support (ASS/SSA, offset) | Pending |
@@ -131,6 +131,7 @@ Full plan details: `memory-bank/plans/01-test-suite.md` … `10-codebase-cleanup
 | Layer | Technology | Version |
 |---|---|---|
 | Framework | Next.js (App Router) | 15.5.9 |
+| List virtualisation | @tanstack/react-virtual | ^3.x |
 | UI library | React | 18.3.1 |
 | Language | TypeScript | 5.x |
 | Styling | Tailwind CSS + ShadCN UI | 3.4.1 |

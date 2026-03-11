@@ -1,6 +1,6 @@
 
 "use client";
-import React from "react";
+import React, { useMemo } from "react";
 import type { Subtitle, VideoFilters, AudioTrack } from "@/types";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
@@ -55,13 +55,16 @@ const formatTime = (time: number) => {
   return timeString.startsWith("00:") ? timeString.substr(3) : timeString;
 };
 
-const PlayerControls: React.FC<PlayerControlsProps> = ({
+export const PlayerControls = React.memo(function PlayerControls({
   isPlaying, progress, duration, volume, isMuted, playbackRate, loop, isFullScreen,
   filters, zoom, subtitles, activeSubtitle, audioTracks, activeAudioTrack,
   onPlayPause, onSeek, onVolumeChange, onMuteToggle, onPlaybackRateChange, onLoopToggle,
   onFullScreenToggle, onFrameStep, onScreenshot, onNext, onPrevious, onFiltersChange,
   onZoomChange, onSubtitleChange, onAudioTrackChange, onSubtitleUpload, onSubtitleRemove,
-}) => {
+}: PlayerControlsProps) {
+  const formattedProgress = useMemo(() => formatTime(progress), [progress]);
+  const formattedDuration = useMemo(() => formatTime(duration), [duration]);
+
   return (
     <TooltipProvider>
       <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col gap-2">
@@ -96,7 +99,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
               </Tooltip>
               <Slider value={[isMuted ? 0 : volume]} max={1} step={0.05} onValueChange={([val]) => onVolumeChange(val)} className="w-24" />
             </div>
-            <span className="font-mono text-sm">{formatTime(progress)} / {formatTime(duration)}</span>
+            <span className="font-mono text-sm">{formattedProgress} / {formattedDuration}</span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -239,6 +242,6 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
       </div>
     </TooltipProvider>
   );
-};
+});
 
 export default PlayerControls;

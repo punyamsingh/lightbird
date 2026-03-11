@@ -1,8 +1,6 @@
 "use client";
 
 import type { AudioTrack, Subtitle } from "@/types";
-import { getFFmpeg } from "@/lib/ffmpeg-singleton";
-import { fetchFile } from "@ffmpeg/util";
 import { SubtitleConverter } from "@/lib/subtitle-converter";
 
 export interface MKVPlayerFile {
@@ -81,6 +79,8 @@ export class MKVPlayer {
     this.videoElement = videoElement;
 
     try {
+      const { getFFmpeg } = await import('@/lib/ffmpeg-singleton');
+      const { fetchFile } = await import('@ffmpeg/util');
       const ffmpeg = await getFFmpeg();
 
       const progressHandler = ({ progress }: { progress: number }) => {
@@ -155,6 +155,7 @@ export class MKVPlayer {
   }
 
   private async _remux(audioTrackIndex: number): Promise<string> {
+    const { getFFmpeg } = await import('@/lib/ffmpeg-singleton');
     const ffmpeg = await getFFmpeg();
     const outputName = `output_${Date.now()}.mp4`;
 
@@ -182,6 +183,7 @@ export class MKVPlayer {
   }
 
   private async _extractSubtitle(trackIndex: number): Promise<string> {
+    const { getFFmpeg } = await import('@/lib/ffmpeg-singleton');
     const ffmpeg = await getFFmpeg();
     const outputName = `subtitle_${trackIndex}_${Date.now()}.srt`;
 
