@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import type { PlaylistItem, AudioTrack } from "@/types";
 import { cn } from "@/lib/utils";
 import PlayerControls from "@/components/player-controls";
-import PlaylistPanel from "@/components/playlist-panel";
+import PlaylistPanel, { type PlaylistSize } from "@/components/playlist-panel";
 import { VideoOverlay } from "@/components/video-overlay";
 import { useToast } from "@/hooks/use-toast";
 import { createVideoPlayer, type VideoPlayer } from "@/lib/video-processor";
@@ -39,7 +39,12 @@ const LightBirdPlayer = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [processingProgress, setProcessingProgress] = useState(0);
-  const [showPlaylist, setShowPlaylist] = useState(true);
+
+  const [playlistOpen, setPlaylistOpen] = useState(true);
+  const [playlistPinned, setPlaylistPinned] = useState(false);
+  const [playlistSize, setPlaylistSize] = useState<PlaylistSize>("md");
+  // Tracks whether the sidebar was auto-hidden due to playback (vs. user action)
+  const wasAutoHiddenRef = useRef(false);
 
   const processFile = async (file: File, subtitleFiles: File[] = []) => {
     setIsLoading(true);
@@ -117,6 +122,21 @@ const LightBirdPlayer = () => {
   useEffect(() => {
     return () => { playerRef.current?.destroy(); };
   }, []);
+
+  // Auto-hide the playlist sidebar when playing (unless pinned); restore when paused
+  useEffect(() => {
+    if (playback.isPlaying) {
+      if (!playlistPinned) {
+        setPlaylistOpen((current) => {
+          if (current) wasAutoHiddenRef.current = true;
+          return current ? false : current;
+        });
+      }
+    } else if (wasAutoHiddenRef.current) {
+      setPlaylistOpen(true);
+      wasAutoHiddenRef.current = false;
+    }
+  }, [playback.isPlaying, playlistPinned]);
 
   const handleFileChange = async (files: FileList) => {
     const { videoFiles, subtitleFiles } = playlist.parseFiles(files);
@@ -203,6 +223,11 @@ const LightBirdPlayer = () => {
     }
   };
 
+  const handlePlaylistToggle = () => {
+    wasAutoHiddenRef.current = false;
+    setPlaylistOpen((v) => !v);
+  };
+
   return (
     <div className="flex flex-1 w-full h-full">
       <div
@@ -256,8 +281,6 @@ const LightBirdPlayer = () => {
             onAudioTrackChange={handleAudioTrackChange}
             onSubtitleUpload={() => subtitleInputRef.current?.click()}
             onSubtitleRemove={subtitles.removeSubtitle}
-            isPlaylistVisible={showPlaylist}
-            onPlaylistToggle={() => setShowPlaylist((v) => !v)}
           />
         )}
 
@@ -283,15 +306,19 @@ const LightBirdPlayer = () => {
         )}
       </div>
 
-      {showPlaylist && (
-        <PlaylistPanel
-          playlist={playlist.playlist}
-          currentVideoIndex={playlist.currentIndex}
-          onSelectVideo={loadVideo}
-          onFilesAdded={handleFileChange}
-          onAddStream={handleAddStream}
-        />
-      )}
+      <PlaylistPanel
+        playlist={playlist.playlist}
+        currentVideoIndex={playlist.currentIndex}
+        onSelectVideo={loadVideo}
+        onFilesAdded={handleFileChange}
+        onAddStream={handleAddStream}
+        isOpen={playlistOpen}
+        isPinned={playlistPinned}
+        size={playlistSize}
+        onToggle={handlePlaylistToggle}
+        onTogglePin={() => setPlaylistPinned((v) => !v)}
+        onSizeChange={setPlaylistSize}
+      />
     </div>
   );
 };
