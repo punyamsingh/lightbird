@@ -19,7 +19,7 @@ export function useProgressPersistence(
     }
   }, [currentVideoName, videoRef]);
 
-  // Save current position (debounced)
+  // Save current position (debounced); flush immediately on cleanup
   useEffect(() => {
     const el = videoRef.current;
     if (!el || !currentVideoName) return;
@@ -36,7 +36,11 @@ export function useProgressPersistence(
     el.addEventListener("timeupdate", onTimeUpdate);
     return () => {
       el.removeEventListener("timeupdate", onTimeUpdate);
-      if (timer) clearTimeout(timer);
+      if (timer) {
+        // Flush the pending write so the position isn't lost on video switch/unmount
+        clearTimeout(timer);
+        localStorage.setItem(`${STORAGE_PREFIX}${currentVideoName}`, String(el.currentTime));
+      }
     };
   }, [currentVideoName, videoRef]);
 }

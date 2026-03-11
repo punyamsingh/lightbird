@@ -3,14 +3,14 @@ import { useVideoPlayback } from "../use-video-playback";
 
 function makeVideoEl() {
   const el = document.createElement("video");
-  el.play = jest.fn().mockResolvedValue(undefined);
-  el.pause = jest.fn();
+  let playing = false;
+  el.play = jest.fn().mockImplementation(async () => { playing = true; });
+  el.pause = jest.fn().mockImplementation(() => { playing = false; });
   Object.defineProperty(el, "duration", { value: 120, writable: true });
   Object.defineProperty(el, "currentTime", { value: 0, writable: true });
   Object.defineProperty(el, "volume", { value: 1, writable: true });
   Object.defineProperty(el, "muted", { value: false, writable: true });
-  Object.defineProperty(el, "paused", { get: () => !el._playing, configurable: true });
-  (el as any)._playing = false;
+  Object.defineProperty(el, "paused", { get: () => !playing, configurable: true });
   return el;
 }
 
@@ -19,12 +19,13 @@ function makeRef(el: HTMLVideoElement) {
 }
 
 describe("useVideoPlayback", () => {
-  it("initial state is correct", () => {
+  it("syncs initial state from the video element on mount", () => {
     const ref = makeRef(makeVideoEl());
     const { result } = renderHook(() => useVideoPlayback(ref));
+    // Hook reads live element state on mount — duration is 120 per the mock
     expect(result.current.isPlaying).toBe(false);
     expect(result.current.progress).toBe(0);
-    expect(result.current.duration).toBe(0);
+    expect(result.current.duration).toBe(120);
     expect(result.current.volume).toBe(1);
     expect(result.current.isMuted).toBe(false);
     expect(result.current.playbackRate).toBe(1);

@@ -15,6 +15,13 @@ export function useVideoPlayback(videoRef: RefObject<HTMLVideoElement | null>) {
     const el = videoRef.current;
     if (!el) return;
 
+    // Sync initial state from element (may already have loaded metadata)
+    setIsPlaying(!el.paused);
+    setProgress(el.currentTime);
+    if (el.duration && !Number.isNaN(el.duration)) setDuration(el.duration);
+    setVolumeState(el.volume);
+    setIsMuted(el.muted);
+
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
     const onTimeUpdate = () => setProgress(el.currentTime);
@@ -38,6 +45,12 @@ export function useVideoPlayback(videoRef: RefObject<HTMLVideoElement | null>) {
       el.removeEventListener("volumechange", onVolumeChange);
     };
   }, [videoRef]);
+
+  // Keep el.loop in sync with loop state
+  useEffect(() => {
+    const el = videoRef.current;
+    if (el) el.loop = loop;
+  }, [loop, videoRef]);
 
   const togglePlay = useCallback(() => {
     const el = videoRef.current;
@@ -89,8 +102,9 @@ export function useVideoPlayback(videoRef: RefObject<HTMLVideoElement | null>) {
       const el = videoRef.current;
       if (!el) return;
       el.pause();
-      const frameTime = 1 / (el.playbackRate * 30);
-      el.currentTime += direction === "forward" ? frameTime : -frameTime;
+      const frameTime = 1 / 30; // fixed 30fps; independent of playback rate
+      const delta = direction === "forward" ? frameTime : -frameTime;
+      el.currentTime = Math.max(0, Math.min(el.currentTime + delta, el.duration || 0));
     },
     [videoRef]
   );

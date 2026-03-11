@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import type { Subtitle } from "@/types";
 import { UniversalSubtitleManager } from "@/lib/subtitle-manager";
 import { useToast } from "@/hooks/use-toast";
@@ -10,6 +10,14 @@ export function useSubtitles() {
   const [activeSubtitle, setActiveSubtitle] = useState("-1");
   const managerRef = useRef<UniversalSubtitleManager | null>(null);
   const { toast } = useToast();
+
+  // Destroy manager on unmount
+  useEffect(() => {
+    return () => {
+      managerRef.current?.destroy();
+      managerRef.current = null;
+    };
+  }, []);
 
   const initManager = useCallback((videoEl: HTMLVideoElement) => {
     managerRef.current?.destroy();

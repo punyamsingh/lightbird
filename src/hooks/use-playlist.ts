@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import type { PlaylistItem } from "@/types";
 
 const VIDEO_EXTENSIONS = [".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm", ".mp4"];
@@ -9,6 +9,20 @@ const SUBTITLE_EXTENSIONS = [".srt", ".vtt", ".ass", ".ssa"];
 export function usePlaylist() {
   const [playlist, setPlaylist] = useState<PlaylistItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number | null>(null);
+  const playlistRef = useRef(playlist);
+
+  useEffect(() => {
+    playlistRef.current = playlist;
+  });
+
+  // Revoke remaining blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      playlistRef.current.forEach((item) => {
+        if (item.file) URL.revokeObjectURL(item.url);
+      });
+    };
+  }, []);
 
   const currentItem = currentIndex !== null ? (playlist[currentIndex] ?? null) : null;
 
@@ -21,27 +35,34 @@ export function usePlaylist() {
   }, []);
 
   const replaceWithFile = useCallback((file: File) => {
-    const newItem: PlaylistItem = {
-      name: file.name,
-      url: URL.createObjectURL(file),
-      type: "video",
-      file,
-    };
-    setPlaylist([newItem]);
+    setPlaylist((prev) => {
+      // Revoke previous blob URLs for local files
+      prev.forEach((item) => {
+        if (item.file) URL.revokeObjectURL(item.url);
+      });
+      return [
+        {
+          name: file.name,
+          url: URL.createObjectURL(file),
+          type: "video",
+          file,
+        },
+      ];
+    });
     setCurrentIndex(0);
   }, []);
 
   const nextItem = useCallback(() => {
     setCurrentIndex((idx) => {
-      if (idx === null) return idx;
-      return idx; // caller checks playlist.length; we expose the computation
+      if (idx === null || playlistRef.current.length <= 1) return idx;
+      return (idx + 1) % playlistRef.current.length;
     });
   }, []);
 
   const prevItem = useCallback(() => {
     setCurrentIndex((idx) => {
-      if (idx === null) return idx;
-      return idx;
+      if (idx === null || playlistRef.current.length <= 1) return idx;
+      return (idx - 1 + playlistRef.current.length) % playlistRef.current.length;
     });
   }, []);
 
