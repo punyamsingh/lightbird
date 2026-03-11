@@ -6,7 +6,23 @@ function makeRef() {
   return { current: el };
 }
 
+// Flush pending rAF callbacks queued by the hook
+function flushRaf() {
+  act(() => {
+    jest.runAllTimers();
+  });
+}
+
 describe("useVideoFilters", () => {
+  beforeEach(() => {
+    // Use fake timers so rAF callbacks run synchronously via jest.runAllTimers()
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it("starts with default filter values", () => {
     const ref = makeRef();
     const { result } = renderHook(() => useVideoFilters(ref));
@@ -21,6 +37,7 @@ describe("useVideoFilters", () => {
     const ref = makeRef();
     const { result } = renderHook(() => useVideoFilters(ref));
     act(() => result.current.setFilters({ brightness: 150, contrast: 80, saturate: 120, hue: 45 }));
+    flushRaf();
     expect(result.current.filters.brightness).toBe(150);
     expect(ref.current.style.filter).toContain("brightness(150%)");
     expect(ref.current.style.filter).toContain("contrast(80%)");
@@ -32,6 +49,7 @@ describe("useVideoFilters", () => {
     const ref = makeRef();
     const { result } = renderHook(() => useVideoFilters(ref));
     act(() => result.current.setZoom(1.5));
+    flushRaf();
     expect(result.current.zoom).toBe(1.5);
     expect(ref.current.style.transform).toBe("scale(1.5)");
   });
