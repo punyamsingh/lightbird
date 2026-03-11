@@ -39,6 +39,7 @@ const LightBirdPlayer = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [processingProgress, setProcessingProgress] = useState(0);
+  const [showPlaylist, setShowPlaylist] = useState(true);
 
   const processFile = async (file: File, subtitleFiles: File[] = []) => {
     setIsLoading(true);
@@ -255,6 +256,8 @@ const LightBirdPlayer = () => {
             onAudioTrackChange={handleAudioTrackChange}
             onSubtitleUpload={() => subtitleInputRef.current?.click()}
             onSubtitleRemove={subtitles.removeSubtitle}
+            isPlaylistVisible={showPlaylist}
+            onPlaylistToggle={() => setShowPlaylist((v) => !v)}
           />
         )}
 
@@ -280,13 +283,15 @@ const LightBirdPlayer = () => {
         )}
       </div>
 
-      <PlaylistPanel
-        playlist={playlist.playlist}
-        currentVideoIndex={playlist.currentIndex}
-        onSelectVideo={loadVideo}
-        onFilesAdded={handleFileChange}
-        onAddStream={handleAddStream}
-      />
+      {showPlaylist && (
+        <PlaylistPanel
+          playlist={playlist.playlist}
+          currentVideoIndex={playlist.currentIndex}
+          onSelectVideo={loadVideo}
+          onFilesAdded={handleFileChange}
+          onAddStream={handleAddStream}
+        />
+      )}
     </div>
   );
 };

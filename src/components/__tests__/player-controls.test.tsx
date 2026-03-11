@@ -40,6 +40,8 @@ const defaultProps = {
   onZoomChange: jest.fn(),
   onSubtitleChange: jest.fn(),
   onAudioTrackChange: jest.fn(),
+  isPlaylistVisible: true,
+  onPlaylistToggle: jest.fn(),
 };
 
 describe('PlayerControls', () => {
@@ -118,5 +120,17 @@ describe('PlayerControls', () => {
     const twoXLabel = screen.getByText('2x');
     fireEvent.click(twoXLabel);
     expect(defaultProps.onPlaybackRateChange).toHaveBeenCalledWith(2);
+  });
+
+  it('calls onPlaylistToggle when the playlist toggle button is clicked', () => {
+    render(<PlayerControls {...defaultProps} isPlaylistVisible={true} />);
+    const toggleBtn = screen.getByRole('button', { name: /hide playlist/i });
+    fireEvent.click(toggleBtn);
+    expect(defaultProps.onPlaylistToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders the playlist toggle button with correct label when playlist is hidden', () => {
+    render(<PlayerControls {...defaultProps} isPlaylistVisible={false} />);
+    expect(screen.getByRole('button', { name: /show playlist/i })).toBeInTheDocument();
   });
 });

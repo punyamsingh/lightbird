@@ -9,7 +9,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Label } from "@/components/ui/label";
 import {
   Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward,
-  FastForward, Rewind, RotateCcw, Settings2, Subtitles, Camera, AudioLines, Plus, X
+  FastForward, Rewind, RotateCcw, Settings2, Subtitles, Camera, AudioLines, Plus, X,
+  PanelRightClose, PanelRightOpen
 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 
@@ -45,6 +46,8 @@ interface PlayerControlsProps {
   onAudioTrackChange: (id: string) => void;
   onSubtitleUpload?: () => void;
   onSubtitleRemove?: (id: string) => void;
+  isPlaylistVisible: boolean;
+  onPlaylistToggle: () => void;
 }
 
 const formatTime = (time: number) => {
@@ -61,6 +64,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   onPlayPause, onSeek, onVolumeChange, onMuteToggle, onPlaybackRateChange, onLoopToggle,
   onFullScreenToggle, onFrameStep, onScreenshot, onNext, onPrevious, onFiltersChange,
   onZoomChange, onSubtitleChange, onAudioTrackChange, onSubtitleUpload, onSubtitleRemove,
+  isPlaylistVisible, onPlaylistToggle,
 }) => {
   return (
     <TooltipProvider>
@@ -100,6 +104,10 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={onPlaylistToggle} aria-label={isPlaylistVisible ? 'Hide Playlist' : 'Show Playlist'}>{isPlaylistVisible ? <PanelRightClose /> : <PanelRightOpen />}</Button></TooltipTrigger>
+              <TooltipContent><p>{isPlaylistVisible ? 'Hide Playlist' : 'Show Playlist'}</p></TooltipContent>
+            </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={() => onFrameStep('backward')}><Rewind size={18} /></Button></TooltipTrigger>
               <TooltipContent><p>Frame Backward</p></TooltipContent>
