@@ -2,15 +2,53 @@
 
 import React, { useRef, useState } from "react";
 import type { PlaylistItem } from "@/types";
+import {
+  DndContext,
+  closestCenter,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
-  FilePlus, Link, ListVideo, Tv,
-  Pin, PinOff, ChevronLeft, ChevronRight, Maximize2, Minimize2,
+  FilePlus,
+  FolderOpen,
+  Link,
+  ListVideo,
+  Tv,
+  Pin,
+  PinOff,
+  ChevronLeft,
+  ChevronRight,
+  Maximize2,
+  Minimize2,
+  X,
+  GripVertical,
+  Download,
+  Upload,
 } from "lucide-react";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { exportPlaylist, parseM3U8 } from "@/lib/m3u-parser";
 
 export type PlaylistSize = "sm" | "md" | "lg";
 
@@ -26,12 +64,105 @@ const NEXT_SIZE: Record<PlaylistSize, PlaylistSize> = {
   lg: "sm",
 };
 
+type SortKey = "name-asc" | "name-desc" | "duration-asc" | "duration-desc";
+
+function formatTime(seconds: number): string {
+  if (!seconds || !isFinite(seconds)) return "";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+const VIDEO_EXTENSIONS_RE = /\.(mp4|mkv|webm|mov|avi|wmv|flv|m4v)$/i;
+
+interface SortableItemProps {
+  item: PlaylistItem;
+  index: number;
+  isActive: boolean;
+  onSelect: (index: number) => void;
+  onRemove: (index: number) => void;
+}
+
+function SortablePlaylistItem({ item, index, isActive, onSelect, onRemove }: SortableItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const duration = formatTime(item.duration ?? 0);
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "flex items-center gap-1 p-1.5 rounded-md text-xs group",
+        "hover:bg-muted transition-colors",
+        isActive ? "bg-primary/20 text-primary-foreground" : ""
+      )}
+    >
+      {/* Drag handle */}
+      <button
+        {...attributes}
+        {...listeners}
+        className="shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground p-0.5"
+        aria-label="Drag to reorder"
+        tabIndex={-1}
+      >
+        <GripVertical className="w-3 h-3" />
+      </button>
+
+      {/* Item select button */}
+      <button
+        onClick={() => onSelect(index)}
+        className="flex-1 flex items-center gap-1.5 min-w-0 text-left"
+        aria-label={`Play ${item.name}`}
+      >
+        {item.type === "video"
+          ? <ListVideo className="w-3.5 h-3.5 shrink-0" />
+          : <Tv className="w-3.5 h-3.5 shrink-0" />}
+        <span className="truncate">{item.name}</span>
+        {duration && (
+          <span className="text-xs text-muted-foreground ml-auto shrink-0 pl-1">
+            {duration}
+          </span>
+        )}
+      </button>
+
+      {/* Remove button */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onRemove(index); }}
+        className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
+        aria-label="Remove from playlist"
+      >
+        <X className="w-3 h-3 text-muted-foreground hover:text-destructive" />
+      </button>
+    </div>
+  );
+}
+
 interface PlaylistPanelProps {
   playlist: PlaylistItem[];
   currentVideoIndex: number | null;
   onSelectVideo: (index: number) => void;
   onFilesAdded: (files: FileList) => void;
+  onFolderFilesAdded: (files: File[]) => void;
   onAddStream: (url: string, name?: string) => void;
+  onRemoveItem: (index: number) => void;
+  onReorder: (newPlaylist: PlaylistItem[]) => void;
+  onImportM3U: (items: Omit<PlaylistItem, "id">[]) => void;
   isOpen: boolean;
   isPinned: boolean;
   size: PlaylistSize;
@@ -40,29 +171,28 @@ interface PlaylistPanelProps {
   onSizeChange: (size: PlaylistSize) => void;
 }
 
-export const PlaylistPanel = React.memo(function PlaylistPanel({
+const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
   playlist,
   currentVideoIndex,
   onSelectVideo,
   onFilesAdded,
+  onFolderFilesAdded,
   onAddStream,
+  onRemoveItem,
+  onReorder,
+  onImportM3U,
   isOpen,
   isPinned,
   size,
   onToggle,
   onTogglePin,
   onSizeChange,
-}: PlaylistPanelProps) {
+}) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  const m3uInputRef = useRef<HTMLInputElement>(null);
   const [streamUrl, setStreamUrl] = useState("");
-
-  const virtualizer = useVirtualizer({
-    count: playlist.length,
-    getScrollElement: () => scrollContainerRef.current,
-    estimateSize: () => 48,
-    overscan: 5,
-  });
+  const [sortKey, setSortKey] = useState<SortKey | "">("");
 
   const handleStreamUrlSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,6 +200,52 @@ export const PlaylistPanel = React.memo(function PlaylistPanel({
       onAddStream(streamUrl);
       setStreamUrl("");
     }
+  };
+
+  const handleFolderSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+      .filter((f) => VIDEO_EXTENSIONS_RE.test(f.name))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    if (files.length > 0) onFolderFilesAdded(files);
+    e.target.value = "";
+  };
+
+  const handleM3USelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const items = parseM3U8(text);
+    if (items.length > 0) onImportM3U(items);
+    e.target.value = "";
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = playlist.findIndex((item) => item.id === active.id);
+    const newIndex = playlist.findIndex((item) => item.id === over.id);
+    if (oldIndex !== -1 && newIndex !== -1) {
+      onReorder(arrayMove(playlist, oldIndex, newIndex));
+    }
+  };
+
+  const handleSort = (value: string) => {
+    setSortKey(value as SortKey);
+    const sorted = [...playlist].sort((a, b) => {
+      switch (value as SortKey) {
+        case "name-asc":
+          return a.name.localeCompare(b.name, undefined, { numeric: true });
+        case "name-desc":
+          return b.name.localeCompare(a.name, undefined, { numeric: true });
+        case "duration-asc":
+          return (a.duration ?? 0) - (b.duration ?? 0);
+        case "duration-desc":
+          return (b.duration ?? 0) - (a.duration ?? 0);
+        default:
+          return 0;
+      }
+    });
+    onReorder(sorted);
   };
 
   return (
@@ -124,6 +300,38 @@ export const PlaylistPanel = React.memo(function PlaylistPanel({
             </div>
 
             <div className="flex items-center gap-0.5 shrink-0">
+              {playlist.length > 0 && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => exportPlaylist(playlist)}
+                      aria-label="Export Playlist"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom"><p>Export as M3U8</p></TooltipContent>
+                </Tooltip>
+              )}
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => m3uInputRef.current?.click()}
+                    aria-label="Import Playlist"
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom"><p>Import M3U/M3U8</p></TooltipContent>
+              </Tooltip>
+
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -175,11 +383,28 @@ export const PlaylistPanel = React.memo(function PlaylistPanel({
             </div>
           </div>
 
-          {/* Add files & stream */}
+          {/* Add files, folder & stream */}
           <div className="p-3 space-y-2 border-b border-border shrink-0">
-            <Button onClick={() => fileInputRef.current?.click()} className="w-full h-8 text-xs">
-              <FilePlus className="mr-2 h-3.5 w-3.5" /> Add Local Files
-            </Button>
+            <div className="flex gap-1.5">
+              <Button onClick={() => fileInputRef.current?.click()} className="flex-1 h-8 text-xs">
+                <FilePlus className="mr-1.5 h-3.5 w-3.5" /> Add Files
+              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => folderInputRef.current?.click()}
+                    aria-label="Open Folder"
+                  >
+                    <FolderOpen className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom"><p>Open Folder</p></TooltipContent>
+              </Tooltip>
+            </div>
+
             <input
               type="file"
               ref={fileInputRef}
@@ -188,6 +413,24 @@ export const PlaylistPanel = React.memo(function PlaylistPanel({
               accept="video/*,.mkv,.avi,.mov,.wmv,.flv,.webm,.vtt,.srt"
               onChange={(e) => e.target.files && onFilesAdded(e.target.files)}
             />
+            <input
+              type="file"
+              ref={folderInputRef}
+              className="hidden"
+              multiple
+              accept="video/*"
+              // @ts-expect-error — webkitdirectory is not in TS types
+              webkitdirectory=""
+              onChange={handleFolderSelect}
+            />
+            <input
+              type="file"
+              ref={m3uInputRef}
+              className="hidden"
+              accept=".m3u,.m3u8"
+              onChange={handleM3USelect}
+            />
+
             <form onSubmit={handleStreamUrlSubmit} className="flex gap-1.5">
               <Input
                 type="url"
@@ -200,56 +443,55 @@ export const PlaylistPanel = React.memo(function PlaylistPanel({
                 <Link className="h-3.5 w-3.5" />
               </Button>
             </form>
-          </div>
 
-          {/* Playlist items — virtualised */}
-          <div ref={scrollContainerRef} className="flex-1 overflow-auto p-2">
-            {playlist.length === 0 ? (
-              <div className="text-center text-xs text-muted-foreground py-10 px-2">
-                <p>Your playlist is empty.</p>
-                <p>Add files or a stream URL to get started.</p>
-              </div>
-            ) : (
-              <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
-                {virtualizer.getVirtualItems().map((vItem) => {
-                  const item = playlist[vItem.index];
-                  const index = vItem.index;
-                  return (
-                    <div
-                      key={vItem.key}
-                      ref={virtualizer.measureElement}
-                      data-index={vItem.index}
-                      style={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        width: "100%",
-                        transform: `translateY(${vItem.start}px)`,
-                      }}
-                    >
-                      <button
-                        onClick={() => onSelectVideo(index)}
-                        className={cn(
-                          "w-full text-left p-2 rounded-md text-xs flex items-center gap-2",
-                          "hover:bg-muted transition-colors",
-                          index === currentVideoIndex ? "bg-primary/20 text-primary-foreground" : ""
-                        )}
-                      >
-                        {item.type === "video"
-                          ? <ListVideo className="w-3.5 h-3.5 shrink-0" />
-                          : <Tv className="w-3.5 h-3.5 shrink-0" />}
-                        <span className="truncate">{item.name}</span>
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
+            {playlist.length > 1 && (
+              <Select value={sortKey} onValueChange={handleSort}>
+                <SelectTrigger className="h-7 text-xs" aria-label="Sort playlist">
+                  <SelectValue placeholder="Sort by…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name-asc">Name A–Z</SelectItem>
+                  <SelectItem value="name-desc">Name Z–A</SelectItem>
+                  <SelectItem value="duration-asc">Shortest first</SelectItem>
+                  <SelectItem value="duration-desc">Longest first</SelectItem>
+                </SelectContent>
+              </Select>
             )}
           </div>
+
+          {/* Playlist items */}
+          <ScrollArea className="flex-1">
+            <div className="p-2 space-y-0.5">
+              {playlist.length === 0 ? (
+                <div className="text-center text-xs text-muted-foreground py-10 px-2">
+                  <p>Your playlist is empty.</p>
+                  <p>Add files or a stream URL to get started.</p>
+                </div>
+              ) : (
+                <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext
+                    items={playlist.map((i) => i.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {playlist.map((item, index) => (
+                      <SortablePlaylistItem
+                        key={item.id}
+                        item={item}
+                        index={index}
+                        isActive={index === currentVideoIndex}
+                        onSelect={onSelectVideo}
+                        onRemove={onRemoveItem}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
+              )}
+            </div>
+          </ScrollArea>
         </div>
       )}
     </TooltipProvider>
   );
-});
+};
 
 export default PlaylistPanel;

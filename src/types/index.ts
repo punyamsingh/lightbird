@@ -1,10 +1,12 @@
 
 
 export interface PlaylistItem {
+  id: string;
   name: string;
   url: string;
   type: 'video' | 'stream';
   file?: File;
+  duration?: number;
 }
 
 export interface Subtitle {

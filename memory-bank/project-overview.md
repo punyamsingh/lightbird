@@ -1,7 +1,7 @@
 # LightBird — Project Overview
 
 > **Last updated:** 2026-03-11
-> **Branch context:** Plans 01 (Test Suite), 02 (MKV / FFmpeg.wasm), 03 (Refactor), 04 (Performance Optimisation), and 05 (Error Handling) implemented.
+> **Branch context:** Plans 01 (Test Suite), 02 (MKV / FFmpeg.wasm), 03 (Refactor), 04 (Performance Optimisation), 05 (Error Handling), and 06 (Playlist Management) implemented.
 
 ---
 
@@ -41,7 +41,7 @@ src/app/page.tsx
 | `src/hooks/use-video-playback.ts` | Play/pause/seek/volume/rate state + video event listeners |
 | `src/hooks/use-video-filters.ts` | Brightness/contrast/saturation/hue/zoom state + CSS application |
 | `src/hooks/use-subtitles.ts` | Subtitle list, UniversalSubtitleManager lifecycle, add/remove/switch |
-| `src/hooks/use-playlist.ts` | Playlist array, current index, file parsing |
+| `src/hooks/use-playlist.ts` | Playlist array, current index, file parsing, removeItem, reorderItems, addFiles, localStorage persistence |
 | `src/hooks/use-keyboard-shortcuts.ts` | Keyboard event registration (Space/Arrows/M/F) |
 | `src/hooks/use-fullscreen.ts` | Fullscreen enter/exit/detect |
 | `src/hooks/use-progress-persistence.ts` | localStorage save (debounced 5s) and restore |
@@ -55,11 +55,12 @@ src/app/page.tsx
 | `src/lib/players/simple-player.ts` | HTML5 player wrapper with subtitle support |
 | `src/lib/players/mkv-player.ts` | MKV player — probes with FFmpeg, remuxes to MP4, extracts embedded subtitles |
 | `src/lib/ffmpeg-singleton.ts` | Lazy-loaded shared FFmpeg.wasm instance (CDN fetch on first MKV load) |
-| `src/types/index.ts` | Shared TypeScript interfaces |
+| `src/types/index.ts` | Shared TypeScript interfaces (`id`, `duration` added to `PlaylistItem`) |
 | `src/components/video-overlay.tsx` | Loading/processing overlay component |
 | `src/lib/media-error.ts` | `parseMediaError` + `validateFile` (Plan 05) |
 | `src/components/player-error-display.tsx` | Error overlay with Retry/Skip/Dismiss (Plan 05) |
 | `src/components/player-error-boundary.tsx` | React class Error Boundary (Plan 05) |
+| `src/lib/m3u-parser.ts` | M3U8 export and import parsing (Plan 06) |
 
 ---
 
@@ -78,7 +79,8 @@ src/app/page.tsx
 ### Known limitations / not yet implemented
 - **MKV FFmpeg.wasm** — implemented (Plan 02); FFmpeg core loaded from unpkg CDN (~31 MB); for production, copy assets to `/public/ffmpeg/` to avoid CDN dependency.
 - **Error handling implemented** — Plan 05 done; see `src/lib/media-error.ts`, `PlayerErrorDisplay`, `PlayerErrorBoundary`.
-- **No playlist persistence** — playlist is lost on page refresh (Plan 06).
+- **Playlist management implemented** — Plan 06 done; drag-and-drop reordering, M3U8 import/export, folder opening, and sorting.
+- **No playlist persistence** — playlist is not persisted after page refresh (persist to localStorage if needed).
 - **No advanced subtitle formats** — ASS/SSA not supported; no sync offset (Plan 07).
 - **No keyboard customisation** — shortcuts are hardcoded (Plan 08).
 - **No video info panel** — metadata not displayed (Plan 09).
@@ -124,7 +126,7 @@ CI runs on every push and PR via `.github/workflows/test.yml`.
 | 03 | Refactor `lightbird-player.tsx` | **DONE** |
 | 04 | Performance Optimisation | **DONE** |
 | 05 | Error Handling & Recovery | **DONE** |
-| 06 | Playlist Management (DnD, M3U8, persistence) | Pending |
+| 06 | Playlist Management (DnD, M3U8) | **DONE** |
 | 07 | Advanced Subtitle Support (ASS/SSA, offset) | Pending |
 | 08 | Keyboard Customisation | Pending |
 | 09 | Video Info Panel | Pending |
@@ -146,6 +148,7 @@ Full plan details: `memory-bank/plans/01-test-suite.md` … `10-codebase-cleanup
 | Component primitives | Radix UI | various |
 | Video processing | FFmpeg.wasm (`@ffmpeg/ffmpeg`) | 0.12.10 |
 | Icons | Lucide React | 0.475.0 |
+| Drag-and-drop | @dnd-kit/core + @dnd-kit/sortable + @dnd-kit/utilities | — |
 | Testing | Jest + React Testing Library | Jest 30, RTL 16 |
 | Forms | React Hook Form + Zod | — |
 | Hosting | Firebase App Hosting | — |

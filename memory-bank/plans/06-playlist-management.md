@@ -1,4 +1,20 @@
-# Plan 06 — Playlist Management Improvements
+# Plan 06 — Playlist Management Improvements [DONE]
+
+## Implementation Summary (2026-03-11)
+
+All 8 steps implemented:
+- **Per-item remove button**: X button per item calls `onRemoveItem`; `usePlaylist.removeItem` adjusts `currentIndex` correctly.
+- **Drag-and-drop reordering**: `@dnd-kit/core` + `@dnd-kit/sortable` + `@dnd-kit/utilities` installed; `SortablePlaylistItem` with grip handle; `reorderItems` in hook preserves current item tracking.
+- **Bulk folder import**: `FolderOpen` button + hidden `<input webkitdirectory>` in `PlaylistPanel`; `addFiles` method in `usePlaylist` creates items with UUID ids and loads duration metadata.
+- **Export M3U8**: `src/lib/m3u-parser.ts` `exportPlaylist()`; Export button visible in header when playlist non-empty.
+- **Import M3U8**: `parseM3U8()` in `m3u-parser.ts`; Import button + hidden file input; items wired through `onImportM3U` prop.
+- **localStorage persistence**: Stream-type items saved/restored in `usePlaylist`; local file blob URLs not persisted.
+- **Duration badges**: `getFileDuration(url)` called when adding files; duration stored on `PlaylistItem.duration`; formatted badge shown per item.
+- **Sort controls**: Sort dropdown (Name A–Z/Z–A, Shortest/Longest first) shown when playlist has >1 item; calls `onReorder`.
+
+**New files**: `src/lib/m3u-parser.ts`, `src/lib/__tests__/m3u-parser.test.ts`
+**Modified**: `src/types/index.ts` (id, duration), `src/hooks/use-playlist.ts`, `src/components/playlist-panel.tsx`, `src/components/lightbird-player.tsx`, `src/hooks/__tests__/use-playlist.test.ts`, `src/components/__tests__/playlist-panel.test.tsx`
+**Tests**: 155 passing (15 test suites)
 
 ## Problem
 
