@@ -1,4 +1,15 @@
-# Plan 02 — Complete MKV Player with FFmpeg.wasm
+# Plan 02 — Complete MKV Player with FFmpeg.wasm [DONE]
+
+## Implementation Summary (2026-03-11)
+
+- Created `src/lib/ffmpeg-singleton.ts`: lazy-loaded shared FFmpeg.wasm instance loaded from unpkg CDN on first MKV file open.
+- Rewrote `src/lib/players/mkv-player.ts`: probes stream info via FFmpeg log output (`parseStreamInfo`), remuxes to fragmented MP4 for browser playback (`_remux`), extracts embedded subtitle tracks on demand (`_extractSubtitle`), and falls back to native `<video>` playback when FFmpeg is unavailable.
+- Updated `src/lib/video-processor.ts`: `createVideoPlayer` accepts optional `onProgress` callback forwarded to `MKVPlayerAdapter → MKVPlayer`.
+- Updated `src/components/lightbird-player.tsx`: added `processingProgress` state; passes progress callback to `createVideoPlayer`; loading overlay shows a 0–100% progress bar during FFmpeg remux.
+- Added tests: `ffmpeg-singleton.test.ts` (singleton lifecycle) and `mkv-player.test.ts` (`parseStreamInfo`, fallback, progress callback, embedded subtitle metadata).
+- All 68 tests pass.
+
+---
 
 ## Problem
 

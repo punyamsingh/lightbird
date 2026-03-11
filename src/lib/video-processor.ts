@@ -50,14 +50,12 @@ class SimplePlayerAdapter implements VideoPlayer {
 class MKVPlayerAdapter implements VideoPlayer {
   private player: MKVPlayer;
 
-  constructor(file: File) {
-    this.player = new MKVPlayer(file);
+  constructor(file: File, onProgress?: (progress: number) => void) {
+    this.player = new MKVPlayer(file, onProgress);
   }
 
   async initialize(videoElement: HTMLVideoElement): Promise<ProcessedFile> {
-    const result = await this.player.initialize();
-    await this.player.setVideoElement(videoElement);
-    return result;
+    return await this.player.initialize(videoElement);
   }
 
   getAudioTracks(): AudioTrack[] {
@@ -81,10 +79,14 @@ class MKVPlayerAdapter implements VideoPlayer {
   }
 }
 
-export function createVideoPlayer(file: File, externalSubtitles: File[] = []): VideoPlayer {
+export function createVideoPlayer(
+  file: File,
+  externalSubtitles: File[] = [],
+  onProgress?: (progress: number) => void,
+): VideoPlayer {
   // Smart format detection
   if (MKVPlayer.isCompatible(file)) {
-    return new MKVPlayerAdapter(file);
+    return new MKVPlayerAdapter(file, onProgress);
   } else if (SimplePlayer.isCompatible(file)) {
     return new SimplePlayerAdapter(file, externalSubtitles);
   } else {

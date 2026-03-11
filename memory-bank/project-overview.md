@@ -1,7 +1,7 @@
 # LightBird — Project Overview
 
-> **Last updated:** 2026-03-10
-> **Branch context:** Plan 01 (Test Suite) implemented.
+> **Last updated:** 2026-03-11
+> **Branch context:** Plans 01 (Test Suite) and 02 (MKV / FFmpeg.wasm) implemented.
 
 ---
 
@@ -18,7 +18,7 @@ LightBird is a modern, lightweight, browser-based video player built with Next.j
 | Player | Handles | Implementation |
 |---|---|---|
 | `SimplePlayer` | MP4, WebM, AVI, MOV, WMV, FLV, OGV | Native HTML5 `<video>` element |
-| `MKVPlayer` | MKV | Placeholder — uses browser native playback; FFmpeg.wasm integration is pending (Plan 02) |
+| `MKVPlayer` | MKV | FFmpeg.wasm — probes streams, remuxes to fragmented MP4, extracts embedded subtitles; falls back to native on failure |
 
 The factory function `createVideoPlayer(file)` in `src/lib/video-processor.ts` selects the right player based on file extension.
 
@@ -38,7 +38,8 @@ src/app/page.tsx
 | `src/lib/subtitle-converter.ts` | Converts SRT → VTT for browser playback |
 | `src/lib/subtitle-manager.ts` | Manages `<track>` elements on the video element |
 | `src/lib/players/simple-player.ts` | HTML5 player wrapper with subtitle support |
-| `src/lib/players/mkv-player.ts` | MKV player placeholder (no FFmpeg yet) |
+| `src/lib/players/mkv-player.ts` | MKV player — probes with FFmpeg, remuxes to MP4, extracts embedded subtitles |
+| `src/lib/ffmpeg-singleton.ts` | Lazy-loaded shared FFmpeg.wasm instance (CDN fetch on first MKV load) |
 | `src/types/index.ts` | Shared TypeScript interfaces |
 
 ---
@@ -56,7 +57,7 @@ src/app/page.tsx
 - Keyboard shortcuts for common actions.
 
 ### Known limitations / not yet implemented
-- **MKV FFmpeg.wasm** — `MKVPlayer` falls back to native browser playback; embedded audio/subtitle tracks are not accessible (Plan 02).
+- **MKV FFmpeg.wasm** — implemented (Plan 02); FFmpeg core loaded from unpkg CDN (~31 MB); for production, copy assets to `/public/ffmpeg/` to avoid CDN dependency.
 - **No error handling** — media errors are not surfaced to the user (Plan 05).
 - **No playlist persistence** — playlist is lost on page refresh (Plan 06).
 - **No advanced subtitle formats** — ASS/SSA not supported; no sync offset (Plan 07).
@@ -83,6 +84,8 @@ npm run test:coverage # with coverage report
 | `src/lib/__tests__/subtitle-converter.test.ts` | SRT→VTT conversion, edge cases |
 | `src/lib/__tests__/video-processor.test.ts` | Player factory routing, VideoPlayer interface |
 | `src/lib/__tests__/subtitle-manager.test.ts` | Add/remove/clear subtitles, DOM track elements |
+| `src/lib/__tests__/ffmpeg-singleton.test.ts` | Singleton lifecycle, lazy loading, reset |
+| `src/lib/__tests__/mkv-player.test.ts` | parseStreamInfo, MKVPlayer fallback, progress, embedded subs |
 | `src/components/__tests__/player-controls.test.tsx` | Control buttons, speed selector, callbacks |
 | `src/components/__tests__/playlist-panel.test.tsx` | Empty state, item rendering, selection, stream URL |
 
@@ -95,7 +98,7 @@ CI runs on every push and PR via `.github/workflows/test.yml`.
 | # | Plan | Status |
 |---|---|---|
 | 01 | Test Suite (Jest + RTL) | **DONE** |
-| 02 | MKV / FFmpeg.wasm Integration | Pending |
+| 02 | MKV / FFmpeg.wasm Integration | **DONE** |
 | 03 | Refactor `lightbird-player.tsx` | Pending |
 | 04 | Performance Optimisation | Pending |
 | 05 | Error Handling & Recovery | Pending |
@@ -118,7 +121,7 @@ Full plan details: `memory-bank/plans/01-test-suite.md` … `10-codebase-cleanup
 | Language | TypeScript | 5.x |
 | Styling | Tailwind CSS + ShadCN UI | 3.4.1 |
 | Component primitives | Radix UI | various |
-| Video processing | FFmpeg.wasm (`@ffmpeg/ffmpeg`) | 0.12.10 (not yet used) |
+| Video processing | FFmpeg.wasm (`@ffmpeg/ffmpeg`) | 0.12.10 |
 | Icons | Lucide React | 0.475.0 |
 | Testing | Jest + React Testing Library | Jest 30, RTL 16 |
 | Forms | React Hook Form + Zod | — |
