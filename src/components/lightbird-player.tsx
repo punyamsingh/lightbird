@@ -27,6 +27,7 @@ const LightBirdPlayer = () => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
+  const [processingProgress, setProcessingProgress] = useState(0);
 
   const [filters, setFilters] = useState<VideoFilters>({ brightness: 100, contrast: 100, saturate: 100, hue: 0 });
   const [zoom, setZoom] = useState(1);
@@ -82,7 +83,8 @@ const LightBirdPlayer = () => {
   const processFile = async (file: File, subtitleFiles: File[] = []) => {
     setIsLoading(true);
     setLoadingMessage("Initializing player...");
-    
+    setProcessingProgress(0);
+
     try {
         // Clean up old player and subtitle manager
         if (currentPlayerRef.current) {
@@ -92,8 +94,13 @@ const LightBirdPlayer = () => {
           subtitleManagerRef.current.destroy();
         }
 
-        // Create new player based on file type
-        const player = createVideoPlayer(file, subtitleFiles);
+        // Create new player based on file type, wiring FFmpeg progress for MKV files
+        const player = createVideoPlayer(file, subtitleFiles, (progress) => {
+          setProcessingProgress(progress);
+          if (progress < 1) {
+            setLoadingMessage(`Processing video… ${Math.round(progress * 100)}%`);
+          }
+        });
         currentPlayerRef.current = player;
 
         if (!videoRef.current) {
@@ -129,15 +136,17 @@ const LightBirdPlayer = () => {
 
         setIsLoading(false);
         setLoadingMessage("");
+        setProcessingProgress(0);
     } catch(error) {
         console.error(error);
-        toast({ 
-          title: "Failed to process video", 
-          description: "There was an error loading the video file. It might be an unsupported format.", 
-          variant: "destructive" 
+        toast({
+          title: "Failed to process video",
+          description: "There was an error loading the video file. It might be an unsupported format.",
+          variant: "destructive"
         });
         setIsLoading(false);
         setLoadingMessage("");
+        setProcessingProgress(0);
     }
   };
 
@@ -531,6 +540,14 @@ const LightBirdPlayer = () => {
                 <div className="w-16 h-16 border-4 border-t-transparent border-primary rounded-full animate-spin"></div>
                 {loadingMessage && <p className="mt-4 text-lg max-w-sm text-center">{loadingMessage}</p>}
                 {!loadingMessage && isLoading && <p className="mt-4 text-lg">Processing video...</p>}
+                {processingProgress > 0 && processingProgress < 1 && (
+                    <div className="mt-4 w-64 bg-gray-700 rounded-full h-2">
+                        <div
+                            className="bg-primary h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${Math.round(processingProgress * 100)}%` }}
+                        />
+                    </div>
+                )}
             </div>
         )}
 

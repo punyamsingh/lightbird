@@ -1,3 +1,21 @@
+// Prevent ESM parse error — @ffmpeg/* is transitively imported by mkv-player
+jest.mock('@ffmpeg/ffmpeg', () => ({
+  FFmpeg: jest.fn().mockImplementation(() => ({
+    load: jest.fn().mockResolvedValue(undefined),
+    on: jest.fn(),
+    off: jest.fn(),
+    exec: jest.fn().mockRejectedValue(new Error('ffmpeg not available in test')),
+    writeFile: jest.fn().mockResolvedValue(undefined),
+    readFile: jest.fn().mockResolvedValue(new Uint8Array()),
+    deleteFile: jest.fn().mockResolvedValue(undefined),
+  })),
+}));
+
+jest.mock('@ffmpeg/util', () => ({
+  toBlobURL: jest.fn().mockResolvedValue('blob:mock-url'),
+  fetchFile: jest.fn().mockResolvedValue(new Uint8Array()),
+}));
+
 import { createVideoPlayer } from '@/lib/video-processor';
 
 function makeFile(name: string, type = 'video/mp4'): File {
