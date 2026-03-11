@@ -155,3 +155,9 @@ Full plan details: `memory-bank/plans/01-test-suite.md` … `10-codebase-cleanup
 4. **`"use client"` directives** — all components and lib files are client-side. Server components are not used in the player layer.
 
 5. **Blob URLs** — video files are loaded via `URL.createObjectURL`. These are cleaned up on `destroy()`.
+
+6. **Playlist virtualisation** (Plan 04) — `PlaylistPanel` uses `@tanstack/react-virtual` (`useVirtualizer`) so only the ~10 visible items are in the DOM regardless of playlist size. `ScrollArea` (Radix) replaced with a plain `<div>` as the scroll container. Item heights are measured at runtime via `virtualizer.measureElement`.
+
+7. **Component memoisation** (Plan 04) — `PlayerControls` and `PlaylistPanel` are wrapped in `React.memo`. All callback props passed to them (`handleNext`, `handlePrevious`, `loadVideo`, `processFile`, `handleSelectVideo`, etc.) are memoised with `useCallback` so referential stability is preserved and `React.memo` is effective during the ~4 `timeupdate` ticks per second.
+
+8. **rAF-batched filter writes** (Plan 04) — `use-video-filters.ts` schedules `style.filter` / `style.transform` DOM writes inside `requestAnimationFrame`, capping updates at 60 fps during rapid slider input and avoiding layout thrashing.

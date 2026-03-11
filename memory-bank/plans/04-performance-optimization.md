@@ -162,7 +162,23 @@ const formattedDuration = useMemo(() => formatTime(duration), [duration]);
 const progressPercent = useMemo(() => duration > 0 ? (currentTime / duration) * 100 : 0, [currentTime, duration]);
 ```
 
-### Step 7 — Code-Split Non-Critical UI
+### Step 7 — Stable Callbacks
+
+All handler functions passed as props to `PlayerControls` and `PlaylistPanel` are wrapped in `useCallback` with correct dependency arrays:
+
+```tsx
+const handleNext = useCallback(() => { loadVideo(...); }, [playlist.currentIndex, playlist.playlist.length, loadVideo]);
+const handleSelectVideo = useCallback((i: number) => loadVideo(i), [loadVideo]);
+// etc.
+```
+
+`processFile` and `loadVideo` are themselves memoized with `useCallback` so downstream handlers can include them as stable deps without eslint suppressions. Inline arrow functions removed from JSX.
+
+---
+
+### Deferred — Code-Split Non-Critical UI
+
+> **Not implemented in Plan 04.** Moved to a future cleanup plan.
 
 Move popover contents (video filter panel, subtitle panel) to dynamically imported components so they don't bloat the initial bundle:
 
