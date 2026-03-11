@@ -46,7 +46,7 @@ const LightBirdPlayer = () => {
   // Tracks whether the sidebar was auto-hidden due to playback (vs. user action)
   const wasAutoHiddenRef = useRef(false);
 
-  const processFile = async (file: File, subtitleFiles: File[] = []) => {
+  const processFile = useCallback(async (file: File, subtitleFiles: File[] = []) => {
     setIsLoading(true);
     setLoadingMessage("Initializing player...");
     setProcessingProgress(0);
@@ -82,9 +82,9 @@ const LightBirdPlayer = () => {
       setLoadingMessage("");
       setProcessingProgress(0);
     }
-  };
+  }, [subtitles, toast]);
 
-  const loadVideo = (index: number) => {
+  const loadVideo = useCallback((index: number) => {
     const item = playlist.playlist[index];
     if (!item) return;
     playlist.selectItem(index);
@@ -99,7 +99,7 @@ const LightBirdPlayer = () => {
       const subs = subtitleFilesMapRef.current.get(item.name) ?? [];
       processFile(item.file, subs);
     }
-  };
+  }, [playlist.playlist, playlist.selectItem, subtitles, processFile]);
 
   // Handle video ended: loop or advance playlist
   useEffect(() => {
@@ -115,8 +115,7 @@ const LightBirdPlayer = () => {
     };
     el.addEventListener("ended", onEnded);
     return () => el.removeEventListener("ended", onEnded);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playback.loop, playlist.currentIndex, playlist.playlist.length]);
+  }, [playback.loop, playlist.currentIndex, playlist.playlist.length, loadVideo]);
 
   // Cleanup player on unmount
   useEffect(() => {
@@ -215,15 +214,13 @@ const LightBirdPlayer = () => {
     if (playlist.currentIndex !== null && playlist.playlist.length > 1) {
       loadVideo((playlist.currentIndex + 1) % playlist.playlist.length);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playlist.currentIndex, playlist.playlist.length]);
+  }, [playlist.currentIndex, playlist.playlist.length, loadVideo]);
 
   const handlePrevious = useCallback(() => {
     if (playlist.currentIndex !== null && playlist.playlist.length > 1) {
       loadVideo((playlist.currentIndex - 1 + playlist.playlist.length) % playlist.playlist.length);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playlist.currentIndex, playlist.playlist.length]);
+  }, [playlist.currentIndex, playlist.playlist.length, loadVideo]);
 
   const handleSubtitleUpload = useCallback(() => {
     subtitleInputRef.current?.click();
@@ -231,8 +228,7 @@ const LightBirdPlayer = () => {
 
   const handleSelectVideo = useCallback((index: number) => {
     loadVideo(index);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playlist.playlist]);
+  }, [loadVideo]);
 
   const handlePlaylistToggle = () => {
     wasAutoHiddenRef.current = false;

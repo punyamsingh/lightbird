@@ -3,17 +3,30 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import PlaylistPanel from '@/components/playlist-panel';
 import type { PlaylistItem } from '@/types';
 
+// Capture args passed to useVirtualizer so tests can assert the wiring contract
+const useVirtualizerMock = jest.fn();
+
 // Mock @tanstack/react-virtual so all items are rendered in JSDOM (no real scroll height)
 jest.mock('@tanstack/react-virtual', () => ({
-  useVirtualizer: ({ count, estimateSize }: { count: number; estimateSize: () => number }) => ({
-    getVirtualItems: () =>
-      Array.from({ length: count }, (_, i) => ({
-        key: i,
-        index: i,
-        start: i * estimateSize(),
-      })),
-    getTotalSize: () => count * estimateSize(),
-  }),
+  useVirtualizer: (options: {
+    count: number;
+    estimateSize: () => number;
+    getScrollElement: () => Element | null;
+    overscan: number;
+  }) => {
+    useVirtualizerMock(options);
+    const { count, estimateSize } = options;
+    return {
+      getVirtualItems: () =>
+        Array.from({ length: count }, (_, i) => ({
+          key: i,
+          index: i,
+          start: i * estimateSize(),
+        })),
+      getTotalSize: () => count * estimateSize(),
+      measureElement: () => {},
+    };
+  },
 }));
 
 const defaultProps = {
@@ -51,6 +64,18 @@ describe('PlaylistPanel', () => {
     expect(screen.getByText('Video 1.mp4')).toBeInTheDocument();
     expect(screen.getByText('Video 2.mkv')).toBeInTheDocument();
     expect(screen.getByText('Live Stream')).toBeInTheDocument();
+  });
+
+  it('passes correct virtualizer configuration', () => {
+    render(<PlaylistPanel {...defaultProps} playlist={mockPlaylist} />);
+    expect(useVirtualizerMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        count: mockPlaylist.length,
+        estimateSize: expect.any(Function),
+        getScrollElement: expect.any(Function),
+        overscan: 5,
+      }),
+    );
   });
 
   it('does not render the empty state when playlist has items', () => {
