@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import PlayerControls from "@/components/player-controls";
 import PlaylistPanel, { type PlaylistSize } from "@/components/playlist-panel";
 import { VideoOverlay } from "@/components/video-overlay";
+import { PlayerErrorDisplay } from "@/components/player-error-display";
 import { useToast } from "@/hooks/use-toast";
 import { createVideoPlayer, type VideoPlayer } from "@/lib/video-processor";
 import { useVideoPlayback } from "@/hooks/use-video-playback";
@@ -15,6 +16,9 @@ import { usePlaylist } from "@/hooks/use-playlist";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useFullscreen } from "@/hooks/use-fullscreen";
 import { useProgressPersistence } from "@/hooks/use-progress-persistence";
+import { parseMediaError, validateFile, type ParsedMediaError } from "@/lib/media-error";
+
+const MAX_RETRIES = 3;
 
 const LightBirdPlayer = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -24,6 +28,10 @@ const LightBirdPlayer = () => {
   const playerRef = useRef<VideoPlayer | null>(null);
   // Companion map: preserves external subtitle files for re-loading playlist items
   const subtitleFilesMapRef = useRef<Map<string, File[]>>(new Map());
+  const retryCountRef = useRef(0);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const streamStallDetectorRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isStreamRef = useRef(false);
 
   const { toast } = useToast();
   const playlist = usePlaylist();
@@ -39,6 +47,45 @@ const LightBirdPlayer = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [processingProgress, setProcessingProgress] = useState(0);
+  const [playerError, setPlayerError] = useState<ParsedMediaError | null>(null);
+
+  const stopStallDetection = () => {
+    if (streamStallDetectorRef.current) {
+      clearInterval(streamStallDetectorRef.current);
+      streamStallDetectorRef.current = null;
+    }
+  };
+
+  const startStallDetection = () => {
+    stopStallDetection();
+    let lastTime = -1;
+    streamStallDetectorRef.current = setInterval(() => {
+      const el = videoRef.current;
+      if (!el) return;
+      const current = el.currentTime;
+      if (!el.paused && current === lastTime) {
+        // Stream appears stalled — attempt reload from current position
+        const resumeAt = current;
+        el.load();
+        el.addEventListener(
+          "canplay",
+          () => {
+            el.currentTime = resumeAt;
+            el.play().catch(() => {});
+          },
+          { once: true }
+        );
+      }
+      lastTime = current;
+    }, 5000);
+  };
+
+  const clearRetryTimer = () => {
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+  };
 
   const [playlistOpen, setPlaylistOpen] = useState(true);
   const [playlistPinned, setPlaylistPinned] = useState(false);
@@ -50,6 +97,10 @@ const LightBirdPlayer = () => {
     setIsLoading(true);
     setLoadingMessage("Initializing player...");
     setProcessingProgress(0);
+    setPlayerError(null);
+    retryCountRef.current = 0;
+    isStreamRef.current = false;
+    stopStallDetection();
     try {
       playerRef.current?.destroy();
       subtitles.reset();
@@ -88,6 +139,9 @@ const LightBirdPlayer = () => {
     const item = playlist.playlist[index];
     if (!item) return;
     playlist.selectItem(index);
+    setPlayerError(null);
+    clearRetryTimer();
+    retryCountRef.current = 0;
     if (item.type === "stream") {
       playerRef.current?.destroy();
       playerRef.current = null;
@@ -95,11 +149,63 @@ const LightBirdPlayer = () => {
       subtitles.reset();
       setAudioTracks([]);
       setActiveAudioTrack("0");
+      isStreamRef.current = true;
+      startStallDetection();
     } else if (item.file) {
+      isStreamRef.current = false;
+      stopStallDetection();
       const subs = subtitleFilesMapRef.current.get(item.name) ?? [];
       processFile(item.file, subs);
     }
   }, [playlist.playlist, playlist.selectItem, subtitles, processFile]);
+
+  const handleSkipToNext = useCallback(() => {
+    setPlayerError(null);
+    clearRetryTimer();
+    if (playlist.currentIndex !== null && playlist.playlist.length > 1) {
+      loadVideo((playlist.currentIndex + 1) % playlist.playlist.length);
+    }
+  }, [playlist.currentIndex, playlist.playlist.length, loadVideo]);
+
+  const handleRetry = useCallback(() => {
+    setPlayerError(null);
+    clearRetryTimer();
+    retryCountRef.current = 0;
+    if (videoRef.current) {
+      videoRef.current.load();
+    }
+  }, []);
+
+  const handleDismissError = useCallback(() => {
+    setPlayerError(null);
+    clearRetryTimer();
+  }, []);
+
+  // Handle video errors
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    const onError = () => {
+      const parsed = parseMediaError(el.error ?? null);
+      setPlayerError(parsed);
+
+      if (parsed.retryable && retryCountRef.current < MAX_RETRIES) {
+        const delay = Math.pow(2, retryCountRef.current) * 1000;
+        retryTimerRef.current = setTimeout(() => {
+          retryCountRef.current += 1;
+          el.load();
+        }, delay);
+      } else if (!parsed.recoverable) {
+        toast({ title: "Skipping unplayable file", description: parsed.message });
+        if (playlist.currentIndex !== null && playlist.playlist.length > 1) {
+          loadVideo((playlist.currentIndex + 1) % playlist.playlist.length);
+        }
+      }
+    };
+    el.addEventListener("error", onError);
+    return () => el.removeEventListener("error", onError);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playlist.currentIndex, playlist.playlist.length]);
 
   // Handle video ended: loop or advance playlist
   useEffect(() => {
@@ -117,9 +223,13 @@ const LightBirdPlayer = () => {
     return () => el.removeEventListener("ended", onEnded);
   }, [playback.loop, playlist.currentIndex, playlist.playlist.length, loadVideo]);
 
-  // Cleanup player on unmount
+  // Cleanup on unmount
   useEffect(() => {
-    return () => { playerRef.current?.destroy(); };
+    return () => {
+      playerRef.current?.destroy();
+      clearRetryTimer();
+      stopStallDetection();
+    };
   }, []);
 
   // Auto-hide the playlist sidebar when playing (unless pinned); restore when paused
@@ -141,6 +251,13 @@ const LightBirdPlayer = () => {
     const { videoFiles, subtitleFiles } = playlist.parseFiles(files);
     if (videoFiles.length === 0) return;
     const videoFile = videoFiles[0];
+
+    const validation = validateFile(videoFile);
+    if (!validation.valid) {
+      toast({ title: "Cannot load file", description: validation.reason, variant: "destructive" });
+      return;
+    }
+
     if (subtitleFiles.length > 0) {
       subtitleFilesMapRef.current.set(videoFile.name, subtitleFiles);
     }
@@ -162,6 +279,8 @@ const LightBirdPlayer = () => {
       subtitles.reset();
       setAudioTracks([]);
       setActiveAudioTrack("0");
+      isStreamRef.current = true;
+      startStallDetection();
     }
   }, [playlist, subtitles]);
 
@@ -254,6 +373,15 @@ const LightBirdPlayer = () => {
           loadingMessage={loadingMessage}
           processingProgress={processingProgress}
         />
+
+        {playerError && (
+          <PlayerErrorDisplay
+            error={playerError}
+            onRetry={playerError.retryable ? handleRetry : undefined}
+            onSkip={handleSkipToNext}
+            onDismiss={handleDismissError}
+          />
+        )}
 
         {playlist.currentItem && (
           <PlayerControls

@@ -1,4 +1,17 @@
-# Plan 05 — Robust Error Handling & Recovery
+# Plan 05 — Robust Error Handling & Recovery [DONE]
+
+## Implementation Summary (2026-03-11)
+
+All steps implemented and tests passing (142 tests).
+
+- **`src/lib/media-error.ts`** — `parseMediaError` maps HTML5 `MediaError` codes (1–4) to `ParsedMediaError` with `type`, `message`, `recoverable`, `retryable`. `validateFile` checks extension and size (≤10 GB).
+- **`src/components/player-error-display.tsx`** — overlay component with AlertCircle icon, error message, and conditional Retry / Skip to Next / Dismiss buttons.
+- **`src/components/player-error-boundary.tsx`** — React class-based Error Boundary; catches render exceptions and shows a "Try again" fallback.
+- **`src/components/lightbird-player.tsx`** — wired `error` event listener with auto-retry (exponential backoff, max 3 retries); auto-skip on unrecoverable errors; stall detection for streams (checks every 5 s, reloads from last position); file validation before load.
+- **`src/app/page.tsx`** — wrapped `<LightBirdPlayer>` with `<PlayerErrorBoundary>`.
+- **Tests** — `src/lib/__tests__/media-error.test.ts`, `src/components/__tests__/player-error-display.test.tsx`, `src/components/__tests__/player-error-boundary.test.tsx`.
+
+---
 
 ## Problem
 

@@ -1,4 +1,5 @@
 import LightBirdPlayer from "@/components/lightbird-player";
+import { PlayerErrorBoundary } from "@/components/player-error-boundary";
 
 export default function Home() {
   return (
@@ -7,7 +8,9 @@ export default function Home() {
         <h1 className="text-xl font-headline font-black tracking-widest" style={{color: 'hsl(var(--accent))'}}>LIGHTBIRD</h1>
       </header>
       <div className="flex-1 flex overflow-hidden">
-        <LightBirdPlayer />
+        <PlayerErrorBoundary>
+          <LightBirdPlayer />
+        </PlayerErrorBoundary>
       </div>
     </main>
   );
