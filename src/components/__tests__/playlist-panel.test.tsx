@@ -3,6 +3,19 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import PlaylistPanel from '@/components/playlist-panel';
 import type { PlaylistItem } from '@/types';
 
+// Mock @tanstack/react-virtual so all items are rendered in JSDOM (no real scroll height)
+jest.mock('@tanstack/react-virtual', () => ({
+  useVirtualizer: ({ count, estimateSize }: { count: number; estimateSize: () => number }) => ({
+    getVirtualItems: () =>
+      Array.from({ length: count }, (_, i) => ({
+        key: i,
+        index: i,
+        start: i * estimateSize(),
+      })),
+    getTotalSize: () => count * estimateSize(),
+  }),
+}));
+
 const defaultProps = {
   playlist: [] as PlaylistItem[],
   currentVideoIndex: null,

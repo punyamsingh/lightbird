@@ -1,4 +1,21 @@
-# Plan 04 — Performance Optimization
+# Plan 04 — Performance Optimization [DONE]
+
+## Implementation Summary (2026-03-11)
+
+All seven optimisation steps implemented:
+
+1. **React.memo** — `PlayerControls` and `PlaylistPanel` wrapped with `React.memo` to prevent unnecessary re-renders on every `timeupdate` tick.
+2. **useMemo in PlayerControls** — `formattedProgress` and `formattedDuration` memoized so `formatTime` is not called on every render.
+3. **Debounced localStorage** — `onTimeUpdate` now debounces writes to `localStorage` by 5 seconds via a `setTimeout` ref, reducing writes from ~4/sec to ~0.2/sec.
+4. **rAF-throttled filter CSS** — `applyFilters` schedules DOM filter/transform writes through `requestAnimationFrame`, capping updates at 60 fps during rapid slider drags.
+5. **Playlist virtualisation** — `PlaylistPanel` uses `@tanstack/react-virtual` (`useVirtualizer`) to render only visible items regardless of playlist size. `ScrollArea` (Radix) replaced with a native `div` as the scroll container.
+6. **Lazy FFmpeg** — `mkv-player.ts` no longer statically imports `getFFmpeg` or `fetchFile`; both are dynamically imported inside `initialize`, `_remux`, and `_extractSubtitle`, so the ~31 MB WASM binary is never fetched for MP4-only users.
+7. **Stable callbacks** — All handler functions passed as props to `PlayerControls`/`PlaylistPanel` wrapped in `useCallback` with correct dependency arrays to preserve referential stability and maximise `React.memo` effectiveness. Inline arrow functions removed from JSX.
+
+New dependency added: `@tanstack/react-virtual` ^3.x.
+Test mock added in `playlist-panel.test.tsx` for `useVirtualizer` (JSDOM has no real scroll height).
+
+---
 
 ## Problem
 

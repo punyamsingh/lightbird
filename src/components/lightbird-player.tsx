@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import type { PlaylistItem, AudioTrack } from "@/types";
 import { cn } from "@/lib/utils";
 import PlayerControls from "@/components/player-controls";
@@ -149,7 +149,7 @@ const LightBirdPlayer = () => {
     await processFile(videoFile, subtitleFiles);
   };
 
-  const handleAddStream = (url: string, name?: string) => {
+  const handleAddStream = useCallback((url: string, name?: string) => {
     const newIndex = playlist.playlist.length;
     const newItem: PlaylistItem = {
       name: name || `Stream ${newIndex + 1}`,
@@ -164,9 +164,9 @@ const LightBirdPlayer = () => {
       setAudioTracks([]);
       setActiveAudioTrack("0");
     }
-  };
+  }, [playlist, subtitles]);
 
-  const handleSubtitleChange = async (id: string) => {
+  const handleSubtitleChange = useCallback(async (id: string) => {
     subtitles.switchSubtitle(id);
     if (playerRef.current) {
       try {
@@ -175,9 +175,9 @@ const LightBirdPlayer = () => {
         console.error("Player subtitle switch failed:", error);
       }
     }
-  };
+  }, [subtitles]);
 
-  const handleAudioTrackChange = async (id: string) => {
+  const handleAudioTrackChange = useCallback(async (id: string) => {
     if (!playerRef.current) return;
     try {
       setIsLoading(true);
@@ -191,9 +191,9 @@ const LightBirdPlayer = () => {
       setIsLoading(false);
       setLoadingMessage("");
     }
-  };
+  }, [toast]);
 
-  const captureScreenshot = () => {
+  const captureScreenshot = useCallback(() => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
@@ -209,19 +209,30 @@ const LightBirdPlayer = () => {
     a.download = `lightbird-screenshot-${new Date().toISOString()}.png`;
     a.click();
     toast({ title: "Screenshot Saved" });
-  };
+  }, [toast]);
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
     if (playlist.currentIndex !== null && playlist.playlist.length > 1) {
       loadVideo((playlist.currentIndex + 1) % playlist.playlist.length);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playlist.currentIndex, playlist.playlist.length]);
 
-  const handlePrevious = () => {
+  const handlePrevious = useCallback(() => {
     if (playlist.currentIndex !== null && playlist.playlist.length > 1) {
       loadVideo((playlist.currentIndex - 1 + playlist.playlist.length) % playlist.playlist.length);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playlist.currentIndex, playlist.playlist.length]);
+
+  const handleSubtitleUpload = useCallback(() => {
+    subtitleInputRef.current?.click();
+  }, []);
+
+  const handleSelectVideo = useCallback((index: number) => {
+    loadVideo(index);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playlist.playlist]);
 
   const handlePlaylistToggle = () => {
     wasAutoHiddenRef.current = false;
@@ -279,7 +290,7 @@ const LightBirdPlayer = () => {
             onZoomChange={filters.setZoom}
             onSubtitleChange={handleSubtitleChange}
             onAudioTrackChange={handleAudioTrackChange}
-            onSubtitleUpload={() => subtitleInputRef.current?.click()}
+            onSubtitleUpload={handleSubtitleUpload}
             onSubtitleRemove={subtitles.removeSubtitle}
           />
         )}
@@ -309,7 +320,7 @@ const LightBirdPlayer = () => {
       <PlaylistPanel
         playlist={playlist.playlist}
         currentVideoIndex={playlist.currentIndex}
-        onSelectVideo={loadVideo}
+        onSelectVideo={handleSelectVideo}
         onFilesAdded={handleFileChange}
         onAddStream={handleAddStream}
         isOpen={playlistOpen}

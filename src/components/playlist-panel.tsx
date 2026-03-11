@@ -2,7 +2,6 @@
 
 import React, { useRef, useState } from "react";
 import type { PlaylistItem } from "@/types";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -11,6 +10,7 @@ import {
   FilePlus, Link, ListVideo, Tv,
   Pin, PinOff, ChevronLeft, ChevronRight, Maximize2, Minimize2,
 } from "lucide-react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 
 export type PlaylistSize = "sm" | "md" | "lg";
 
@@ -40,7 +40,7 @@ interface PlaylistPanelProps {
   onSizeChange: (size: PlaylistSize) => void;
 }
 
-const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
+export const PlaylistPanel = React.memo(function PlaylistPanel({
   playlist,
   currentVideoIndex,
   onSelectVideo,
@@ -52,9 +52,17 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
   onToggle,
   onTogglePin,
   onSizeChange,
-}) => {
+}: PlaylistPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [streamUrl, setStreamUrl] = useState("");
+
+  const virtualizer = useVirtualizer({
+    count: playlist.length,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: () => 48,
+    overscan: 5,
+  });
 
   const handleStreamUrlSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -194,38 +202,54 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
             </form>
           </div>
 
-          {/* Playlist items */}
-          <ScrollArea className="flex-1">
-            <div className="p-2 space-y-1">
-              {playlist.length === 0 ? (
-                <div className="text-center text-xs text-muted-foreground py-10 px-2">
-                  <p>Your playlist is empty.</p>
-                  <p>Add files or a stream URL to get started.</p>
-                </div>
-              ) : (
-                playlist.map((item, index) => (
-                  <button
-                    key={index}
-                    onClick={() => onSelectVideo(index)}
-                    className={cn(
-                      "w-full text-left p-2 rounded-md text-xs flex items-center gap-2",
-                      "hover:bg-muted transition-colors",
-                      index === currentVideoIndex ? "bg-primary/20 text-primary-foreground" : ""
-                    )}
-                  >
-                    {item.type === "video"
-                      ? <ListVideo className="w-3.5 h-3.5 shrink-0" />
-                      : <Tv className="w-3.5 h-3.5 shrink-0" />}
-                    <span className="truncate">{item.name}</span>
-                  </button>
-                ))
-              )}
-            </div>
-          </ScrollArea>
+          {/* Playlist items — virtualised */}
+          <div ref={scrollContainerRef} className="flex-1 overflow-auto p-2">
+            {playlist.length === 0 ? (
+              <div className="text-center text-xs text-muted-foreground py-10 px-2">
+                <p>Your playlist is empty.</p>
+                <p>Add files or a stream URL to get started.</p>
+              </div>
+            ) : (
+              <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
+                {virtualizer.getVirtualItems().map((vItem) => {
+                  const item = playlist[vItem.index];
+                  const index = vItem.index;
+                  return (
+                    <div
+                      key={vItem.key}
+                      ref={virtualizer.measureElement}
+                      data-index={vItem.index}
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        transform: `translateY(${vItem.start}px)`,
+                      }}
+                    >
+                      <button
+                        onClick={() => onSelectVideo(index)}
+                        className={cn(
+                          "w-full text-left p-2 rounded-md text-xs flex items-center gap-2",
+                          "hover:bg-muted transition-colors",
+                          index === currentVideoIndex ? "bg-primary/20 text-primary-foreground" : ""
+                        )}
+                      >
+                        {item.type === "video"
+                          ? <ListVideo className="w-3.5 h-3.5 shrink-0" />
+                          : <Tv className="w-3.5 h-3.5 shrink-0" />}
+                        <span className="truncate">{item.name}</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </TooltipProvider>
   );
-};
+});
 
 export default PlaylistPanel;
