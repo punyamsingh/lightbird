@@ -265,6 +265,48 @@ const LightBirdPlayer = () => {
     await processFile(videoFile, subtitleFiles);
   };
 
+  const handleFolderFilesAdded = useCallback(
+    async (files: File[]) => {
+      const prevLen = playlist.playlist.length;
+      await playlist.addFiles(files);
+      // Auto-load the first added file if nothing is playing
+      if (playlist.currentIndex === null && files.length > 0) {
+        const newIndex = prevLen;
+        playlist.selectItem(newIndex);
+        await processFile(files[0]);
+      }
+    },
+    [playlist, processFile]
+  );
+
+  const handleRemoveItem = useCallback((index: number) => {
+    playlist.removeItem(index);
+  }, [playlist]);
+
+  const handleReorder = useCallback(
+    (newPlaylist: import("@/types").PlaylistItem[]) => {
+      playlist.reorderItems(newPlaylist);
+    },
+    [playlist]
+  );
+
+  const handleImportM3U = useCallback(
+    (items: Omit<import("@/types").PlaylistItem, "id">[]) => {
+      items.forEach((item) => {
+        playlist.appendItem({ ...item, id: crypto.randomUUID() });
+      });
+      if (playlist.currentIndex === null && items.length > 0) {
+        const firstStream = items.find((i) => i.type === "stream");
+        if (firstStream && videoRef.current) {
+          playlist.selectItem(0);
+          videoRef.current.src = firstStream.url;
+          subtitles.reset();
+        }
+      }
+    },
+    [playlist, subtitles]
+  );
+
   const handleAddStream = useCallback((url: string, name?: string) => {
     const newIndex = playlist.playlist.length;
     const newItem: PlaylistItem = {
@@ -446,7 +488,11 @@ const LightBirdPlayer = () => {
         currentVideoIndex={playlist.currentIndex}
         onSelectVideo={handleSelectVideo}
         onFilesAdded={handleFileChange}
+        onFolderFilesAdded={handleFolderFilesAdded}
         onAddStream={handleAddStream}
+        onRemoveItem={handleRemoveItem}
+        onReorder={handleReorder}
+        onImportM3U={handleImportM3U}
         isOpen={playlistOpen}
         isPinned={playlistPinned}
         size={playlistSize}

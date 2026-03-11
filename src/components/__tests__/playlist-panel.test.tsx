@@ -3,30 +3,37 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import PlaylistPanel from '@/components/playlist-panel';
 import type { PlaylistItem } from '@/types';
 
-// Capture args passed to useVirtualizer so tests can assert the wiring contract
-const useVirtualizerMock = jest.fn();
-
-// Mock @tanstack/react-virtual so all items are rendered in JSDOM (no real scroll height)
-jest.mock('@tanstack/react-virtual', () => ({
-  useVirtualizer: (options: {
-    count: number;
-    estimateSize: () => number;
-    getScrollElement: () => Element | null;
-    overscan: number;
-  }) => {
-    useVirtualizerMock(options);
-    const { count, estimateSize } = options;
-    return {
-      getVirtualItems: () =>
-        Array.from({ length: count }, (_, i) => ({
-          key: i,
-          index: i,
-          start: i * estimateSize(),
-        })),
-      getTotalSize: () => count * estimateSize(),
-      measureElement: () => {},
-    };
+// Mock @dnd-kit to avoid needing pointer events in jsdom
+jest.mock('@dnd-kit/core', () => ({
+  DndContext: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  closestCenter: jest.fn(),
+}));
+jest.mock('@dnd-kit/sortable', () => ({
+  SortableContext: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  verticalListSortingStrategy: jest.fn(),
+  useSortable: () => ({
+    attributes: {},
+    listeners: {},
+    setNodeRef: jest.fn(),
+    transform: null,
+    transition: null,
+    isDragging: false,
+  }),
+  arrayMove: (arr: unknown[], from: number, to: number) => {
+    const result = [...arr];
+    const [removed] = result.splice(from, 1);
+    result.splice(to, 0, removed);
+    return result;
   },
+}));
+jest.mock('@dnd-kit/utilities', () => ({
+  CSS: { Transform: { toString: () => '' } },
+}));
+
+// Mock m3u-parser to avoid DOM side effects in export tests
+jest.mock('@/lib/m3u-parser', () => ({
+  exportPlaylist: jest.fn(),
+  parseM3U8: jest.fn().mockReturnValue([]),
 }));
 
 const defaultProps = {
@@ -34,7 +41,11 @@ const defaultProps = {
   currentVideoIndex: null,
   onSelectVideo: jest.fn(),
   onFilesAdded: jest.fn(),
+  onFolderFilesAdded: jest.fn(),
   onAddStream: jest.fn(),
+  onRemoveItem: jest.fn(),
+  onReorder: jest.fn(),
+  onImportM3U: jest.fn(),
   isOpen: true,
   isPinned: false,
   size: 'md' as const,
@@ -44,9 +55,9 @@ const defaultProps = {
 };
 
 const mockPlaylist: PlaylistItem[] = [
-  { name: 'Video 1.mp4', url: 'blob:url1', type: 'video' },
-  { name: 'Video 2.mkv', url: 'blob:url2', type: 'video' },
-  { name: 'Live Stream', url: 'http://example.com/stream', type: 'stream' },
+  { id: 'id-1', name: 'Video 1.mp4', url: 'blob:url1', type: 'video' },
+  { id: 'id-2', name: 'Video 2.mkv', url: 'blob:url2', type: 'video' },
+  { id: 'id-3', name: 'Live Stream', url: 'http://example.com/stream', type: 'stream' },
 ];
 
 describe('PlaylistPanel', () => {
@@ -66,18 +77,6 @@ describe('PlaylistPanel', () => {
     expect(screen.getByText('Live Stream')).toBeInTheDocument();
   });
 
-  it('passes correct virtualizer configuration', () => {
-    render(<PlaylistPanel {...defaultProps} playlist={mockPlaylist} />);
-    expect(useVirtualizerMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        count: mockPlaylist.length,
-        estimateSize: expect.any(Function),
-        getScrollElement: expect.any(Function),
-        overscan: 5,
-      }),
-    );
-  });
-
   it('does not render the empty state when playlist has items', () => {
     render(<PlaylistPanel {...defaultProps} playlist={mockPlaylist} />);
     expect(screen.queryByText(/Your playlist is empty/)).not.toBeInTheDocument();
@@ -85,14 +84,16 @@ describe('PlaylistPanel', () => {
 
   it('applies visual distinction to the currently playing item', () => {
     render(<PlaylistPanel {...defaultProps} playlist={mockPlaylist} currentVideoIndex={1} />);
-    const activeButton = screen.getByText('Video 2.mkv').closest('button');
-    expect(activeButton?.className).toContain('bg-primary');
+    // The active item wrapper div has bg-primary class
+    const activeItem = screen.getByText('Video 2.mkv').closest('button');
+    // The parent div should have bg-primary class
+    expect(activeItem?.parentElement?.className).toContain('bg-primary');
   });
 
   it('does not mark other items as active', () => {
     render(<PlaylistPanel {...defaultProps} playlist={mockPlaylist} currentVideoIndex={0} />);
-    const inactiveButton = screen.getByText('Video 2.mkv').closest('button');
-    expect(inactiveButton?.className).not.toContain('bg-primary');
+    const inactiveItem = screen.getByText('Video 2.mkv').closest('button');
+    expect(inactiveItem?.parentElement?.className).not.toContain('bg-primary');
   });
 
   it('calls onSelectVideo with the correct index when an item is clicked', () => {
@@ -168,5 +169,57 @@ describe('PlaylistPanel', () => {
   it('shows Unpin label when isPinned is true', () => {
     render(<PlaylistPanel {...defaultProps} isPinned={true} />);
     expect(screen.getByRole('button', { name: /unpin playlist/i })).toBeInTheDocument();
+  });
+
+  it('renders a remove button for each playlist item', () => {
+    render(<PlaylistPanel {...defaultProps} playlist={mockPlaylist} />);
+    const removeButtons = screen.getAllByRole('button', { name: /remove from playlist/i });
+    expect(removeButtons).toHaveLength(mockPlaylist.length);
+  });
+
+  it('calls onRemoveItem with the correct index when remove is clicked', () => {
+    render(<PlaylistPanel {...defaultProps} playlist={mockPlaylist} />);
+    const removeButtons = screen.getAllByRole('button', { name: /remove from playlist/i });
+    fireEvent.click(removeButtons[1]);
+    expect(defaultProps.onRemoveItem).toHaveBeenCalledWith(1);
+  });
+
+  it('shows an Export button when playlist has items', () => {
+    render(<PlaylistPanel {...defaultProps} playlist={mockPlaylist} />);
+    expect(screen.getByRole('button', { name: /export playlist/i })).toBeInTheDocument();
+  });
+
+  it('does not show Export button when playlist is empty', () => {
+    render(<PlaylistPanel {...defaultProps} />);
+    expect(screen.queryByRole('button', { name: /export playlist/i })).not.toBeInTheDocument();
+  });
+
+  it('shows an Import Playlist button', () => {
+    render(<PlaylistPanel {...defaultProps} />);
+    expect(screen.getByRole('button', { name: /import playlist/i })).toBeInTheDocument();
+  });
+
+  it('shows the Open Folder button', () => {
+    render(<PlaylistPanel {...defaultProps} />);
+    expect(screen.getByRole('button', { name: /open folder/i })).toBeInTheDocument();
+  });
+
+  it('shows sort control when playlist has more than 1 item', () => {
+    render(<PlaylistPanel {...defaultProps} playlist={mockPlaylist} />);
+    expect(screen.getByRole('combobox', { name: /sort playlist/i })).toBeInTheDocument();
+  });
+
+  it('does not show sort control when playlist has 1 or fewer items', () => {
+    render(<PlaylistPanel {...defaultProps} playlist={[mockPlaylist[0]]} />);
+    expect(screen.queryByRole('combobox', { name: /sort playlist/i })).not.toBeInTheDocument();
+  });
+
+  it('shows duration badge when item has a duration', () => {
+    const playlistWithDuration: PlaylistItem[] = [
+      { id: 'id-1', name: 'Video.mp4', url: 'blob:url1', type: 'video', duration: 125 },
+    ];
+    render(<PlaylistPanel {...defaultProps} playlist={playlistWithDuration} />);
+    // 125 seconds = 2:05
+    expect(screen.getByText('2:05')).toBeInTheDocument();
   });
 });
