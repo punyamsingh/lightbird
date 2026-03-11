@@ -60,6 +60,8 @@ export class MKVPlayer {
   private objectUrl: string | null = null;
   // Maps subtitle track ID → ffmpeg subtitle stream index
   private subtitleTrackMap: Map<string, number> = new Map();
+  // Maps subtitle track ID → blob URL for cleanup
+  private subtitleBlobUrls: Map<string, string> = new Map();
   private onProgress?: (progress: number) => void;
 
   constructor(file: File, onProgress?: (progress: number) => void) {
@@ -88,53 +90,56 @@ export class MKVPlayer {
         ffmpeg.on('progress', progressHandler);
       }
 
-      // Write file to FFmpeg virtual FS
-      await ffmpeg.writeFile(this.file.name, await fetchFile(this.file));
-
-      // Probe to collect stream info via log output
-      const logs: string[] = [];
-      const logHandler = ({ message }: { message: string }) => logs.push(message);
-      ffmpeg.on('log', logHandler);
       try {
-        await ffmpeg.exec(['-i', this.file.name, '-f', 'null', '-']);
-      } catch {
-        // ffmpeg exits with error when output is /dev/null – this is expected
-      }
-      ffmpeg.off('log', logHandler);
+        // Write file to FFmpeg virtual FS
+        await ffmpeg.writeFile(this.file.name, await fetchFile(this.file));
 
-      const { audioTracks, subtitleTracks } = parseStreamInfo(logs.join('\n'));
+        // Probe to collect stream info via log output
+        const logs: string[] = [];
+        const logHandler = ({ message }: { message: string }) => logs.push(message);
+        ffmpeg.on('log', logHandler);
+        try {
+          await ffmpeg.exec(['-i', this.file.name, '-f', 'null', '-']);
+        } catch {
+          // ffmpeg exits with error when output is /dev/null – this is expected
+        }
+        ffmpeg.off('log', logHandler);
 
-      // Build audio track metadata
-      this.playerFile.audioTracks =
-        audioTracks.length > 0
-          ? audioTracks.map((t, i) => ({
-              id: String(i),
-              name: t.title ?? (t.lang ? `Audio ${i + 1} (${t.lang})` : `Audio ${i + 1}`),
-              lang: t.lang ?? 'unknown',
-            }))
-          : [{ id: '0', name: 'Default Audio', lang: 'unknown' }];
+        const { audioTracks, subtitleTracks } = parseStreamInfo(logs.join('\n'));
 
-      // Build subtitle track metadata and populate the ID→index map
-      this.subtitleTrackMap.clear();
-      this.playerFile.subtitleTracks = subtitleTracks.map((t, i) => {
-        const id = String(i);
-        this.subtitleTrackMap.set(id, i);
-        return {
-          id,
-          name: t.title ?? (t.lang ? `Subtitle ${i + 1} (${t.lang})` : `Subtitle ${i + 1}`),
-          lang: t.lang ?? 'unknown',
-          type: 'embedded' as const,
-        };
-      });
+        // Build audio track metadata
+        this.playerFile.audioTracks =
+          audioTracks.length > 0
+            ? audioTracks.map((t, i) => ({
+                id: String(i),
+                name: t.title ?? (t.lang ? `Audio ${i + 1} (${t.lang})` : `Audio ${i + 1}`),
+                lang: t.lang ?? 'unknown',
+              }))
+            : [{ id: '0', name: 'Default Audio', lang: 'unknown' }];
 
-      // Remux with the first audio track so the browser can play it
-      const url = await this._remux(0);
-      this.playerFile.videoUrl = url;
-      videoElement.src = url;
+        // Build subtitle track metadata and populate the ID→index map
+        this.subtitleTrackMap.clear();
+        this.playerFile.subtitleTracks = subtitleTracks.map((t, i) => {
+          const id = String(i);
+          this.subtitleTrackMap.set(id, i);
+          return {
+            id,
+            name: t.title ?? (t.lang ? `Subtitle ${i + 1} (${t.lang})` : `Subtitle ${i + 1}`),
+            lang: t.lang ?? 'unknown',
+            type: 'embedded' as const,
+          };
+        });
 
-      if (this.onProgress) {
-        ffmpeg.off('progress', progressHandler);
-        this.onProgress(1);
+        // Remux with the first audio track so the browser can play it
+        const url = await this._remux(0);
+        this.playerFile.videoUrl = url;
+        videoElement.src = url;
+
+        this.onProgress?.(1);
+      } finally {
+        if (this.onProgress) {
+          ffmpeg.off('progress', progressHandler);
+        }
       }
     } catch (error) {
       console.error('MKVPlayer: FFmpeg initialisation failed, falling back to native playback', error);
@@ -251,6 +256,7 @@ export class MKVPlayer {
       const vttContent = await SubtitleConverter.convertSrtToVtt(srtContent);
       const blob = new Blob([vttContent], { type: 'text/vtt' });
       const url = URL.createObjectURL(blob);
+      this.subtitleBlobUrls.set(trackId, url);
 
       const track = document.createElement('track');
       track.kind = 'subtitles';
@@ -279,6 +285,10 @@ export class MKVPlayer {
       URL.revokeObjectURL(this.objectUrl);
       this.objectUrl = null;
     }
+    for (const url of this.subtitleBlobUrls.values()) {
+      URL.revokeObjectURL(url);
+    }
+    this.subtitleBlobUrls.clear();
   }
 
   static isCompatible(file: File): boolean {
