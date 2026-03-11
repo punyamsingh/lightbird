@@ -22,6 +22,8 @@ const LightBirdPlayer = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const subtitleInputRef = useRef<HTMLInputElement>(null);
   const playerRef = useRef<VideoPlayer | null>(null);
+  // Companion map: preserves external subtitle files for re-loading playlist items
+  const subtitleFilesMapRef = useRef<Map<string, File[]>>(new Map());
 
   const { toast } = useToast();
   const playlist = usePlaylist();
@@ -88,7 +90,8 @@ const LightBirdPlayer = () => {
       setAudioTracks([]);
       setActiveAudioTrack("0");
     } else if (item.file) {
-      processFile(item.file);
+      const subs = subtitleFilesMapRef.current.get(item.name) ?? [];
+      processFile(item.file, subs);
     }
   };
 
@@ -118,6 +121,9 @@ const LightBirdPlayer = () => {
     const { videoFiles, subtitleFiles } = playlist.parseFiles(files);
     if (videoFiles.length === 0) return;
     const videoFile = videoFiles[0];
+    if (subtitleFiles.length > 0) {
+      subtitleFilesMapRef.current.set(videoFile.name, subtitleFiles);
+    }
     playlist.replaceWithFile(videoFile);
     await processFile(videoFile, subtitleFiles);
   };
@@ -151,17 +157,16 @@ const LightBirdPlayer = () => {
   };
 
   const handleAudioTrackChange = async (id: string) => {
-    setActiveAudioTrack(id);
     if (!playerRef.current) return;
     try {
       setIsLoading(true);
       setLoadingMessage("Switching audio track...");
       await playerRef.current.switchAudioTrack(id);
-      setIsLoading(false);
-      setLoadingMessage("");
+      setActiveAudioTrack(id);
     } catch (error) {
       console.error("Failed to switch audio track:", error);
       toast({ title: "Failed to switch audio track", variant: "destructive" });
+    } finally {
       setIsLoading(false);
       setLoadingMessage("");
     }

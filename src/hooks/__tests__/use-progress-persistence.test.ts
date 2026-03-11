@@ -37,24 +37,37 @@ describe("useProgressPersistence", () => {
     expect(el.currentTime).toBe(0);
   });
 
-  it("saves position to localStorage after debounce", () => {
+  it("saves position to localStorage after debounce fires", () => {
     const el = document.createElement("video");
     Object.defineProperty(el, "currentTime", { value: 60, writable: true });
     const ref = { current: el };
     renderHook(() => useProgressPersistence(ref, "movie.mp4"));
 
-    act(() => {
-      el.dispatchEvent(new Event("timeupdate"));
-    });
+    act(() => { el.dispatchEvent(new Event("timeupdate")); });
 
-    // Not saved yet (debounced)
+    // Not saved yet before debounce fires
     expect(localStorage.getItem("lightbirdplayer-movie.mp4")).toBeNull();
 
-    act(() => {
-      jest.advanceTimersByTime(5000);
-    });
+    act(() => { jest.advanceTimersByTime(5000); });
 
     expect(localStorage.getItem("lightbirdplayer-movie.mp4")).toBe("60");
+  });
+
+  it("flushes pending position to localStorage on cleanup (unmount/video switch)", () => {
+    const el = document.createElement("video");
+    Object.defineProperty(el, "currentTime", { value: 75, writable: true });
+    const ref = { current: el };
+    const { unmount } = renderHook(() => useProgressPersistence(ref, "movie.mp4"));
+
+    act(() => { el.dispatchEvent(new Event("timeupdate")); });
+
+    // Still within debounce window — not saved yet
+    act(() => { jest.advanceTimersByTime(1000); });
+    expect(localStorage.getItem("lightbirdplayer-movie.mp4")).toBeNull();
+
+    // Unmount flushes immediately
+    unmount();
+    expect(localStorage.getItem("lightbirdplayer-movie.mp4")).toBe("75");
   });
 
   it("debounces — only saves once after multiple timeupdate events", () => {
