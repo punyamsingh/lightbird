@@ -9,6 +9,12 @@ const defaultProps = {
   onSelectVideo: jest.fn(),
   onFilesAdded: jest.fn(),
   onAddStream: jest.fn(),
+  isOpen: true,
+  isPinned: false,
+  size: 'md' as const,
+  onToggle: jest.fn(),
+  onTogglePin: jest.fn(),
+  onSizeChange: jest.fn(),
 };
 
 const mockPlaylist: PlaylistItem[] = [
@@ -84,5 +90,45 @@ describe('PlaylistPanel', () => {
     const urlInput = screen.getByPlaceholderText('Enter stream URL');
     fireEvent.submit(urlInput.closest('form')!);
     expect(defaultProps.onAddStream).not.toHaveBeenCalled();
+  });
+
+  it('calls onToggle when the collapse button is clicked', () => {
+    render(<PlaylistPanel {...defaultProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /collapse/i }));
+    expect(defaultProps.onToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onTogglePin when the pin button is clicked', () => {
+    render(<PlaylistPanel {...defaultProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /pin playlist/i }));
+    expect(defaultProps.onTogglePin).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onSizeChange when the resize button is clicked', () => {
+    render(<PlaylistPanel {...defaultProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /resize playlist/i }));
+    expect(defaultProps.onSizeChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows collapsed drawer strip when isOpen is false', () => {
+    render(<PlaylistPanel {...defaultProps} isOpen={false} />);
+    expect(screen.getByRole('button', { name: /expand playlist/i })).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Enter stream URL')).not.toBeInTheDocument();
+  });
+
+  it('calls onToggle when the expand button is clicked in collapsed state', () => {
+    render(<PlaylistPanel {...defaultProps} isOpen={false} />);
+    fireEvent.click(screen.getByRole('button', { name: /expand playlist/i }));
+    expect(defaultProps.onToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows item count badge in collapsed state when playlist has items', () => {
+    render(<PlaylistPanel {...defaultProps} isOpen={false} playlist={mockPlaylist} />);
+    expect(screen.getByText('3')).toBeInTheDocument();
+  });
+
+  it('shows Unpin label when isPinned is true', () => {
+    render(<PlaylistPanel {...defaultProps} isPinned={true} />);
+    expect(screen.getByRole('button', { name: /unpin playlist/i })).toBeInTheDocument();
   });
 });
