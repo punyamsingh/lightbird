@@ -22,6 +22,7 @@ import { useVideoInfo } from "@/hooks/use-video-info";
 import { parseMediaError, validateFile, type ParsedMediaError } from "@/lib/media-error";
 import { loadShortcuts } from "@/lib/keyboard-shortcuts";
 import type { ShortcutBinding } from "@/lib/keyboard-shortcuts";
+import { ProgressEstimator } from "@/lib/progress-estimator";
 
 const MAX_RETRIES = 3;
 
@@ -52,11 +53,14 @@ const LightBirdPlayer = () => {
   const [showShortcutsDialog, setShowShortcutsDialog] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
 
+  const progressEstimatorRef = useRef<ProgressEstimator | null>(null);
   const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
   const [activeAudioTrack, setActiveAudioTrack] = useState("0");
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [processingProgress, setProcessingProgress] = useState(0);
+  const [processingEta, setProcessingEta] = useState<number | null>(null);
+  const [processingThroughput, setProcessingThroughput] = useState<number | null>(null);
   const [playerError, setPlayerError] = useState<ParsedMediaError | null>(null);
 
   const shortcutHandlers = useMemo(() => ({
@@ -127,6 +131,9 @@ const LightBirdPlayer = () => {
     setLoadingMessage("Initializing player...");
     setProcessingProgress(0);
     setPlayerError(null);
+    progressEstimatorRef.current = new ProgressEstimator(file.size);
+    setProcessingEta(null);
+    setProcessingThroughput(null);
     retryCountRef.current = 0;
     isStreamRef.current = false;
     stopStallDetection();
@@ -134,9 +141,14 @@ const LightBirdPlayer = () => {
       playerRef.current?.destroy();
       subtitles.reset();
       const player = createVideoPlayer(file, subtitleFiles, (progress) => {
+        progressEstimatorRef.current?.update(progress);
+        const est = progressEstimatorRef.current?.getEstimate();
+
         setProcessingProgress(progress);
         if (progress < 1) {
           setLoadingMessage(`Processing video… ${Math.round(progress * 100)}%`);
+          setProcessingEta(est?.etaSeconds ?? null);
+          setProcessingThroughput(est && est.speedMBps > 0 ? est.speedMBps : null);
         }
       });
       playerRef.current = player;
@@ -161,6 +173,10 @@ const LightBirdPlayer = () => {
       setIsLoading(false);
       setLoadingMessage("");
       setProcessingProgress(0);
+    } finally {
+      progressEstimatorRef.current = null;
+      setProcessingEta(null);
+      setProcessingThroughput(null);
     }
   }, [subtitles, toast]);
 
@@ -444,6 +460,8 @@ const LightBirdPlayer = () => {
           isLoading={isLoading}
           loadingMessage={loadingMessage}
           processingProgress={processingProgress}
+          eta={processingEta}
+          throughputMBs={processingThroughput}
         />
 
         {playerError && (
