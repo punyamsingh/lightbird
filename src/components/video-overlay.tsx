@@ -6,9 +6,12 @@ interface VideoOverlayProps {
   isLoading: boolean;
   loadingMessage: string;
   processingProgress?: number;
+  eta?: number | null;        // seconds remaining (null = not yet calculable)
+  throughputMBs?: number | null; // MB/s (null = not yet calculable)
+  onCancel?: () => void; // when provided, shows a Cancel button
 }
 
-export function VideoOverlay({ isLoading, loadingMessage, processingProgress = 0 }: VideoOverlayProps) {
+export function VideoOverlay({ isLoading, loadingMessage, processingProgress = 0, eta, throughputMBs, onCancel }: VideoOverlayProps) {
   if (!isLoading && !loadingMessage) return null;
 
   return (
@@ -18,12 +21,28 @@ export function VideoOverlay({ isLoading, loadingMessage, processingProgress = 0
         {loadingMessage || "Processing video..."}
       </p>
       {processingProgress > 0 && processingProgress < 1 && (
-        <div className="mt-4 w-64 bg-gray-700 rounded-full h-2">
-          <div
-            className="bg-primary h-2 rounded-full transition-all duration-300"
-            style={{ width: `${Math.round(processingProgress * 100)}%` }}
-          />
-        </div>
+        <>
+          <div className="mt-4 w-64 bg-gray-700 rounded-full h-2">
+            <div
+              className="bg-primary h-2 rounded-full transition-all duration-300"
+              style={{ width: `${Math.round(processingProgress * 100)}%` }}
+            />
+          </div>
+          {throughputMBs !== null && throughputMBs !== undefined && (
+            <p className="mt-1 text-sm text-white/60">
+              {throughputMBs} MB/s
+              {eta !== null && eta !== undefined && ` · ~${eta}s left`}
+            </p>
+          )}
+        </>
+      )}
+      {onCancel && (
+        <button
+          onClick={onCancel}
+          className="mt-3 px-4 py-1.5 text-sm rounded border border-white/30 text-white/80 hover:bg-white/10 transition-colors"
+        >
+          Cancel
+        </button>
       )}
     </div>
   );

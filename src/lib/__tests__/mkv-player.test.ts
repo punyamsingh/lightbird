@@ -18,7 +18,7 @@ beforeAll(() => {
   (global as unknown as { Worker: jest.Mock }).Worker = MockWorkerConstructor;
 });
 
-import { MKVPlayer, parseStreamInfo } from '@/lib/players/mkv-player';
+import { MKVPlayer, parseStreamInfo, CancellationError } from '@/lib/players/mkv-player';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -347,3 +347,41 @@ describe('subtitle blob URL cleanup', () => {
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:subtitle-url');
   });
 });
+
+// ---------------------------------------------------------------------------
+// MKVPlayer — cancellation
+// ---------------------------------------------------------------------------
+
+describe('MKVPlayer cancellation', () => {
+  it('terminates worker and rejects with CancellationError on cancel()', async () => {
+    const player = new MKVPlayer(makeFile());
+    const videoEl = document.createElement('video');
+
+    // Start initialize (don't await — cancel before it resolves)
+    const initPromise = player.initialize(videoEl);
+
+    player.cancel();
+
+    // Must reject with CancellationError specifically (not just any error)
+    await expect(initPromise).rejects.toBeInstanceOf(CancellationError);
+    expect(mockWorkerInstance.terminate).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears pendingOperations after cancel()', async () => {
+    const player = new MKVPlayer(makeFile());
+    const videoEl = document.createElement('video');
+
+    // Trigger worker creation via initialize (don't await)
+    player.initialize(videoEl).catch(() => {});
+
+    player.cancel();
+
+    expect(player['pendingOperations'].size).toBe(0);
+  });
+
+  it('is a no-op when cancel() is called before the worker is created', () => {
+    const player = new MKVPlayer(makeFile());
+    expect(() => player.cancel()).not.toThrow();
+  });
+});
+
