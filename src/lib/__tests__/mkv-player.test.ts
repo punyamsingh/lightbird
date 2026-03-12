@@ -1,41 +1,24 @@
 // ---------------------------------------------------------------------------
-// Module mocks — jest.mock() is hoisted, so no external variables may be
-// referenced in the factory.  We wire up mockFFmpeg in beforeEach instead.
+// Worker mock — must be set up before importing MKVPlayer
 // ---------------------------------------------------------------------------
 
-jest.mock('@/lib/ffmpeg-singleton', () => ({
-  getFFmpeg: jest.fn(),
-  resetFFmpeg: jest.fn(),
-}));
+import type { WorkerOutbound } from '@/lib/workers/ffmpeg-worker';
 
-jest.mock('@ffmpeg/util', () => ({
-  fetchFile: jest.fn().mockResolvedValue(new Uint8Array()),
-  toBlobURL: jest.fn().mockResolvedValue('blob:mock-url'),
-}));
+let mockWorkerInstance: {
+  postMessage: jest.Mock;
+  onmessage: ((event: MessageEvent) => void) | null;
+  onerror: ((event: ErrorEvent) => void) | null;
+  terminate: jest.Mock;
+};
+
+// The constructor mock is defined at module level so it can be set on global
+const MockWorkerConstructor = jest.fn(() => mockWorkerInstance);
+
+beforeAll(() => {
+  (global as unknown as { Worker: jest.Mock }).Worker = MockWorkerConstructor;
+});
 
 import { MKVPlayer, parseStreamInfo } from '@/lib/players/mkv-player';
-import { getFFmpeg } from '@/lib/ffmpeg-singleton';
-
-const mockGetFFmpeg = getFFmpeg as jest.MockedFunction<typeof getFFmpeg>;
-
-// ---------------------------------------------------------------------------
-// Shared mock FFmpeg instance — recreated each test
-// ---------------------------------------------------------------------------
-
-let mockFFmpeg: any;
-
-function makeMockFFmpeg(execImpl?: () => Promise<void>) {
-  return {
-    on: jest.fn(),
-    off: jest.fn(),
-    exec: execImpl
-      ? jest.fn().mockImplementation(execImpl)
-      : jest.fn().mockRejectedValue(new Error('ffmpeg probe error')),
-    writeFile: jest.fn().mockResolvedValue(undefined),
-    readFile: jest.fn().mockResolvedValue(new Uint8Array([0, 1, 2, 3])),
-    deleteFile: jest.fn().mockResolvedValue(undefined),
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -44,6 +27,55 @@ function makeMockFFmpeg(execImpl?: () => Promise<void>) {
 function makeFile(name = 'test.mkv'): File {
   return new File(['mkv-content'], name, { type: 'video/x-matroska' });
 }
+
+/** Simulate a message arriving from the worker */
+function simulateWorkerMessage(msg: WorkerOutbound) {
+  mockWorkerInstance.onmessage?.({ data: msg } as MessageEvent);
+}
+
+/** Default logs for a successful probe */
+const DEFAULT_LOGS = [
+  '  Stream #0:0: Video: h264 (High), yuv420p, 1920x1080',
+  '  Stream #0:1(eng): Audio: aac, 48000 Hz, stereo',
+  '  Stream #0:2(jpn): Audio: ac3, 48000 Hz, 5.1',
+  '  Stream #0:3(eng): Subtitle: subrip',
+].join('\n');
+
+/**
+ * Start initialize, then resolve it immediately with a successful REMUX_DONE.
+ * Returns the resolved player file.
+ */
+async function initializeSuccess(
+  player: MKVPlayer,
+  videoEl: HTMLVideoElement,
+  logs = DEFAULT_LOGS,
+) {
+  const initPromise = player.initialize(videoEl);
+  // postMessage was called synchronously in sendToWorker's Promise executor
+  const msg = mockWorkerInstance.postMessage.mock.calls[0][0];
+  simulateWorkerMessage({
+    id: msg.id,
+    type: 'REMUX_DONE',
+    data: new Uint8Array([0, 1, 2, 3]),
+    logs,
+  });
+  return initPromise;
+}
+
+// ---------------------------------------------------------------------------
+// Setup / teardown
+// ---------------------------------------------------------------------------
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockWorkerInstance = {
+    postMessage: jest.fn(),
+    onmessage: null,
+    onerror: null,
+    terminate: jest.fn(),
+  };
+  MockWorkerConstructor.mockReturnValue(mockWorkerInstance);
+});
 
 // ---------------------------------------------------------------------------
 // parseStreamInfo
@@ -96,30 +128,95 @@ describe('parseStreamInfo', () => {
 });
 
 // ---------------------------------------------------------------------------
-// MKVPlayer
+// MKVPlayer — static helpers
 // ---------------------------------------------------------------------------
 
-describe('MKVPlayer', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    // Default: exec rejects → triggers the fallback native-playback path
-    mockFFmpeg = makeMockFFmpeg();
-    mockGetFFmpeg.mockResolvedValue(mockFFmpeg);
-  });
-
-  it('isCompatible returns true for .mkv files', () => {
+describe('MKVPlayer.isCompatible', () => {
+  it('returns true for .mkv files', () => {
     expect(MKVPlayer.isCompatible(makeFile('movie.mkv'))).toBe(true);
   });
 
-  it('isCompatible returns false for non-mkv files', () => {
+  it('returns false for non-mkv files', () => {
     expect(MKVPlayer.isCompatible(makeFile('movie.mp4'))).toBe(false);
     expect(MKVPlayer.isCompatible(makeFile('movie.avi'))).toBe(false);
   });
+});
 
-  it('falls back to native playback when FFmpeg throws', async () => {
+// ---------------------------------------------------------------------------
+// MKVPlayer — worker integration
+// ---------------------------------------------------------------------------
+
+describe('MKVPlayer worker integration', () => {
+  it('posts a REMUX message to the worker on initialize', async () => {
     const player = new MKVPlayer(makeFile());
     const videoEl = document.createElement('video');
-    await player.initialize(videoEl);
+
+    const initPromise = player.initialize(videoEl);
+
+    // postMessage was called synchronously before the first await resolved
+    expect(mockWorkerInstance.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'REMUX' }),
+    );
+
+    // Resolve initialize
+    const msg = mockWorkerInstance.postMessage.mock.calls[0][0];
+    simulateWorkerMessage({
+      id: msg.id,
+      type: 'REMUX_DONE',
+      data: new Uint8Array([0, 1, 2]),
+      logs: '  Stream #0:0: Video: h264\n  Stream #0:1(eng): Audio: aac, stereo',
+    });
+
+    await initPromise;
+    expect(player.getAudioTracks()).toHaveLength(1);
+  });
+
+  it('forwards PROGRESS messages to the onProgress callback', () => {
+    const onProgress = jest.fn();
+    const player = new MKVPlayer(makeFile(), onProgress);
+
+    // Trigger worker creation
+    player['getWorker']();
+
+    simulateWorkerMessage({ id: 'any', type: 'PROGRESS', progress: 0.5 });
+
+    expect(onProgress).toHaveBeenCalledWith(0.5);
+  });
+
+  it('calls worker.terminate() on destroy()', () => {
+    const player = new MKVPlayer(makeFile());
+    // Trigger lazy worker creation
+    player['getWorker']();
+    player.destroy();
+
+    expect(mockWorkerInstance.terminate).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onProgress(1) after successful initialize', async () => {
+    const onProgress = jest.fn();
+    const player = new MKVPlayer(makeFile(), onProgress);
+    const videoEl = document.createElement('video');
+
+    await initializeSuccess(player, videoEl);
+
+    expect(onProgress).toHaveBeenCalledWith(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// MKVPlayer — fallback path
+// ---------------------------------------------------------------------------
+
+describe('MKVPlayer fallback (worker ERROR)', () => {
+  it('falls back to native playback when the worker sends ERROR', async () => {
+    const player = new MKVPlayer(makeFile());
+    const videoEl = document.createElement('video');
+
+    const initPromise = player.initialize(videoEl);
+    const msg = mockWorkerInstance.postMessage.mock.calls[0][0];
+    simulateWorkerMessage({ id: msg.id, type: 'ERROR', error: 'FFmpeg failed' });
+
+    await initPromise;
 
     expect(player.getAudioTracks()).toHaveLength(1);
     expect(player.getAudioTracks()[0].id).toBe('0');
@@ -129,62 +226,59 @@ describe('MKVPlayer', () => {
   it('getSubtitles returns empty array on fallback', async () => {
     const player = new MKVPlayer(makeFile());
     const videoEl = document.createElement('video');
-    await player.initialize(videoEl);
+
+    const initPromise = player.initialize(videoEl);
+    const msg = mockWorkerInstance.postMessage.mock.calls[0][0];
+    simulateWorkerMessage({ id: msg.id, type: 'ERROR', error: 'fail' });
+
+    await initPromise;
     expect(player.getSubtitles()).toEqual([]);
   });
+});
 
-  describe('with successful FFmpeg probe and remux', () => {
-    beforeEach(() => {
-      // exec resolves for both probe and remux
-      mockFFmpeg = makeMockFFmpeg(() => Promise.resolve(undefined));
+// ---------------------------------------------------------------------------
+// MKVPlayer — successful probe and remux
+// ---------------------------------------------------------------------------
 
-      // When ffmpeg.on('log', handler) is called, feed stream-info messages
-      mockFFmpeg.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
-        if (event === 'log') {
-          // Deliver messages synchronously so they are captured before exec returns
-          handler({ message: '  Stream #0:0: Video: h264, 1920x1080' });
-          handler({ message: '  Stream #0:1(eng): Audio: aac, stereo' });
-          handler({ message: '  Stream #0:2(jpn): Audio: ac3, 5.1' });
-          handler({ message: '  Stream #0:3(eng): Subtitle: subrip' });
-        }
-      });
+describe('MKVPlayer with successful REMUX_DONE', () => {
+  it('populates audio tracks from logs', async () => {
+    const player = new MKVPlayer(makeFile());
+    const videoEl = document.createElement('video');
+    await initializeSuccess(player, videoEl);
 
-      mockGetFFmpeg.mockResolvedValue(mockFFmpeg);
-    });
-
-    it('populates audio tracks from FFmpeg probe output', async () => {
-      const player = new MKVPlayer(makeFile());
-      const videoEl = document.createElement('video');
-      await player.initialize(videoEl);
-
-      const tracks = player.getAudioTracks();
-      expect(tracks.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it('calls the onProgress callback with 1 on completion', async () => {
-      const onProgress = jest.fn();
-      const player = new MKVPlayer(makeFile(), onProgress);
-      const videoEl = document.createElement('video');
-      await player.initialize(videoEl);
-
-      expect(onProgress).toHaveBeenCalledWith(1);
-    });
-
-    it('exposes embedded subtitle track metadata', async () => {
-      const player = new MKVPlayer(makeFile());
-      const videoEl = document.createElement('video');
-      await player.initialize(videoEl);
-
-      const subs = player.getSubtitles();
-      expect(subs).toHaveLength(1);
-      expect(subs[0].type).toBe('embedded');
-      expect(subs[0].lang).toBe('eng');
-    });
+    const tracks = player.getAudioTracks();
+    expect(tracks.length).toBeGreaterThanOrEqual(1);
   });
 
+  it('exposes embedded subtitle track metadata', async () => {
+    const player = new MKVPlayer(makeFile());
+    const videoEl = document.createElement('video');
+    await initializeSuccess(player, videoEl);
+
+    const subs = player.getSubtitles();
+    expect(subs).toHaveLength(1);
+    expect(subs[0].type).toBe('embedded');
+    expect(subs[0].lang).toBe('eng');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// MKVPlayer — lifecycle edge cases
+// ---------------------------------------------------------------------------
+
+describe('MKVPlayer lifecycle', () => {
   it('destroy does not throw when called before initialize', () => {
     const player = new MKVPlayer(makeFile());
     expect(() => player.destroy()).not.toThrow();
+  });
+
+  it('destroy does not throw when called multiple times', () => {
+    const player = new MKVPlayer(makeFile());
+    player['getWorker']();
+    expect(() => {
+      player.destroy();
+      player.destroy();
+    }).not.toThrow();
   });
 
   it('switchAudioTrack is a no-op if videoElement is not set', async () => {
@@ -195,106 +289,61 @@ describe('MKVPlayer', () => {
   it('switchSubtitle with "-1" does nothing', async () => {
     const player = new MKVPlayer(makeFile());
     const videoEl = document.createElement('video');
-    await player.initialize(videoEl);
+    await initializeSuccess(player, videoEl);
     await expect(player.switchSubtitle('-1')).resolves.toBeUndefined();
   });
 
   it('switchSubtitle with unknown id (not in track map) does nothing', async () => {
     const player = new MKVPlayer(makeFile());
     const videoEl = document.createElement('video');
-    await player.initialize(videoEl);
-    // '99' is not in subtitleTrackMap (only populated on successful probe)
+    // Fallback path — subtitleTrackMap stays empty
+    const initPromise = player.initialize(videoEl);
+    const msg = mockWorkerInstance.postMessage.mock.calls[0][0];
+    simulateWorkerMessage({ id: msg.id, type: 'ERROR', error: 'fail' });
+    await initPromise;
+
     await expect(player.switchSubtitle('99')).resolves.toBeUndefined();
   });
+});
 
-  describe('progress handler cleanup', () => {
-    it('removes progress handler on error path via finally', async () => {
-      // Arrange: getFFmpeg resolves but exec rejects (simulates remux failure)
-      mockFFmpeg = makeMockFFmpeg();
-      // on() for progress just records the call; exec rejects → triggers finally
-      mockGetFFmpeg.mockResolvedValue(mockFFmpeg);
+// ---------------------------------------------------------------------------
+// MKVPlayer — subtitle blob URL cleanup
+// ---------------------------------------------------------------------------
 
-      const onProgress = jest.fn();
-      const player = new MKVPlayer(makeFile(), onProgress);
-      const videoEl = document.createElement('video');
-      await player.initialize(videoEl);
+describe('subtitle blob URL cleanup', () => {
+  const revokeObjectURL = jest.fn();
 
-      // ffmpeg.off should have been called for 'progress' despite the error path
-      const offProgressCalls = (mockFFmpeg.off as jest.Mock).mock.calls.filter(
-        ([event]: [string]) => event === 'progress',
-      );
-      expect(offProgressCalls.length).toBeGreaterThanOrEqual(1);
+  beforeEach(() => {
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      value: revokeObjectURL,
+      writable: true,
     });
-
-    it('removes progress handler on success path via finally', async () => {
-      mockFFmpeg = makeMockFFmpeg(() => Promise.resolve(undefined));
-      mockFFmpeg.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
-        if (event === 'log') {
-          handler({ message: '  Stream #0:0: Video: h264, 1920x1080' });
-          handler({ message: '  Stream #0:1(eng): Audio: aac, stereo' });
-        }
-      });
-      mockGetFFmpeg.mockResolvedValue(mockFFmpeg);
-
-      const onProgress = jest.fn();
-      const player = new MKVPlayer(makeFile(), onProgress);
-      const videoEl = document.createElement('video');
-      await player.initialize(videoEl);
-
-      const offProgressCalls = (mockFFmpeg.off as jest.Mock).mock.calls.filter(
-        ([event]: [string]) => event === 'progress',
-      );
-      expect(offProgressCalls.length).toBeGreaterThanOrEqual(1);
-    });
+    revokeObjectURL.mockClear();
   });
 
-  describe('subtitle blob URL cleanup', () => {
-    const revokeObjectURL = jest.fn();
+  it('tracks and revokes subtitle blob URLs on destroy', async () => {
+    const player = new MKVPlayer(makeFile());
+    const videoEl = document.createElement('video');
 
-    beforeEach(() => {
-      Object.defineProperty(URL, 'revokeObjectURL', {
-        value: revokeObjectURL,
-        writable: true,
-      });
-      revokeObjectURL.mockClear();
-    });
+    // Initialize with a subtitle track in the logs
+    const logsWithSub = [
+      '  Stream #0:0: Video: h264, 1920x1080',
+      '  Stream #0:1(eng): Audio: aac, stereo',
+      '  Stream #0:2(eng): Subtitle: subrip',
+    ].join('\n');
+    await initializeSuccess(player, videoEl, logsWithSub);
 
-    it('tracks and revokes subtitle blob URLs on destroy', async () => {
-      // Arrange: successful probe with one subtitle track
-      mockFFmpeg = makeMockFFmpeg(() => Promise.resolve(undefined));
-      mockFFmpeg.on.mockImplementation((event: string, handler: (...args: any[]) => void) => {
-        if (event === 'log') {
-          handler({ message: '  Stream #0:0: Video: h264, 1920x1080' });
-          handler({ message: '  Stream #0:1(eng): Audio: aac, stereo' });
-          handler({ message: '  Stream #0:2(eng): Subtitle: subrip' });
-        }
-      });
-      mockGetFFmpeg.mockResolvedValue(mockFFmpeg);
+    // Mock createObjectURL for the subtitle blob
+    const createObjectURL = jest.fn().mockReturnValue('blob:subtitle-url');
+    Object.defineProperty(URL, 'createObjectURL', { value: createObjectURL, writable: true });
 
-      const player = new MKVPlayer(makeFile());
-      const videoEl = document.createElement('video');
-      await player.initialize(videoEl);
+    // Patch _extractSubtitle to avoid a second worker round-trip
+    (player as unknown as { _extractSubtitle: jest.Mock })._extractSubtitle =
+      jest.fn().mockResolvedValue('1\n00:00:00,000 --> 00:00:01,000\nHello\n');
 
-      // switchSubtitle creates a blob URL; mock SubtitleConverter inline via URL.createObjectURL
-      const createObjectURL = jest.fn().mockReturnValue('blob:subtitle-url');
-      Object.defineProperty(URL, 'createObjectURL', { value: createObjectURL, writable: true });
+    await player.switchSubtitle('0');
+    player.destroy();
 
-      // Patch _extractSubtitle to avoid a second ffmpeg exec
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (player as any)._extractSubtitle = jest.fn().mockResolvedValue('1\n00:00:00,000 --> 00:00:01,000\nHello\n');
-
-      await player.switchSubtitle('0');
-      player.destroy();
-
-      expect(revokeObjectURL).toHaveBeenCalledWith('blob:subtitle-url');
-    });
-
-    it('does not leak blob URLs when destroy is called multiple times', async () => {
-      const player = new MKVPlayer(makeFile());
-      // Should not throw
-      player.destroy();
-      player.destroy();
-      expect(revokeObjectURL).not.toThrow;
-    });
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:subtitle-url');
   });
 });
