@@ -339,6 +339,7 @@ const LightBirdPlayer = () => {
   const handleAddStream = useCallback((url: string, name?: string) => {
     const newIndex = playlist.playlist.length;
     const newItem: PlaylistItem = {
+      id: crypto.randomUUID(),
       name: name || `Stream ${newIndex + 1}`,
       url,
       type: "stream",
