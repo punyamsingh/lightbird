@@ -1,6 +1,6 @@
 # Sub-plan 02 — Progress UI with Speed and ETA
 
-## Status: PENDING
+## Status: DONE
 
 ## Depends On
 
