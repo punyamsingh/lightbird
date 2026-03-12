@@ -1,64 +1,29 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import type { useVideoPlayback } from "./use-video-playback";
-import type { useFullscreen } from "./use-fullscreen";
+import { useEffect } from "react";
+import { isInteractiveElement, matchesShortcut } from "@/lib/keyboard-shortcuts";
+import type { ShortcutBinding, ShortcutAction } from "@/lib/keyboard-shortcuts";
 
-type Playback = ReturnType<typeof useVideoPlayback>;
-type Fullscreen = ReturnType<typeof useFullscreen>;
+export type ShortcutHandlers = Partial<Record<ShortcutAction, () => void>>;
 
-export function useKeyboardShortcuts(playback: Playback, fullscreen: Fullscreen) {
-  const playbackRef = useRef(playback);
-  const fullscreenRef = useRef(fullscreen);
-
-  useEffect(() => {
-    playbackRef.current = playback;
-  });
-  useEffect(() => {
-    fullscreenRef.current = fullscreen;
-  });
-
+export function useKeyboardShortcuts(
+  shortcuts: ShortcutBinding[],
+  handlers: ShortcutHandlers
+) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
+      if (isInteractiveElement(document.activeElement)) return;
 
-      const pb = playbackRef.current;
-      const fs = fullscreenRef.current;
-
-      switch (e.code) {
-        case "Space":
+      for (const binding of shortcuts) {
+        if (matchesShortcut(e, binding)) {
           e.preventDefault();
-          pb.togglePlay();
+          handlers[binding.action]?.();
           break;
-        case "ArrowRight":
-          e.preventDefault();
-          pb.seek(pb.progress + 5);
-          break;
-        case "ArrowLeft":
-          e.preventDefault();
-          pb.seek(pb.progress - 5);
-          break;
-        case "ArrowUp":
-          e.preventDefault();
-          pb.setVolume(Math.min(1, pb.volume + 0.1));
-          break;
-        case "ArrowDown":
-          e.preventDefault();
-          pb.setVolume(Math.max(0, pb.volume - 0.1));
-          break;
-        case "KeyM":
-          e.preventDefault();
-          pb.toggleMute();
-          break;
-        case "KeyF":
-          e.preventDefault();
-          fs.toggle();
-          break;
+        }
       }
     };
 
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [shortcuts, handlers]);
 }

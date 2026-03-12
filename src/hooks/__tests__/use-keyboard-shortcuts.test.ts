@@ -1,119 +1,152 @@
 import { renderHook } from "@testing-library/react";
 import { useKeyboardShortcuts } from "../use-keyboard-shortcuts";
+import { DEFAULT_SHORTCUTS } from "@/lib/keyboard-shortcuts";
+import type { ShortcutHandlers } from "../use-keyboard-shortcuts";
 
-function makePlayback() {
+function makeHandlers(): ShortcutHandlers {
   return {
-    isPlaying: false,
-    progress: 30,
-    duration: 120,
-    volume: 0.8,
-    isMuted: false,
-    playbackRate: 1,
-    loop: false,
-    togglePlay: jest.fn(),
-    seek: jest.fn(),
-    setVolume: jest.fn(),
-    toggleMute: jest.fn(),
-    setPlaybackRate: jest.fn(),
-    frameStep: jest.fn(),
-    toggleLoop: jest.fn(),
+    "play-pause": jest.fn(),
+    "seek-forward-5": jest.fn(),
+    "seek-backward-5": jest.fn(),
+    "seek-forward-30": jest.fn(),
+    "seek-backward-30": jest.fn(),
+    "volume-up": jest.fn(),
+    "volume-down": jest.fn(),
+    mute: jest.fn(),
+    fullscreen: jest.fn(),
+    "next-item": jest.fn(),
+    "prev-item": jest.fn(),
+    screenshot: jest.fn(),
+    "show-shortcuts": jest.fn(),
   };
 }
 
-function makeFullscreen() {
-  return {
-    isFullscreen: false,
-    toggle: jest.fn(),
-  };
-}
-
-function fireKey(code: string, target: EventTarget = window) {
-  const event = new KeyboardEvent("keydown", { code, bubbles: true, cancelable: true });
-  target.dispatchEvent(event);
+function fireKey(key: string, opts: Partial<KeyboardEventInit> = {}) {
+  const event = new KeyboardEvent("keydown", {
+    key,
+    bubbles: true,
+    cancelable: true,
+    ...opts,
+  });
+  document.dispatchEvent(event);
   return event;
 }
 
 describe("useKeyboardShortcuts", () => {
-  it("Space calls togglePlay", () => {
-    const playback = makePlayback();
-    const fullscreen = makeFullscreen();
-    renderHook(() => useKeyboardShortcuts(playback, fullscreen));
-    fireKey("Space");
-    expect(playback.togglePlay).toHaveBeenCalled();
+  it("Space triggers play-pause", () => {
+    const handlers = makeHandlers();
+    renderHook(() => useKeyboardShortcuts(DEFAULT_SHORTCUTS, handlers));
+    fireKey(" ");
+    expect(handlers["play-pause"]).toHaveBeenCalled();
   });
 
-  it("ArrowRight seeks forward by 5s", () => {
-    const playback = makePlayback();
-    const fullscreen = makeFullscreen();
-    renderHook(() => useKeyboardShortcuts(playback, fullscreen));
+  it("ArrowRight triggers seek-forward-5", () => {
+    const handlers = makeHandlers();
+    renderHook(() => useKeyboardShortcuts(DEFAULT_SHORTCUTS, handlers));
     fireKey("ArrowRight");
-    expect(playback.seek).toHaveBeenCalledWith(35); // 30 + 5
+    expect(handlers["seek-forward-5"]).toHaveBeenCalled();
   });
 
-  it("ArrowLeft seeks back by 5s", () => {
-    const playback = makePlayback();
-    const fullscreen = makeFullscreen();
-    renderHook(() => useKeyboardShortcuts(playback, fullscreen));
+  it("ArrowLeft triggers seek-backward-5", () => {
+    const handlers = makeHandlers();
+    renderHook(() => useKeyboardShortcuts(DEFAULT_SHORTCUTS, handlers));
     fireKey("ArrowLeft");
-    expect(playback.seek).toHaveBeenCalledWith(25); // 30 - 5
+    expect(handlers["seek-backward-5"]).toHaveBeenCalled();
   });
 
-  it("ArrowUp increases volume by 0.1", () => {
-    const playback = makePlayback();
-    const fullscreen = makeFullscreen();
-    renderHook(() => useKeyboardShortcuts(playback, fullscreen));
+  it("Shift+ArrowRight triggers seek-forward-30", () => {
+    const handlers = makeHandlers();
+    renderHook(() => useKeyboardShortcuts(DEFAULT_SHORTCUTS, handlers));
+    fireKey("ArrowRight", { shiftKey: true });
+    expect(handlers["seek-forward-30"]).toHaveBeenCalled();
+    expect(handlers["seek-forward-5"]).not.toHaveBeenCalled();
+  });
+
+  it("Shift+ArrowLeft triggers seek-backward-30", () => {
+    const handlers = makeHandlers();
+    renderHook(() => useKeyboardShortcuts(DEFAULT_SHORTCUTS, handlers));
+    fireKey("ArrowLeft", { shiftKey: true });
+    expect(handlers["seek-backward-30"]).toHaveBeenCalled();
+    expect(handlers["seek-backward-5"]).not.toHaveBeenCalled();
+  });
+
+  it("ArrowUp triggers volume-up", () => {
+    const handlers = makeHandlers();
+    renderHook(() => useKeyboardShortcuts(DEFAULT_SHORTCUTS, handlers));
     fireKey("ArrowUp");
-    expect(playback.setVolume).toHaveBeenCalledWith(expect.closeTo(0.9, 5));
+    expect(handlers["volume-up"]).toHaveBeenCalled();
   });
 
-  it("ArrowDown decreases volume by 0.1", () => {
-    const playback = makePlayback();
-    const fullscreen = makeFullscreen();
-    renderHook(() => useKeyboardShortcuts(playback, fullscreen));
+  it("ArrowDown triggers volume-down", () => {
+    const handlers = makeHandlers();
+    renderHook(() => useKeyboardShortcuts(DEFAULT_SHORTCUTS, handlers));
     fireKey("ArrowDown");
-    expect(playback.setVolume).toHaveBeenCalledWith(expect.closeTo(0.7, 5));
+    expect(handlers["volume-down"]).toHaveBeenCalled();
   });
 
-  it("KeyM calls toggleMute", () => {
-    const playback = makePlayback();
-    const fullscreen = makeFullscreen();
-    renderHook(() => useKeyboardShortcuts(playback, fullscreen));
-    fireKey("KeyM");
-    expect(playback.toggleMute).toHaveBeenCalled();
+  it("m triggers mute", () => {
+    const handlers = makeHandlers();
+    renderHook(() => useKeyboardShortcuts(DEFAULT_SHORTCUTS, handlers));
+    fireKey("m");
+    expect(handlers.mute).toHaveBeenCalled();
   });
 
-  it("KeyF calls fullscreen toggle", () => {
-    const playback = makePlayback();
-    const fullscreen = makeFullscreen();
-    renderHook(() => useKeyboardShortcuts(playback, fullscreen));
-    fireKey("KeyF");
-    expect(fullscreen.toggle).toHaveBeenCalled();
+  it("f triggers fullscreen", () => {
+    const handlers = makeHandlers();
+    renderHook(() => useKeyboardShortcuts(DEFAULT_SHORTCUTS, handlers));
+    fireKey("f");
+    expect(handlers.fullscreen).toHaveBeenCalled();
   });
 
-  it("ignores keydown when target is an INPUT element", () => {
-    const playback = makePlayback();
-    const fullscreen = makeFullscreen();
-    renderHook(() => useKeyboardShortcuts(playback, fullscreen));
+  it("? triggers show-shortcuts", () => {
+    const handlers = makeHandlers();
+    renderHook(() => useKeyboardShortcuts(DEFAULT_SHORTCUTS, handlers));
+    fireKey("?");
+    expect(handlers["show-shortcuts"]).toHaveBeenCalled();
+  });
+
+  it("ignores keydown when activeElement is an INPUT", () => {
+    const handlers = makeHandlers();
+    renderHook(() => useKeyboardShortcuts(DEFAULT_SHORTCUTS, handlers));
     const input = document.createElement("input");
     document.body.appendChild(input);
-    const event = new KeyboardEvent("keydown", {
-      code: "Space",
-      bubbles: true,
-      cancelable: true,
-    });
-    Object.defineProperty(event, "target", { value: input });
-    window.dispatchEvent(event);
-    expect(playback.togglePlay).not.toHaveBeenCalled();
+    input.focus();
+    fireKey(" ");
+    expect(handlers["play-pause"]).not.toHaveBeenCalled();
     document.body.removeChild(input);
   });
 
+  it("ignores keydown when activeElement is a TEXTAREA", () => {
+    const handlers = makeHandlers();
+    renderHook(() => useKeyboardShortcuts(DEFAULT_SHORTCUTS, handlers));
+    const ta = document.createElement("textarea");
+    document.body.appendChild(ta);
+    ta.focus();
+    fireKey(" ");
+    expect(handlers["play-pause"]).not.toHaveBeenCalled();
+    document.body.removeChild(ta);
+  });
+
   it("removes event listener on unmount", () => {
-    const playback = makePlayback();
-    const fullscreen = makeFullscreen();
-    const { unmount } = renderHook(() => useKeyboardShortcuts(playback, fullscreen));
+    const handlers = makeHandlers();
+    const { unmount } = renderHook(() =>
+      useKeyboardShortcuts(DEFAULT_SHORTCUTS, handlers)
+    );
     unmount();
-    fireKey("Space");
-    // After unmount, togglePlay should not have been called
-    expect(playback.togglePlay).not.toHaveBeenCalled();
+    fireKey(" ");
+    expect(handlers["play-pause"]).not.toHaveBeenCalled();
+  });
+
+  it("uses custom shortcuts when provided", () => {
+    const handlers = makeHandlers();
+    const customShortcuts = DEFAULT_SHORTCUTS.map((s) =>
+      s.action === "play-pause" ? { ...s, key: "k" } : s
+    );
+    renderHook(() => useKeyboardShortcuts(customShortcuts, handlers));
+    fireKey("k");
+    expect(handlers["play-pause"]).toHaveBeenCalled();
+    // Space should no longer trigger play-pause
+    fireKey(" ");
+    expect(handlers["play-pause"]).toHaveBeenCalledTimes(1);
   });
 });

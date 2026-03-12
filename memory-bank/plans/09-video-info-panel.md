@@ -1,4 +1,15 @@
-# Plan 09 — Video Information Panel
+# Plan 09 — Video Information Panel [DONE]
+
+## Implementation Summary (2026-03-12)
+
+- **`src/types/index.ts`** — Added `VideoMetadata`, `AudioTrackMeta`, `SubtitleTrackMeta` types.
+- **`src/lib/video-info.ts`** — `extractNativeMetadata()` extracts filename, size, duration, resolution, and container from `HTMLVideoElement` + `File`.
+- **`src/hooks/use-video-info.ts`** — `useVideoInfo(videoRef, currentFile)` hook: listens to `loadedmetadata`, updates `metadata` state, exposes `enrichMetadata()` for future FFmpeg-derived data.
+- **`src/components/video-info-panel.tsx`** — Overlay panel showing video info table with formatted values; gracefully shows `—` for missing data.
+- **`src/components/lightbird-player.tsx`** — Wires `useVideoInfo`; `showInfo` toggle renders `VideoInfoPanel`; Info button in `PlayerControls`.
+
+---
+
 
 ## Problem
 

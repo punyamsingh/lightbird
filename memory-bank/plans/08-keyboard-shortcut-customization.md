@@ -1,4 +1,17 @@
-# Plan 08 — Keyboard Shortcut Customization
+# Plan 08 — Keyboard Shortcut Customization [DONE]
+
+## Implementation Summary (2026-03-12)
+
+Implemented a configurable keyboard shortcut registry with localStorage persistence:
+
+- **`src/lib/keyboard-shortcuts.ts`** —  type,  array, , , , , and  utilities.
+- **`src/hooks/use-keyboard-shortcuts.ts`** — Refactored to accept  and . Uses the registry instead of hardcoded . Hardened to skip all interactive elements (input, textarea, select, button, a, contentEditable).
+- **`src/components/shortcut-settings-dialog.tsx`** — Dialog for viewing and remapping shortcuts. Key capture mode with conflict detection.
+- **`src/components/lightbird-player.tsx`** — Loads shortcuts on mount, builds  via , wires . Includes  help overlay and ShortcutSettingsDialog.
+- **`src/components/player-controls.tsx`** — Added optional  and  props with Info (ℹ) and Keyboard (⌨) icon buttons.
+
+---
+
 
 ## Problem
 

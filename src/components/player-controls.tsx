@@ -9,7 +9,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Label } from "@/components/ui/label";
 import {
   Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward,
-  FastForward, Rewind, RotateCcw, Settings2, Subtitles, Camera, AudioLines, Plus, X
+  FastForward, Rewind, RotateCcw, Settings2, Subtitles, Camera, AudioLines, Plus, X,
+  Info, Keyboard
 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 
@@ -45,6 +46,8 @@ interface PlayerControlsProps {
   onAudioTrackChange: (id: string) => void;
   onSubtitleUpload?: () => void;
   onSubtitleRemove?: (id: string) => void;
+  onShowInfo?: () => void;
+  onOpenShortcuts?: () => void;
 }
 
 const formatTime = (time: number) => {
@@ -61,6 +64,7 @@ export const PlayerControls = React.memo(function PlayerControls({
   onPlayPause, onSeek, onVolumeChange, onMuteToggle, onPlaybackRateChange, onLoopToggle,
   onFullScreenToggle, onFrameStep, onScreenshot, onNext, onPrevious, onFiltersChange,
   onZoomChange, onSubtitleChange, onAudioTrackChange, onSubtitleUpload, onSubtitleRemove,
+  onShowInfo, onOpenShortcuts,
 }: PlayerControlsProps) {
   const formattedProgress = useMemo(() => formatTime(progress), [progress]);
   const formattedDuration = useMemo(() => formatTime(duration), [duration]);
@@ -225,6 +229,18 @@ export const PlayerControls = React.memo(function PlayerControls({
                   </div>
               </PopoverContent>
             </Popover>
+            {onShowInfo && (
+              <Tooltip>
+                <TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={onShowInfo}><Info className="h-4 w-4" /></Button></TooltipTrigger>
+                <TooltipContent><p>Video Information</p></TooltipContent>
+              </Tooltip>
+            )}
+            {onOpenShortcuts && (
+              <Tooltip>
+                <TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={onOpenShortcuts}><Keyboard className="h-4 w-4" /></Button></TooltipTrigger>
+                <TooltipContent><p>Keyboard Shortcuts</p></TooltipContent>
+              </Tooltip>
+            )}
             <Tooltip>
               <TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={onScreenshot}><Camera /></Button></TooltipTrigger>
               <TooltipContent><p>Screenshot</p></TooltipContent>

@@ -1,4 +1,17 @@
-# Plan 10 — Codebase Cleanup & Dependency Audit
+# Plan 10 — Codebase Cleanup & Dependency Audit [DONE]
+
+## Implementation Summary (2026-03-12)
+
+- **Removed deprecated functions** — `probeFile()` and `remuxFile()` deleted from `src/lib/video-processor.ts`.
+- **Re-enabled strict build checks** — `typescript.ignoreBuildErrors` and `eslint.ignoreDuringBuilds` removed from `next.config.ts`.
+- **Removed unused ShadCN components** — Deleted `accordion`, `alert-dialog`, `avatar`, `calendar`, `carousel`, `chart`, `dropdown-menu`, `menubar`, `tabs` from `src/components/ui/`.
+- **Uninstalled unused packages** — `firebase`, `recharts`, `genkit`, `@genkit-ai/googleai`, `@genkit-ai/next`, `genkit-cli` removed via `npm uninstall`.
+- **Removed `src/ai/` directory** — Genkit setup files (`genkit.ts`, `dev.ts`) deleted.
+- **Removed genkit scripts** — `genkit:dev` and `genkit:watch` removed from `package.json`.
+- **Added `.env.example`** — Documents optional Firebase environment variables.
+
+---
+
 
 ## Problem
 

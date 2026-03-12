@@ -95,14 +95,3 @@ export function createVideoPlayer(
   }
 }
 
-// Legacy functions for backward compatibility (will be removed)
-export async function probeFile(file: File): Promise<any> {
-  console.warn('probeFile is deprecated. Use createVideoPlayer instead.');
-  const player = createVideoPlayer(file);
-  return { name: file.name, audioTracks: [], subtitleTracks: [] };
-}
-
-export async function remuxFile(audioTrackIndex: number, subtitleTrackIndex: number): Promise<string> {
-  console.warn('remuxFile is deprecated. Use createVideoPlayer instead.');
-  throw new Error('remuxFile is no longer supported. Use the new player system.');
-}
