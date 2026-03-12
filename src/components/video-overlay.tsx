@@ -8,9 +8,10 @@ interface VideoOverlayProps {
   processingProgress?: number;
   eta?: number | null;        // seconds remaining (null = not yet calculable)
   throughputMBs?: number | null; // MB/s (null = not yet calculable)
+  onCancel?: () => void; // when provided, shows a Cancel button
 }
 
-export function VideoOverlay({ isLoading, loadingMessage, processingProgress = 0, eta, throughputMBs }: VideoOverlayProps) {
+export function VideoOverlay({ isLoading, loadingMessage, processingProgress = 0, eta, throughputMBs, onCancel }: VideoOverlayProps) {
   if (!isLoading && !loadingMessage) return null;
 
   return (
@@ -34,6 +35,14 @@ export function VideoOverlay({ isLoading, loadingMessage, processingProgress = 0
             </p>
           )}
         </>
+      )}
+      {onCancel && (
+        <button
+          onClick={onCancel}
+          className="mt-3 px-4 py-1.5 text-sm rounded border border-white/30 text-white/80 hover:bg-white/10 transition-colors"
+        >
+          Cancel
+        </button>
       )}
     </div>
   );

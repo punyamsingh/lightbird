@@ -11,6 +11,7 @@ import { VideoInfoPanel } from "@/components/video-info-panel";
 import { ShortcutSettingsDialog } from "@/components/shortcut-settings-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { createVideoPlayer, type VideoPlayer } from "@/lib/video-processor";
+import { CancellationError } from "@/lib/players/mkv-player";
 import { useVideoPlayback } from "@/hooks/use-video-playback";
 import { useVideoFilters } from "@/hooks/use-video-filters";
 import { useSubtitles } from "@/hooks/use-subtitles";
@@ -62,6 +63,7 @@ const LightBirdPlayer = () => {
   const [processingEta, setProcessingEta] = useState<number | null>(null);
   const [processingThroughput, setProcessingThroughput] = useState<number | null>(null);
   const [playerError, setPlayerError] = useState<ParsedMediaError | null>(null);
+  const [cancellableProcessing, setCancellableProcessing] = useState(false);
 
   const shortcutHandlers = useMemo(() => ({
     'play-pause': () => playback.togglePlay(),
@@ -81,6 +83,15 @@ const LightBirdPlayer = () => {
   }), [playback.togglePlay, playback.seek, playback.setVolume, playback.toggleMute, fullscreen.toggle]);
 
   useKeyboardShortcuts(shortcuts, shortcutHandlers);
+
+  const handleCancelProcessing = useCallback(() => {
+    playerRef.current?.cancel?.();
+    playerRef.current = null;
+    setCancellableProcessing(false);
+    setIsLoading(false);
+    setLoadingMessage('');
+    setProcessingProgress(0);
+  }, []);
 
   const stopStallDetection = () => {
     if (streamStallDetectorRef.current) {
@@ -152,9 +163,14 @@ const LightBirdPlayer = () => {
         }
       });
       playerRef.current = player;
+      setCancellableProcessing(true);
       if (!videoRef.current) throw new Error("Video element not available");
       setLoadingMessage("Loading video...");
-      await player.initialize(videoRef.current);
+      try {
+        await player.initialize(videoRef.current);
+      } finally {
+        setCancellableProcessing(false);
+      }
       subtitles.initManager(videoRef.current);
       subtitles.importSubtitles(player.getSubtitles());
       const newAudioTracks = player.getAudioTracks();
@@ -165,11 +181,13 @@ const LightBirdPlayer = () => {
       setProcessingProgress(0);
     } catch (error) {
       console.error(error);
-      toast({
-        title: "Failed to process video",
-        description: "There was an error loading the video file. It might be an unsupported format.",
-        variant: "destructive",
-      });
+      if (!(error instanceof CancellationError)) {
+        toast({
+          title: "Failed to process video",
+          description: "There was an error loading the video file. It might be an unsupported format.",
+          variant: "destructive",
+        });
+      }
       setIsLoading(false);
       setLoadingMessage("");
       setProcessingProgress(0);
@@ -462,6 +480,7 @@ const LightBirdPlayer = () => {
           processingProgress={processingProgress}
           eta={processingEta}
           throughputMBs={processingThroughput}
+          onCancel={cancellableProcessing ? handleCancelProcessing : undefined}
         />
 
         {playerError && (
