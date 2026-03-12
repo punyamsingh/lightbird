@@ -37,3 +37,33 @@ export interface VideoFilters {
   saturate: number;
   hue: number;
 }
+
+export interface VideoMetadata {
+  filename: string;
+  fileSize: number | null;
+  duration: number;
+  container: string;
+  width: number;
+  height: number;
+  frameRate: number | null;
+  videoBitrate: number | null;
+  videoCodec: string | null;
+  colorSpace: string | null;
+  audioTracks: AudioTrackMeta[];
+  subtitleTracks: SubtitleTrackMeta[];
+}
+
+export interface AudioTrackMeta {
+  index: number;
+  codec: string | null;
+  channels: number | null;
+  sampleRate: number | null;
+  language: string | null;
+  bitrate: number | null;
+}
+
+export interface SubtitleTrackMeta {
+  index: number;
+  format: string | null;
+  language: string | null;
+}

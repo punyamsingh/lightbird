@@ -1,12 +1,14 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import type { PlaylistItem, AudioTrack } from "@/types";
 import { cn } from "@/lib/utils";
 import PlayerControls from "@/components/player-controls";
 import PlaylistPanel, { type PlaylistSize } from "@/components/playlist-panel";
 import { VideoOverlay } from "@/components/video-overlay";
 import { PlayerErrorDisplay } from "@/components/player-error-display";
+import { VideoInfoPanel } from "@/components/video-info-panel";
+import { ShortcutSettingsDialog } from "@/components/shortcut-settings-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { createVideoPlayer, type VideoPlayer } from "@/lib/video-processor";
 import { useVideoPlayback } from "@/hooks/use-video-playback";
@@ -16,7 +18,10 @@ import { usePlaylist } from "@/hooks/use-playlist";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useFullscreen } from "@/hooks/use-fullscreen";
 import { useProgressPersistence } from "@/hooks/use-progress-persistence";
+import { useVideoInfo } from "@/hooks/use-video-info";
 import { parseMediaError, validateFile, type ParsedMediaError } from "@/lib/media-error";
+import { loadShortcuts } from "@/lib/keyboard-shortcuts";
+import type { ShortcutBinding } from "@/lib/keyboard-shortcuts";
 
 const MAX_RETRIES = 3;
 
@@ -39,8 +44,13 @@ const LightBirdPlayer = () => {
   const filters = useVideoFilters(videoRef);
   const subtitles = useSubtitles();
   const fullscreen = useFullscreen(containerRef);
-  useKeyboardShortcuts(playback, fullscreen);
+  const { metadata: videoMetadata } = useVideoInfo(videoRef, playlist.currentItem?.file ?? null);
   useProgressPersistence(videoRef, playlist.currentItem?.name ?? null);
+
+  const [shortcuts, setShortcuts] = useState<ShortcutBinding[]>(() => loadShortcuts());
+  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+  const [showShortcutsDialog, setShowShortcutsDialog] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
 
   const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
   const [activeAudioTrack, setActiveAudioTrack] = useState("0");
@@ -48,6 +58,25 @@ const LightBirdPlayer = () => {
   const [loadingMessage, setLoadingMessage] = useState("");
   const [processingProgress, setProcessingProgress] = useState(0);
   const [playerError, setPlayerError] = useState<ParsedMediaError | null>(null);
+
+  const shortcutHandlers = useMemo(() => ({
+    'play-pause': () => playback.togglePlay(),
+    'seek-forward-5': () => { const el = videoRef.current; if (el) playback.seek(el.currentTime + 5); },
+    'seek-backward-5': () => { const el = videoRef.current; if (el) playback.seek(el.currentTime - 5); },
+    'seek-forward-30': () => { const el = videoRef.current; if (el) playback.seek(el.currentTime + 30); },
+    'seek-backward-30': () => { const el = videoRef.current; if (el) playback.seek(el.currentTime - 30); },
+    'volume-up': () => { const el = videoRef.current; if (el) playback.setVolume(Math.min(1, el.volume + 0.05)); },
+    'volume-down': () => { const el = videoRef.current; if (el) playback.setVolume(Math.max(0, el.volume - 0.05)); },
+    'mute': () => playback.toggleMute(),
+    'fullscreen': () => fullscreen.toggle(),
+    'next-item': () => handleNext(),
+    'prev-item': () => handlePrevious(),
+    'screenshot': () => captureScreenshot(),
+    'show-shortcuts': () => setShowShortcutsHelp((v) => !v),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [playback.togglePlay, playback.seek, playback.setVolume, playback.toggleMute, fullscreen.toggle]);
+
+  useKeyboardShortcuts(shortcuts, shortcutHandlers);
 
   const stopStallDetection = () => {
     if (streamStallDetectorRef.current) {
@@ -425,6 +454,44 @@ const LightBirdPlayer = () => {
           />
         )}
 
+        {showInfo && (
+          <VideoInfoPanel
+            metadata={videoMetadata}
+            onClose={() => setShowInfo(false)}
+          />
+        )}
+
+        {showShortcutsHelp && (
+          <div
+            className="absolute inset-0 bg-black/90 z-50 flex items-center justify-center"
+            onClick={() => setShowShortcutsHelp(false)}
+          >
+            <div
+              className="bg-card rounded-lg p-6 max-w-sm w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-lg font-semibold mb-4">Keyboard Shortcuts</h2>
+              <div className="space-y-1 max-h-80 overflow-y-auto">
+                {shortcuts.map((b) => {
+                  const mods: string[] = [];
+                  if (b.modifiers?.ctrl) mods.push("Ctrl");
+                  if (b.modifiers?.shift) mods.push("Shift");
+                  if (b.modifiers?.alt) mods.push("Alt");
+                  const keyLabel = b.key === " " ? "Space" : b.key;
+                  const formatted = [...mods, keyLabel].join(" + ");
+                  return (
+                    <div key={b.action} className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">{b.label}</span>
+                      <kbd className="font-mono bg-muted px-1.5 rounded text-xs">{formatted}</kbd>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground mt-4">Press ? or click outside to close</p>
+            </div>
+          </div>
+        )}
+
         {playlist.currentItem && (
           <PlayerControls
             isPlaying={playback.isPlaying}
@@ -458,6 +525,16 @@ const LightBirdPlayer = () => {
             onAudioTrackChange={handleAudioTrackChange}
             onSubtitleUpload={handleSubtitleUpload}
             onSubtitleRemove={subtitles.removeSubtitle}
+            onShowInfo={() => setShowInfo((v) => !v)}
+            onOpenShortcuts={() => setShowShortcutsDialog(true)}
+          />
+        )}
+
+        {showShortcutsDialog && (
+          <ShortcutSettingsDialog
+            shortcuts={shortcuts}
+            onSave={(updated) => setShortcuts(updated)}
+            onClose={() => setShowShortcutsDialog(false)}
           />
         )}
 

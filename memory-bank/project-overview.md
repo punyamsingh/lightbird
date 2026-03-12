@@ -1,7 +1,7 @@
 # LightBird — Project Overview
 
-> **Last updated:** 2026-03-11
-> **Branch context:** Plans 01 (Test Suite), 02 (MKV / FFmpeg.wasm), 03 (Refactor), 04 (Performance Optimisation), 05 (Error Handling), and 06 (Playlist Management) implemented.
+> **Last updated:** 2026-03-12
+> **Branch context:** Plans 01–06 implemented; Plans 08 (Keyboard Shortcut Customisation), 09 (Video Info Panel), and 10 (Codebase Cleanup) now also implemented.
 
 ---
 
@@ -82,10 +82,10 @@ src/app/page.tsx
 - **Playlist management implemented** — Plan 06 done; drag-and-drop reordering, M3U8 import/export, folder opening, and sorting.
 - **No playlist persistence** — playlist is not persisted after page refresh (persist to localStorage if needed).
 - **No advanced subtitle formats** — ASS/SSA not supported; no sync offset (Plan 07).
-- **No keyboard customisation** — shortcuts are hardcoded (Plan 08).
-- **No video info panel** — metadata not displayed (Plan 09).
-- **Unused dependencies** — Firebase, Genkit, ReCharts are installed but not used (Plan 10).
-- **Build errors suppressed** — `next.config.ts` has `ignoreBuildErrors: true` (Plan 10).
+- **Keyboard shortcuts customisable** — registry in `src/lib/keyboard-shortcuts.ts`, persisted to localStorage, configurable via ShortcutSettingsDialog.
+- **Video info panel added** — shows filename, size, duration, resolution, codec from native API (Plan 09 DONE).
+- **Unused dependencies removed** — Firebase, Genkit, ReCharts uninstalled; `src/ai/` deleted (Plan 10 DONE).
+- **Build errors re-enabled** — `next.config.ts` no longer suppresses TypeScript/ESLint errors (Plan 10 DONE).
 
 ---
 
@@ -128,9 +128,9 @@ CI runs on every push and PR via `.github/workflows/test.yml`.
 | 05 | Error Handling & Recovery | **DONE** |
 | 06 | Playlist Management (DnD, M3U8) | **DONE** |
 | 07 | Advanced Subtitle Support (ASS/SSA, offset) | Pending |
-| 08 | Keyboard Customisation | Pending |
-| 09 | Video Info Panel | Pending |
-| 10 | Codebase Cleanup | Pending |
+| 08 | Keyboard Customisation | **DONE** |
+| 09 | Video Info Panel | **DONE** |
+| 10 | Codebase Cleanup | **DONE** |
 
 Full plan details: `memory-bank/plans/01-test-suite.md` … `10-codebase-cleanup.md`
 
