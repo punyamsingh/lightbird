@@ -2,6 +2,7 @@
 
 import type { AudioTrack, Subtitle } from "@/types";
 import { SubtitleConverter } from "@/lib/subtitle-converter";
+import type { WorkerInbound, WorkerOutbound } from "@/lib/workers/ffmpeg-worker";
 
 export interface MKVPlayerFile {
   name: string;
@@ -62,6 +63,13 @@ export class MKVPlayer {
   private subtitleBlobUrls: Map<string, string> = new Map();
   private onProgress?: (progress: number) => void;
 
+  // Worker management
+  private worker: Worker | null = null;
+  private pendingOperations: Map<string, {
+    resolve: (value: unknown) => void;
+    reject: (reason: unknown) => void;
+  }> = new Map();
+
   constructor(file: File, onProgress?: (progress: number) => void) {
     this.file = file;
     this.onProgress = onProgress;
@@ -75,76 +83,105 @@ export class MKVPlayer {
     };
   }
 
+  private getWorker(): Worker {
+    if (!this.worker) {
+      // Next.js requires this exact syntax for Worker bundling
+      this.worker = new Worker(
+        new URL('../workers/ffmpeg-worker.ts', import.meta.url),
+      );
+      this.worker.onmessage = (event: MessageEvent) => {
+        this._handleWorkerMessage(event.data);
+      };
+      this.worker.onerror = (error) => {
+        console.error('FFmpeg worker error:', error);
+      };
+    }
+    return this.worker;
+  }
+
+  private _handleWorkerMessage(msg: WorkerOutbound): void {
+    const { id, type } = msg;
+
+    if (type === 'PROGRESS') {
+      this.onProgress?.(msg.progress);
+      return; // progress messages don't resolve a pending operation
+    }
+
+    const pending = this.pendingOperations.get(id);
+    if (!pending) return;
+
+    this.pendingOperations.delete(id);
+
+    if (type === 'ERROR') {
+      pending.reject(new Error(msg.error));
+    } else {
+      pending.resolve(msg);
+    }
+  }
+
+  private sendToWorker<T>(message: WorkerInbound): Promise<T> {
+    return new Promise((resolve, reject) => {
+      this.pendingOperations.set(message.id, {
+        resolve: resolve as (value: unknown) => void,
+        reject,
+      });
+      this.getWorker().postMessage(message);
+    });
+  }
+
   async initialize(videoElement: HTMLVideoElement): Promise<MKVPlayerFile> {
     this.videoElement = videoElement;
 
     try {
-      const { getFFmpeg } = await import('@/lib/ffmpeg-singleton');
-      const { fetchFile } = await import('@ffmpeg/util');
-      const ffmpeg = await getFFmpeg();
+      const opId = crypto.randomUUID();
+      const result = await this.sendToWorker<{ type: 'REMUX_DONE'; data: Uint8Array; logs: string }>({
+        id: opId,
+        type: 'REMUX',
+        payload: {
+          file: this.file,
+          fileName: this.file.name,
+          audioTrackIndex: 0,
+        },
+      });
 
-      const progressHandler = ({ progress }: { progress: number }) => {
-        this.onProgress?.(Math.max(0, Math.min(0.99, progress)));
-      };
-      if (this.onProgress) {
-        ffmpeg.on('progress', progressHandler);
-      }
+      const { audioTracks, subtitleTracks } = parseStreamInfo(result.logs);
 
-      try {
-        // Write file to FFmpeg virtual FS
-        await ffmpeg.writeFile(this.file.name, await fetchFile(this.file));
+      // Build audio track metadata
+      this.playerFile.audioTracks =
+        audioTracks.length > 0
+          ? audioTracks.map((t, i) => ({
+              id: String(i),
+              name: t.title ?? (t.lang ? `Audio ${i + 1} (${t.lang})` : `Audio ${i + 1}`),
+              lang: t.lang ?? 'unknown',
+            }))
+          : [{ id: '0', name: 'Default Audio', lang: 'unknown' }];
 
-        // Probe to collect stream info via log output
-        const logs: string[] = [];
-        const logHandler = ({ message }: { message: string }) => logs.push(message);
-        ffmpeg.on('log', logHandler);
-        try {
-          await ffmpeg.exec(['-i', this.file.name, '-f', 'null', '-']);
-        } catch {
-          // ffmpeg exits with error when output is /dev/null – this is expected
-        }
-        ffmpeg.off('log', logHandler);
+      // Build subtitle track metadata and populate the ID→index map
+      this.subtitleTrackMap.clear();
+      this.playerFile.subtitleTracks = subtitleTracks.map((t, i) => {
+        const id = String(i);
+        this.subtitleTrackMap.set(id, i);
+        return {
+          id,
+          name: t.title ?? (t.lang ? `Subtitle ${i + 1} (${t.lang})` : `Subtitle ${i + 1}`),
+          lang: t.lang ?? 'unknown',
+          type: 'embedded' as const,
+        };
+      });
 
-        const { audioTracks, subtitleTracks } = parseStreamInfo(logs.join('\n'));
+      const blob = new Blob([result.data], { type: 'video/mp4' });
+      const url = URL.createObjectURL(blob);
+      if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
+      this.objectUrl = url;
+      this.playerFile.videoUrl = url;
+      videoElement.src = url;
 
-        // Build audio track metadata
-        this.playerFile.audioTracks =
-          audioTracks.length > 0
-            ? audioTracks.map((t, i) => ({
-                id: String(i),
-                name: t.title ?? (t.lang ? `Audio ${i + 1} (${t.lang})` : `Audio ${i + 1}`),
-                lang: t.lang ?? 'unknown',
-              }))
-            : [{ id: '0', name: 'Default Audio', lang: 'unknown' }];
-
-        // Build subtitle track metadata and populate the ID→index map
-        this.subtitleTrackMap.clear();
-        this.playerFile.subtitleTracks = subtitleTracks.map((t, i) => {
-          const id = String(i);
-          this.subtitleTrackMap.set(id, i);
-          return {
-            id,
-            name: t.title ?? (t.lang ? `Subtitle ${i + 1} (${t.lang})` : `Subtitle ${i + 1}`),
-            lang: t.lang ?? 'unknown',
-            type: 'embedded' as const,
-          };
-        });
-
-        // Remux with the first audio track so the browser can play it
-        const url = await this._remux(0);
-        this.playerFile.videoUrl = url;
-        videoElement.src = url;
-
-        this.onProgress?.(1);
-      } finally {
-        if (this.onProgress) {
-          ffmpeg.off('progress', progressHandler);
-        }
-      }
+      this.onProgress?.(1);
     } catch (error) {
-      console.error('MKVPlayer: FFmpeg initialisation failed, falling back to native playback', error);
+      console.error('MKVPlayer: Worker failed, falling back to native playback', error);
       // Fallback: hand the raw file to the browser and hope for the best
       const url = URL.createObjectURL(this.file);
+      if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
       this.objectUrl = url;
       this.playerFile.videoUrl = url;
       this.playerFile.audioTracks = [{ id: '0', name: 'Default Audio', lang: 'unknown' }];
@@ -155,48 +192,36 @@ export class MKVPlayer {
   }
 
   private async _remux(audioTrackIndex: number): Promise<string> {
-    const { getFFmpeg } = await import('@/lib/ffmpeg-singleton');
-    const ffmpeg = await getFFmpeg();
-    const outputName = `output_${Date.now()}.mp4`;
+    const opId = crypto.randomUUID();
+    const result = await this.sendToWorker<{ type: 'REMUX_DONE'; data: Uint8Array; logs: string }>({
+      id: opId,
+      type: 'REMUX',
+      payload: {
+        file: this.file,
+        fileName: this.file.name,
+        audioTrackIndex,
+      },
+    });
 
-    await ffmpeg.exec([
-      '-i', this.file.name,
-      '-map', '0:v:0',
-      '-map', `0:a:${audioTrackIndex}`,
-      '-c:v', 'copy',
-      '-c:a', 'aac',
-      '-movflags', 'frag_keyframe+empty_moov',
-      outputName,
-    ]);
-
-    const data = await ffmpeg.readFile(outputName);
-    try { await ffmpeg.deleteFile(outputName); } catch { /* ignore */ }
-
-    const blob = new Blob([data as Uint8Array], { type: 'video/mp4' });
+    const blob = new Blob([result.data], { type: 'video/mp4' });
     const url = URL.createObjectURL(blob);
-
-    if (this.objectUrl) {
-      URL.revokeObjectURL(this.objectUrl);
-    }
+    if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
     this.objectUrl = url;
     return url;
   }
 
   private async _extractSubtitle(trackIndex: number): Promise<string> {
-    const { getFFmpeg } = await import('@/lib/ffmpeg-singleton');
-    const ffmpeg = await getFFmpeg();
-    const outputName = `subtitle_${trackIndex}_${Date.now()}.srt`;
-
-    await ffmpeg.exec([
-      '-i', this.file.name,
-      '-map', `0:s:${trackIndex}`,
-      outputName,
-    ]);
-
-    const data = await ffmpeg.readFile(outputName);
-    try { await ffmpeg.deleteFile(outputName); } catch { /* ignore */ }
-
-    return new TextDecoder().decode(data as Uint8Array);
+    const opId = crypto.randomUUID();
+    const result = await this.sendToWorker<{ type: 'EXTRACT_SUBTITLE_DONE'; srtText: string }>({
+      id: opId,
+      type: 'EXTRACT_SUBTITLE',
+      payload: {
+        file: this.file,
+        fileName: this.file.name,
+        trackIndex,
+      },
+    });
+    return result.srtText;
   }
 
   getAudioTracks(): AudioTrack[] {
@@ -283,6 +308,13 @@ export class MKVPlayer {
   }
 
   destroy(): void {
+    // Terminate the worker so the FFmpeg WASM thread is killed
+    if (this.worker) {
+      this.worker.terminate();
+      this.worker = null;
+    }
+    this.pendingOperations.clear();
+
     if (this.objectUrl) {
       URL.revokeObjectURL(this.objectUrl);
       this.objectUrl = null;

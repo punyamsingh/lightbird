@@ -33,6 +33,7 @@ const nextConfig: NextConfig = {
   },
   webpack: (config, { isServer }) => {
     config.experiments = { ...config.experiments, asyncWebAssembly: true, layers: true };
+    config.output.globalObject = 'self'; // required for Web Worker bundling
     return config;
   },
 };
