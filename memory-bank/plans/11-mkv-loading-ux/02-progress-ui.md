@@ -30,6 +30,9 @@ Show `"Processing… 42% · 2.3 MB/s · ~12s left"`.
 /**
  * Estimates remux speed and ETA from a stream of progress values [0, 1].
  *
+ * startTime is initialized lazily on the first update() call with progress > 0
+ * to avoid capturing bootstrap latency from the constructor.
+ *
  * Usage:
  *   const est = new ProgressEstimator(fileSizeBytes);
  *   est.update(0.42); // call on each progress event
@@ -37,21 +40,27 @@ Show `"Processing… 42% · 2.3 MB/s · ~12s left"`.
  */
 export class ProgressEstimator {
   private readonly fileSizeBytes: number;
-  private readonly startTime: number;
+  private startTime: number | null = null; // set lazily on first real progress
   private lastProgress = 0;
 
   constructor(fileSizeBytes: number) {
     this.fileSizeBytes = fileSizeBytes;
-    this.startTime = Date.now();
   }
 
   update(progress: number): void {
+    if (progress > 0 && this.startTime === null) {
+      this.startTime = Date.now(); // initialize on first real progress event
+    }
     this.lastProgress = progress;
   }
 
   getEstimate(): { speedMBps: number; etaSeconds: number | null } {
+    if (this.startTime === null || this.lastProgress <= 0) {
+      return { speedMBps: 0, etaSeconds: null };
+    }
+
     const elapsedMs = Date.now() - this.startTime;
-    if (elapsedMs < 500 || this.lastProgress <= 0) {
+    if (elapsedMs < 500) {
       return { speedMBps: 0, etaSeconds: null };
     }
 
@@ -70,11 +79,7 @@ export class ProgressEstimator {
       etaSeconds: etaSeconds !== null ? Math.round(etaSeconds) : null,
     };
   }
-
-  reset(): void {
-    this.lastProgress = 0;
-    // Note: startTime is set in constructor — create a new instance to reset
-  }
+  // No reset() method — create a new instance per file load instead.
 }
 ```
 
@@ -129,14 +134,23 @@ const player = createVideoPlayer(file, subtitleFiles, (progress) => {
 />
 ```
 
-### 5. Clean up on finish / cancel
+### 5. Clean up in `finally` (always runs — success, error, or cancel)
 
 ```typescript
-// At the end of processFile() success or catch block:
-progressEstimatorRef.current = null;
-setProcessingEta(null);
-setProcessingThroughput(null);
+// Replace the separate success/catch cleanups with a single finally block:
+try {
+  // ... existing processFile() body ...
+} catch (error) {
+  // ... error handling / toast ...
+} finally {
+  progressEstimatorRef.current = null;
+  setProcessingEta(null);
+  setProcessingThroughput(null);
+}
 ```
+
+> **Why `finally`:** The estimator must be cleared on cancellation too (sub-plan 03).
+> A `finally` block guarantees cleanup regardless of which path exits the `try`.
 
 ---
 
@@ -190,17 +204,24 @@ describe('ProgressEstimator', () => {
     jest.useRealTimers();
   });
 
-  it('returns zero speed before 500ms have elapsed', () => {
+  it('returns zero speed before 500ms have elapsed after first update', () => {
     const est = new ProgressEstimator(100 * 1024 * 1024); // 100 MB
-    jest.advanceTimersByTime(200);
-    est.update(0.3);
+    est.update(0.3); // startTime is set here
+    jest.advanceTimersByTime(200); // only 200ms since first update
     expect(est.getEstimate().speedMBps).toBe(0);
   });
 
-  it('calculates speed correctly after 1 second', () => {
+  it('returns zero speed before any update', () => {
+    const est = new ProgressEstimator(100 * 1024 * 1024);
+    jest.advanceTimersByTime(5000); // lots of time passes but no update
+    expect(est.getEstimate().speedMBps).toBe(0);
+  });
+
+  it('calculates speed correctly after 1 second from first update', () => {
     const est = new ProgressEstimator(100 * 1024 * 1024); // 100 MB
-    jest.advanceTimersByTime(1000);
-    est.update(0.1); // 10% in 1s = 10 MB/s
+    est.update(0.1); // startTime set here
+    jest.advanceTimersByTime(1000); // 1s has elapsed since first update
+    est.update(0.1); // same progress value, just to re-read estimate
     const { speedMBps } = est.getEstimate();
     expect(speedMBps).toBeCloseTo(10, 0);
   });
