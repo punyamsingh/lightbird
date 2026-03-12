@@ -34,6 +34,18 @@ Any in-flight promise in `MKVPlayer.pendingOperations` will never resolve or rej
 
 ## Changes to `MKVPlayer`
 
+### 0. Add `CancellationError` sentinel class (new file or top of `mkv-player.ts`)
+
+```typescript
+// Dedicated sentinel — use instanceof check, not string matching
+export class CancellationError extends Error {
+  constructor() {
+    super('MKVPlayer: operation cancelled');
+    this.name = 'CancellationError';
+  }
+}
+```
+
 ### 1. Add a public `cancel()` method
 
 ```typescript
@@ -44,9 +56,9 @@ cancel(): void {
   this.worker.terminate();
   this.worker = null;
 
-  // Reject all pending operations
+  // Reject all pending operations with the CancellationError sentinel
   for (const { reject } of this.pendingOperations.values()) {
-    reject(new Error('MKVPlayer: operation cancelled'));
+    reject(new CancellationError());
   }
   this.pendingOperations.clear();
 }
@@ -54,36 +66,54 @@ cancel(): void {
 
 ### 2. `VideoPlayer` interface: add optional `cancel()`
 
-In `src/lib/video-processor.ts` (the `VideoPlayer` interface):
+In `src/lib/video-processor.ts`, add only `cancel?()` — do not change any existing signatures.
+The current `initialize()` return type is `Promise<ProcessedFile>` and must stay that way:
 
 ```typescript
 export interface VideoPlayer {
-  initialize(videoElement: HTMLVideoElement): Promise<unknown>;
+  initialize(videoElement: HTMLVideoElement): Promise<ProcessedFile>; // unchanged
   getAudioTracks(): AudioTrack[];
   getSubtitles(): Subtitle[];
   switchAudioTrack(trackId: string): Promise<void>;
   switchSubtitle(trackId: string): Promise<void>;
-  getActiveAudioTrack(): string;
-  getActiveSubtitleTrack(): string;
   destroy(): void;
-  cancel?(): void; // optional — only implemented by MKVPlayer
+  cancel?(): void; // ADD THIS — optional, only MKVPlayer implements it
 }
 ```
+
+`ProcessedFile` is already exported from `video-processor.ts` as `type ProcessedFile = SimplePlayerFile | MKVPlayerFile`.
 
 ---
 
 ## Changes to `lightbird-player.tsx`
 
-### 1. Add a cancel handler
+### 1. Add a `cancellableProcessing` state and cancel handler
 
 ```typescript
+// New state: true from the moment the player is created until initialize() settles
+const [cancellableProcessing, setCancellableProcessing] = useState(false);
+
 const handleCancelProcessing = useCallback(() => {
   playerRef.current?.cancel?.();
   playerRef.current = null;
+  setCancellableProcessing(false);
   setIsLoading(false);
   setLoadingMessage('');
   setProcessingProgress(0);
 }, []);
+```
+
+Set `cancellableProcessing = true` in `processFile()` **after** the player is created but **before** `initialize()` is awaited, and clear it in the `finally` block:
+
+```typescript
+const player = createVideoPlayer(file, subtitleFiles, ...);
+playerRef.current = player;
+setCancellableProcessing(true); // cancel button now available
+try {
+  await player.initialize(videoRef.current!);
+} finally {
+  setCancellableProcessing(false);
+}
 ```
 
 ### 2. Pass it to `VideoOverlay`
@@ -93,12 +123,13 @@ const handleCancelProcessing = useCallback(() => {
   isLoading={isLoading}
   loadingMessage={loadingMessage}
   processingProgress={processingProgress}
-  onCancel={processingProgress > 0 && processingProgress < 1 ? handleCancelProcessing : undefined}
+  onCancel={cancellableProcessing ? handleCancelProcessing : undefined}
 />
 ```
 
-> `onCancel` is only defined while actively remuxing (`0 < progress < 1`).
-> This hides the button during the initial "Initializing player..." phase.
+> `onCancel` is now available from the start of `initialize()` through to completion,
+> including the "Initializing player…" phase. The Cancel button appears for the
+> full duration of the async operation.
 
 ---
 
@@ -132,26 +163,21 @@ In the JSX, add a Cancel button when `onCancel` is defined:
 
 ## Error Handling in `processFile()`
 
-The `cancel()` call causes the `player.initialize()` promise to reject with
-`"operation cancelled"`. The existing `catch` block in `processFile()` will fire and show
-a toast. We need to suppress the toast for intentional cancellations:
+The `cancel()` call causes `player.initialize()` to reject with a `CancellationError`.
+Use `instanceof` — not a string check — to suppress the toast for intentional cancellations:
 
 ```typescript
-} catch (error) {
-  const isCancelled =
-    error instanceof Error && error.message.includes('cancelled');
+import { CancellationError } from '@/lib/players/mkv-player';
 
-  if (!isCancelled) {
+} catch (error) {
+  if (!(error instanceof CancellationError)) {
     toast({
       title: 'Failed to process video',
       description: 'There was an error loading the video file.',
       variant: 'destructive',
     });
   }
-
-  setIsLoading(false);
-  setLoadingMessage('');
-  setProcessingProgress(0);
+  // setIsLoading etc. are handled by the finally block (see sub-plan 02)
 }
 ```
 
@@ -161,7 +187,7 @@ a toast. We need to suppress the toast for intentional cancellations:
 
 ```typescript
 describe('MKVPlayer cancellation', () => {
-  it('terminates worker and rejects pending operation on cancel()', async () => {
+  it('terminates worker and rejects with CancellationError on cancel()', async () => {
     const terminate = jest.fn();
     const mockWorker = {
       postMessage: jest.fn(),
@@ -172,24 +198,24 @@ describe('MKVPlayer cancellation', () => {
     jest.spyOn(global, 'Worker').mockImplementation(() => mockWorker as unknown as Worker);
 
     const player = new MKVPlayer(mockFile);
-    // Start an operation without resolving it
+    // Start initialize (don't await — cancel before it resolves)
     const initPromise = player.initialize(mockVideoElement);
 
-    // Cancel immediately
     player.cancel();
 
-    await expect(initPromise).rejects.toThrow('cancelled');
+    // Must reject with CancellationError specifically (not just any error)
+    await expect(initPromise).rejects.toBeInstanceOf(CancellationError);
     expect(terminate).toHaveBeenCalledTimes(1);
   });
 
-  it('clears pendingOperations after cancel()', () => {
+  it('clears pendingOperations after cancel()', async () => {
+    const postMessage = jest.fn();
+    const mockWorker = { postMessage, terminate: jest.fn(), onmessage: null, onerror: null };
+    jest.spyOn(global, 'Worker').mockImplementation(() => mockWorker as unknown as Worker);
+
     const player = new MKVPlayer(mockFile);
-    player['getWorker'](); // create worker
-    // Manually add a fake pending op
-    player['pendingOperations'].set('fake-id', {
-      resolve: jest.fn(),
-      reject: jest.fn(),
-    });
+    // Trigger worker creation via public API
+    player.initialize(mockVideoElement).catch(() => {});
 
     player.cancel();
 
@@ -202,9 +228,10 @@ describe('MKVPlayer cancellation', () => {
 
 ## Acceptance Criteria
 
-- [ ] `MKVPlayer.cancel()` exists and terminates the worker.
-- [ ] All pending promises reject with `"operation cancelled"` when cancelled.
-- [ ] The Cancel button appears in the loading overlay only while `0 < progress < 1`.
+- [ ] `CancellationError` class is exported from `mkv-player.ts`.
+- [ ] `MKVPlayer.cancel()` exists, terminates the worker, and rejects pending ops with `CancellationError`.
+- [ ] `instanceof CancellationError` (not string matching) is used to detect cancellation.
+- [ ] `cancellableProcessing` state gates the cancel button — visible from start of `initialize()`, not just when `processingProgress > 0`.
 - [ ] Cancelling does not show the error toast.
 - [ ] After cancelling, the UI returns to the idle/empty state.
 - [ ] All new tests pass.

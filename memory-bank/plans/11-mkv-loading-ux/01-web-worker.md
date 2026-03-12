@@ -200,8 +200,8 @@ self.onmessage = async (event: MessageEvent<WorkerInbound>) => {
 // (avoids re-uploading the same file on repeated operations)
 function ffmpegHasFile(ff: FFmpeg, name: string): boolean {
   try {
-    ff.listDir('/').find((f) => f.name === name);
-    return true;
+    const entries = ff.listDir('/');
+    return !!entries?.some((f) => f.name === name);
   } catch {
     return false;
   }
@@ -282,7 +282,9 @@ await ffmpeg.writeFile(...);
 // ...
 
 // NEW — sends to worker:
-const opId = crypto.randomUUID();
+const opId = typeof crypto?.randomUUID === 'function'
+  ? crypto.randomUUID()
+  : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const result = await this.sendToWorker<{ type: 'REMUX_DONE'; data: Uint8Array; logs: string }>({
   id: opId,
   type: 'REMUX',
@@ -305,7 +307,9 @@ const url = URL.createObjectURL(blob);
 
 ```typescript
 private async _remux(audioTrackIndex: number): Promise<string> {
-  const opId = crypto.randomUUID();
+  const opId = typeof crypto?.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const result = await this.sendToWorker<{ type: 'REMUX_DONE'; data: Uint8Array; logs: string }>({
     id: opId,
     type: 'REMUX',
@@ -366,7 +370,9 @@ thread. It must be moved to the worker too.
 
 ```typescript
 private async _extractSubtitle(trackIndex: number): Promise<string> {
-  const opId = crypto.randomUUID();
+  const opId = typeof crypto?.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const result = await this.sendToWorker<{ type: 'EXTRACT_SUBTITLE_DONE'; srtText: string }>({
     id: opId,
     type: 'EXTRACT_SUBTITLE',
@@ -415,32 +421,26 @@ React re-render → VideoOverlay shows "42%"
 
 ---
 
-## `next.config.ts` Check
+## `next.config.ts` Changes Required
 
-Before implementing, verify these are present in `next.config.ts`:
+**Before implementing**, make the following changes to `next.config.ts`.
+
+The COOP/COEP headers are already present (`/:path*`, `same-origin`, `require-corp`) — do not change them.
+
+The webpack config currently only sets `asyncWebAssembly: true`. **Add `globalObject: 'self'`**:
 
 ```typescript
-// Required for SharedArrayBuffer (FFmpeg uses it internally)
-async headers() {
-  return [
-    {
-      source: '/(.*)',
-      headers: [
-        { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
-        { key: 'Cross-Origin-Embedder-Policy', value: 'require-corp' },
-      ],
-    },
-  ];
-},
-// Required for Worker bundling
-webpack(config) {
-  config.output.globalObject = 'self'; // must be 'self', not 'window'
+webpack: (config, { isServer }) => {
+  config.experiments = { ...config.experiments, asyncWebAssembly: true, layers: true };
+  config.output.globalObject = 'self'; // ADD THIS — required for Web Worker bundling
   return config;
 },
 ```
 
-> If `globalObject` is `'window'` the Worker will fail immediately with
-> `ReferenceError: window is not defined`.
+> **Why:** Without `globalObject = 'self'`, Next.js bundles worker code referencing
+> `window` as the global. Workers have no `window` — they throw
+> `ReferenceError: window is not defined` on first import. Setting it to `'self'`
+> uses the correct Worker global.
 
 ---
 

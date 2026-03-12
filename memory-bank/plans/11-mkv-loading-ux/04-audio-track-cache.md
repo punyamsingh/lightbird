@@ -36,27 +36,38 @@ private remuxCache: Map<number, string> = new Map();
 
 ### 2. Update `_remux()` to check cache first
 
+**Critical:** Sub-plan 01's `_remux()` contains the line:
+```typescript
+if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
+```
+**Delete that line.** Once the cache is in place, `this.objectUrl` may point to a URL
+that is also stored in `remuxCache`. Revoking it here would silently break any future
+cache hit for that track index. All revocations are moved exclusively to `destroy()`.
+
 ```typescript
 private async _remux(audioTrackIndex: number): Promise<string> {
-  // Cache hit: return the previously remuxed URL
+  // Cache hit: return the previously remuxed URL instantly (no FFmpeg)
   const cached = this.remuxCache.get(audioTrackIndex);
   if (cached) return cached;
 
-  // Cache miss: run FFmpeg (either via worker or directly, depending on which sub-plan is active)
-  // ... existing remux logic ...
+  // Cache miss: run FFmpeg via worker (sub-plan 01)
+  // ... existing sendToWorker(REMUX) call ...
 
+  const blob = new Blob([result.data], { type: 'video/mp4' });
   const url = URL.createObjectURL(blob);
 
-  // Store result — do NOT revoke this URL until destroy()
+  // Store in cache — revocation happens only in destroy()
   this.remuxCache.set(audioTrackIndex, url);
-
-  // Still update objectUrl for backwards compatibility (used in destroy() currently)
-  // After sub-plan 1, objectUrl can be removed in favour of remuxCache.
-  this.objectUrl = url;
+  this.objectUrl = url; // keep for destroy() fallback
 
   return url;
 }
 ```
+
+> **Memory note:** The cache accumulates one blob URL per unique audio track index
+> and holds them until `destroy()`. For typical files (1–3 tracks) this is negligible.
+> Files with many audio tracks could accumulate more; a bounded cache is a future
+> optimisation if needed.
 
 ### 3. Update `destroy()` to revoke all cached URLs
 
@@ -70,9 +81,10 @@ destroy(): void {
   }
   this.remuxCache.clear();
 
-  // Keep objectUrl cleanup for safety (may point to same URL as cache entry 0)
+  // Also revoke objectUrl explicitly (handles native fallback URL from sub-plan 05
+  // which is stored in this.objectUrl but NOT in remuxCache)
   if (this.objectUrl) {
-    // Already revoked above if it was in the cache; safe to call twice (no-op)
+    URL.revokeObjectURL(this.objectUrl); // safe to call twice — second call is a no-op
     this.objectUrl = null;
   }
 
@@ -82,8 +94,6 @@ destroy(): void {
   this.subtitleBlobUrls.clear();
 }
 ```
-
-> **URL.revokeObjectURL called twice for the same URL is safe** — the second call is a no-op.
 
 ---
 
@@ -105,20 +115,31 @@ describe('MKVPlayer remux cache', () => {
     expect(mockVideoElement.src).toBe('blob:cached-track-0');
   });
 
-  it('stores the result in the cache after a fresh remux', async () => {
+  it('stores the result in remuxCache after a fresh remux', async () => {
+    const postMessage = jest.fn();
+    const mockWorker = { postMessage, terminate: jest.fn(), onmessage: null, onerror: null };
+    jest.spyOn(global, 'Worker').mockImplementation(() => mockWorker as unknown as Worker);
+    jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fresh-track-2');
+
     const player = new MKVPlayer(mockFile);
-    // Mock _remux to return a URL without running FFmpeg
-    const spy = jest
-      .spyOn(player as unknown as { _remux: Function }, '_remux')
-      .mockResolvedValue('blob:fresh-remux');
+    player['remuxCache'].clear();
 
-    player['remuxCache'].clear(); // ensure cache is empty
-    const url = await player['_remux'](2);
+    // Spy on remuxCache.set to assert it is called with the right key/value
+    const cacheSpy = jest.spyOn(player['remuxCache'], 'set');
 
-    expect(url).toBe('blob:fresh-remux');
-    // After this plan's changes, the cache should be populated
-    // (the mock returns before cache.set, so test the real implementation path)
-    spy.mockRestore();
+    // Start _remux without awaiting — resolve the worker message manually
+    const remuxPromise = player['_remux'](2);
+
+    // Simulate worker REMUX_DONE response
+    const msg = postMessage.mock.calls[0][0];
+    mockWorker.onmessage?.({
+      data: { id: msg.id, type: 'REMUX_DONE', data: new Uint8Array([0]), logs: '' },
+    });
+
+    await remuxPromise;
+
+    expect(cacheSpy).toHaveBeenCalledWith(2, 'blob:fresh-track-2');
+    cacheSpy.mockRestore();
   });
 
   it('revokes all cached URLs on destroy()', () => {
