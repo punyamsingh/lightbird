@@ -33,7 +33,7 @@ one-time disclaimer is shown on first use.
 ## UX Flow
 
 ### Single video file in torrent
-```
+```text
 User clicks 🔗 Magnet button (in PlaylistPanel)
   → Inline input field appears
   → User pastes magnet:? URI → clicks Load
@@ -44,7 +44,7 @@ User clicks 🔗 Magnet button (in PlaylistPanel)
 ```
 
 ### Multi-file / folder torrent
-```
+```text
 User clicks 🔗 Magnet button → pastes URI → Load
   → "Fetching torrent info…"
   → Metadata ready → N video files found
@@ -55,6 +55,7 @@ User clicks 🔗 Magnet button → pastes URI → Load
 ```
 
 ### Error cases
+
 | Situation | Message |
 |---|---|
 | Invalid magnet URI | Inline: "Not a valid magnet link" |
@@ -157,7 +158,7 @@ interface UseMagnetReturn {
 - Stores a `Map<itemId, TorrentFile>` (not in React state — avoids re-renders)
 - `addMagnet`:
   1. Validates URI with `isMagnetUri`
-  2. Shows first-use disclaimer (localStorage flag `lightbird_magnet_disclaimer`)
+  2. Shows first-use disclaimer (localStorage flag `lightbird_magnet_disclaimer_accepted`)
   3. Sets status to `'loading-metadata'`
   4. Calls `client.add(uri, { announce: [...publicTrackers] })`
   5. Listens for `'ready'` event (metadata received)
