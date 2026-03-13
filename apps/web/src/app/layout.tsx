@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "@lightbird/ui";
+import { FeatureFlagsProvider } from "@lightbird/ui";
 
 export const metadata: Metadata = {
   title: "LightBird",
@@ -23,8 +24,10 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
-        {children}
-        <Toaster />
+        <FeatureFlagsProvider>
+          {children}
+          <Toaster />
+        </FeatureFlagsProvider>
       </body>
     </html>
   );

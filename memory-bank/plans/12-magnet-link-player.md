@@ -205,7 +205,7 @@ export interface TorrentStatus { // NEW
 ### `src/components/playlist-panel.tsx`
 New props:
 ```typescript
-onAddMagnet: (uri: string) => Promise<void>;
+onAddMagnet: (uri: string) => Promise<boolean>;
 torrentStatus: TorrentStatus;
 ```
 
@@ -300,14 +300,14 @@ No additional `@types/` package needed — WebTorrent v2 ships its own TypeScrip
 
 ## Success Criteria
 
-- [ ] `isMagnetUri` correctly validates/rejects URIs
-- [ ] Pasting a valid magnet link starts fetching torrent metadata
-- [ ] Single-video torrent: video streams without waiting for full download
-- [ ] Multi-video torrent: all video files are added to the playlist
-- [ ] Non-video files in torrent are silently ignored
-- [ ] Download speed and peer count update live in the UI
-- [ ] Disclaimer shown on first use; not shown again after acceptance
-- [ ] Invalid URI shows inline validation error (no crash)
-- [ ] Removing all torrent items from playlist cleans up the WebTorrent session
-- [ ] `npm test` passes with no regressions
-- [ ] CI green on push
+- [x] `isMagnetUri` correctly validates/rejects URIs
+- [x] Pasting a valid magnet link starts fetching torrent metadata
+- [x] Single-video torrent: video streams without waiting for full download
+- [x] Multi-video torrent: all video files are added to the playlist
+- [x] Non-video files in torrent are silently ignored
+- [x] Download speed and peer count update live in the UI
+- [x] Disclaimer shown on first use; not shown again after acceptance
+- [x] Invalid URI shows inline validation error (no crash)
+- [x] Removing all torrent items from playlist cleans up the WebTorrent session
+- [x] `npm test` passes with no regressions
+- [x] CI green on push

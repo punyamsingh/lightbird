@@ -24,7 +24,8 @@ import {
   useChapters,
   useMagnet,
 } from "@lightbird/core/react";
-import { captureVideoThumbnail, parseMediaError, validateFile, type ParsedMediaError, loadShortcuts, type ShortcutBinding, ProgressEstimator, hasAcceptedDisclaimer, acceptDisclaimer } from "@lightbird/core";
+import { captureVideoThumbnail, parseMediaError, validateFile, type ParsedMediaError, loadShortcuts, type ShortcutBinding, ProgressEstimator, hasAcceptedDisclaimer, acceptDisclaimer, FLAG_MAGNET_LINK } from "@lightbird/core";
+import { useBooleanFlagValue } from "@openfeature/react-sdk";
 import { SubtitleOverlay } from "./subtitle-overlay";
 import {
   AlertDialog,
@@ -65,6 +66,7 @@ const LightBirdPlayer = () => {
   const { metadata: videoMetadata } = useVideoInfo(videoRef, playlist.currentItem?.file ?? null);
   useProgressPersistence(videoRef, playlist.currentItem?.name ?? null);
   const { chapters, currentChapter, goToChapter } = useChapters(videoRef, playerRef);
+  const magnetLinkEnabled = useBooleanFlagValue(FLAG_MAGNET_LINK, false);
   const magnet = useMagnet();
   const [disclaimerPendingUri, setDisclaimerPendingUri] = useState<string | null>(null);
 
@@ -492,6 +494,7 @@ const LightBirdPlayer = () => {
       setAudioTracks([]);
       setActiveAudioTrack("0");
       isStreamRef.current = true;
+      startStallDetection();
     }
     if (items.length > 1) {
       toast({ title: `${items.length} videos added from torrent`, description: magnet.torrentStatus.torrentName });
@@ -768,6 +771,7 @@ const LightBirdPlayer = () => {
         onAddStream={handleAddStream}
         onAddMagnet={handleAddMagnet}
         torrentStatus={magnet.torrentStatus}
+        showMagnet={magnetLinkEnabled}
         onRemoveItem={handleRemoveItem}
         onReorder={handleReorder}
         onImportM3U={handleImportM3U}
@@ -779,8 +783,8 @@ const LightBirdPlayer = () => {
         onSizeChange={setPlaylistSize}
       />
 
-      {/* One-time legal disclaimer for magnet link feature */}
-      <AlertDialog open={disclaimerPendingUri !== null} onOpenChange={(open: boolean) => { if (!open) setDisclaimerPendingUri(null); }}>
+      {/* One-time legal disclaimer for magnet link feature (only shown when feature is enabled) */}
+      <AlertDialog open={magnetLinkEnabled && disclaimerPendingUri !== null} onOpenChange={(open: boolean) => { if (!open) setDisclaimerPendingUri(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Magnet Link Streaming</AlertDialogTitle>
