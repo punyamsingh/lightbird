@@ -13,6 +13,11 @@ export async function captureVideoThumbnail(
       return;
     }
 
+    const cleanup = () => {
+      videoEl.removeEventListener("seeked", onSeeked);
+      videoEl.removeEventListener("error", onError);
+    };
+
     const onSeeked = () => {
       try {
         ctx.drawImage(videoEl, 0, 0, 320, 180);
@@ -21,11 +26,23 @@ export async function captureVideoThumbnail(
         resolve(null);
       } finally {
         videoEl.currentTime = savedTime;
-        videoEl.removeEventListener("seeked", onSeeked);
+        cleanup();
       }
     };
 
+    const onError = () => {
+      cleanup();
+      resolve(null);
+    };
+
     videoEl.addEventListener("seeked", onSeeked, { once: true });
-    videoEl.currentTime = Math.min(atSeconds, videoEl.duration || 0);
+    videoEl.addEventListener("error", onError, { once: true });
+
+    try {
+      videoEl.currentTime = Math.min(atSeconds, videoEl.duration || 0);
+    } catch {
+      cleanup();
+      resolve(null);
+    }
   });
 }

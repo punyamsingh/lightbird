@@ -1,8 +1,17 @@
-# Media Session API — Master Plan
+# Media Session API — Master Plan [DONE]
 
 **Status:** ✅ DONE
 **Priority:** MEDIUM
 **New dependencies:** None (browser API)
+
+## Implementation Summary
+
+Both sub-issues (MS-01 and MS-02) were implemented together:
+
+- **`src/hooks/use-media-session.ts`** — `useMediaSession` hook sets `navigator.mediaSession.metadata` (title + JPEG artwork) and registers all six action handlers. Feature-detected with `'mediaSession' in navigator && navigator.mediaSession`. Handlers cleared and metadata nulled on unmount.
+- **`src/lib/video-thumbnail.ts`** — `captureVideoThumbnail` seeks to the 5-second mark, draws a 320×180 JPEG frame to an offscreen canvas, restores `currentTime`. Resolves `null` on any error; an `error` event listener and a try/catch on the `currentTime` assignment prevent the promise from hanging.
+- **`lightbird-player.tsx`** — `loadeddata` listener is scoped to `playlist.currentItem` (cancelled via a `let cancelled` flag so stale captures are discarded). Uses explicit `handleMediaPlay`/`handleMediaPause` wrappers rather than `togglePlay`.
+- **`jest.setup.ts`** — `MediaMetadata` polyfill added for jsdom.
 
 ---
 
