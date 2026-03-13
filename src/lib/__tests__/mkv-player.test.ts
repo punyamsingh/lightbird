@@ -339,6 +339,22 @@ describe('MKVPlayer fallback (worker ERROR)', () => {
     await initPromise;
     expect(player.getSubtitles()).toEqual([]);
   });
+
+  it('falls back to native playback when worker.onerror fires', async () => {
+    const player = new MKVPlayer(makeFile());
+    const videoEl = document.createElement('video');
+
+    const initPromise = player.initialize(videoEl);
+    await Promise.resolve(); // flush _canPlayNatively microtask — worker is now created
+
+    // Simulate a fatal worker-level error (e.g. the Worker script failed to load)
+    mockWorkerInstance.onerror?.(new ErrorEvent('error', { message: 'worker crashed' }));
+
+    await initPromise; // should resolve via the catch/fallback path in initialize()
+
+    expect(player.getAudioTracks()).toHaveLength(1);
+    expect(player.getAudioTracks()[0].name).toBe('Default Audio');
+  });
 });
 
 // ---------------------------------------------------------------------------

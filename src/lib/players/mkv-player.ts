@@ -146,6 +146,10 @@ export class MKVPlayer {
       };
       this.worker.onerror = (error) => {
         console.error('FFmpeg worker error:', error);
+        for (const { reject } of this.pendingOperations.values()) {
+          reject(error);
+        }
+        this.pendingOperations.clear();
       };
     }
     return this.worker;
@@ -410,12 +414,17 @@ export class MKVPlayer {
   }
 
   destroy(): void {
+    // Reject any in-flight operations so callers don't hang
+    for (const { reject } of this.pendingOperations.values()) {
+      reject(new Error('MKVPlayer destroyed'));
+    }
+    this.pendingOperations.clear();
+
     // Terminate the worker so the FFmpeg WASM thread is killed
     if (this.worker) {
       this.worker.terminate();
       this.worker = null;
     }
-    this.pendingOperations.clear();
 
     // Revoke all remux cache entries
     for (const url of this.remuxCache.values()) {

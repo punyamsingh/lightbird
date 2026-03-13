@@ -37,6 +37,31 @@ describe('ProgressEstimator', () => {
     expect(est.getEstimate().etaSeconds).toBeNull();
   });
 
+  it('ignores NaN progress values', () => {
+    const est = new ProgressEstimator(100 * 1024 * 1024);
+    est.update(NaN);
+    jest.advanceTimersByTime(2000);
+    expect(est.getEstimate().speedMBps).toBe(0);
+    expect(est.getEstimate().etaSeconds).toBeNull();
+  });
+
+  it('clamps progress values above 1 to 1', () => {
+    const est = new ProgressEstimator(100 * 1024 * 1024);
+    est.update(1.5); // should be clamped to 1.0
+    jest.advanceTimersByTime(1000);
+    const { speedMBps, etaSeconds } = est.getEstimate();
+    expect(speedMBps).toBeGreaterThan(0);
+    expect(etaSeconds).toBe(0); // 0 bytes remaining at progress = 1
+  });
+
+  it('clamps negative progress values to 0', () => {
+    const est = new ProgressEstimator(100 * 1024 * 1024);
+    est.update(-0.5); // should be clamped to 0
+    jest.advanceTimersByTime(2000);
+    expect(est.getEstimate().speedMBps).toBe(0);
+    expect(est.getEstimate().etaSeconds).toBeNull();
+  });
+
   it('returns decreasing ETA as progress increases', () => {
     const est = new ProgressEstimator(100 * 1024 * 1024);
     est.update(0.1); // startTime set here at T=0
