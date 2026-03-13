@@ -35,8 +35,10 @@ import {
   FilePlus,
   FolderOpen,
   Link,
+  Link2,
   ListVideo,
   Tv,
+  Globe,
   Pin,
   PinOff,
   ChevronLeft,
@@ -47,7 +49,10 @@ import {
   GripVertical,
   Download,
   Upload,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
+import type { TorrentStatus } from "@/types";
 import { exportPlaylist, parseM3U8 } from "@/lib/m3u-parser";
 
 export type PlaylistSize = "sm" | "md" | "lg";
@@ -76,6 +81,12 @@ function formatTime(seconds: number): string {
 }
 
 const VIDEO_EXTENSIONS_RE = /\.(mp4|mkv|webm|mov|avi|wmv|flv|m4v)$/i;
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 interface SortableItemProps {
   item: PlaylistItem;
@@ -130,7 +141,9 @@ function SortablePlaylistItem({ item, index, isActive, onSelect, onRemove }: Sor
         className="flex-1 flex items-center gap-1.5 min-w-0 text-left"
         aria-label={`Play ${item.name}`}
       >
-        {item.type === "video"
+        {item.source === "torrent"
+          ? <Globe className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
+          : item.type === "video"
           ? <ListVideo className="w-3.5 h-3.5 shrink-0" />
           : <Tv className="w-3.5 h-3.5 shrink-0" />}
         <span className="truncate">{item.name}</span>
@@ -160,6 +173,11 @@ interface PlaylistPanelProps {
   onFilesAdded: (files: FileList) => void;
   onFolderFilesAdded: (files: File[]) => void;
   onAddStream: (url: string, name?: string) => void;
+  /** Returns true if items were added, false if a disclaimer prompt was triggered. Throws on error. */
+  onAddMagnet: (uri: string) => Promise<boolean>;
+  torrentStatus: TorrentStatus;
+  /** When false, hides the magnet link button and input entirely. Defaults to true. */
+  showMagnet?: boolean;
   onRemoveItem: (index: number) => void;
   onReorder: (newPlaylist: PlaylistItem[]) => void;
   onImportM3U: (items: Omit<PlaylistItem, "id">[]) => void;
@@ -178,6 +196,9 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
   onFilesAdded,
   onFolderFilesAdded,
   onAddStream,
+  onAddMagnet,
+  torrentStatus,
+  showMagnet = true,
   onRemoveItem,
   onReorder,
   onImportM3U,
@@ -192,6 +213,9 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
   const folderInputRef = useRef<HTMLInputElement>(null);
   const m3uInputRef = useRef<HTMLInputElement>(null);
   const [streamUrl, setStreamUrl] = useState("");
+  const [magnetUri, setMagnetUri] = useState("");
+  const [showMagnetInput, setShowMagnetInput] = useState(false);
+  const [magnetError, setMagnetError] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey | "">("");
 
   const handleStreamUrlSubmit = (e: React.FormEvent) => {
@@ -199,6 +223,25 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
     if (streamUrl) {
       onAddStream(streamUrl);
       setStreamUrl("");
+    }
+  };
+
+  const handleMagnetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const uri = magnetUri.trim();
+    if (!uri) return;
+    setMagnetError(null);
+    try {
+      const added = await onAddMagnet(uri);
+      if (added) {
+        // Items were added — clear the input and close the magnet form
+        setMagnetUri("");
+        setShowMagnetInput(false);
+      }
+      // If !added, the disclaimer dialog was triggered — keep the input so the
+      // user doesn't have to re-paste after accepting.
+    } catch (err) {
+      setMagnetError(err instanceof Error ? err.message : "Failed to load magnet link");
     }
   };
 
@@ -442,7 +485,78 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
               <Button type="submit" size="icon" variant="secondary" className="h-8 w-8 shrink-0">
                 <Link className="h-3.5 w-3.5" />
               </Button>
+              {showMagnet && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant={showMagnetInput ? "default" : "outline"}
+                      className="h-8 w-8 shrink-0"
+                      onClick={() => { setShowMagnetInput((v) => !v); setMagnetError(null); }}
+                      aria-label="Add magnet link"
+                    >
+                      <Link2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom"><p>Add Magnet Link</p></TooltipContent>
+                </Tooltip>
+              )}
             </form>
+
+            {showMagnet && showMagnetInput && (
+              <form onSubmit={handleMagnetSubmit} className="space-y-1.5">
+                <div className="flex gap-1.5">
+                  <Input
+                    placeholder="magnet:?xt=urn:btih:…"
+                    value={magnetUri}
+                    onChange={(e) => { setMagnetUri(e.target.value); setMagnetError(null); }}
+                    className="h-8 text-xs font-mono"
+                    disabled={torrentStatus.status === "loading-metadata"}
+                  />
+                  <Button
+                    type="submit"
+                    size="icon"
+                    variant="default"
+                    className="h-8 w-8 shrink-0"
+                    disabled={!magnetUri.trim() || torrentStatus.status === "loading-metadata"}
+                    aria-label="Load magnet link"
+                  >
+                    {torrentStatus.status === "loading-metadata"
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <Globe className="h-3.5 w-3.5" />}
+                  </Button>
+                </div>
+                {torrentStatus.status === "loading-metadata" && (
+                  <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Fetching torrent info…
+                  </p>
+                )}
+                {magnetError && (
+                  <p className="text-[11px] text-destructive flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3 shrink-0" />
+                    {magnetError}
+                  </p>
+                )}
+              </form>
+            )}
+
+            {/* Torrent download progress bar */}
+            {showMagnet && torrentStatus.status === "ready" && torrentStatus.progress < 1 && (
+              <div className="space-y-1">
+                <div className="w-full bg-muted rounded-full h-1 overflow-hidden">
+                  <div
+                    className="bg-emerald-500 h-1 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.round(torrentStatus.progress * 100)}%` }}
+                  />
+                </div>
+                <p className="text-[10px] text-muted-foreground flex items-center justify-between">
+                  <span>↓ {formatBytes(torrentStatus.downloadSpeed)}/s · {torrentStatus.numPeers} peer{torrentStatus.numPeers !== 1 ? "s" : ""}</span>
+                  <span>{Math.round(torrentStatus.progress * 100)}%</span>
+                </p>
+              </div>
+            )}
 
             {playlist.length > 1 && (
               <Select value={sortKey} onValueChange={handleSort}>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import PlaylistPanel from '@/components/playlist-panel';
 import type { PlaylistItem } from '@/types';
 
@@ -36,6 +36,16 @@ jest.mock('@/lib/m3u-parser', () => ({
   parseM3U8: jest.fn().mockReturnValue([]),
 }));
 
+const idleTorrentStatus = {
+  status: 'idle' as const,
+  torrentName: '',
+  numPeers: 0,
+  downloadSpeed: 0,
+  uploadSpeed: 0,
+  progress: 0,
+  error: null,
+};
+
 const defaultProps = {
   playlist: [] as PlaylistItem[],
   currentVideoIndex: null,
@@ -43,6 +53,9 @@ const defaultProps = {
   onFilesAdded: jest.fn(),
   onFolderFilesAdded: jest.fn(),
   onAddStream: jest.fn(),
+  onAddMagnet: jest.fn().mockResolvedValue(true),
+  torrentStatus: idleTorrentStatus,
+  showMagnet: true,
   onRemoveItem: jest.fn(),
   onReorder: jest.fn(),
   onImportM3U: jest.fn(),
@@ -221,5 +234,108 @@ describe('PlaylistPanel', () => {
     render(<PlaylistPanel {...defaultProps} playlist={playlistWithDuration} />);
     // 125 seconds = 2:05
     expect(screen.getByText('2:05')).toBeInTheDocument();
+  });
+
+  // ── Magnet link UI ────────────────────────────────────────────────────────
+
+  it('shows Add Magnet Link button when showMagnet is true', () => {
+    render(<PlaylistPanel {...defaultProps} showMagnet={true} />);
+    expect(screen.getByRole('button', { name: /add magnet link/i })).toBeInTheDocument();
+  });
+
+  it('hides Add Magnet Link button when showMagnet is false', () => {
+    render(<PlaylistPanel {...defaultProps} showMagnet={false} />);
+    expect(screen.queryByRole('button', { name: /add magnet link/i })).not.toBeInTheDocument();
+  });
+
+  it('reveals the magnet input form when the magnet button is clicked', () => {
+    render(<PlaylistPanel {...defaultProps} />);
+    expect(screen.queryByPlaceholderText(/magnet:\?xt/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /add magnet link/i }));
+    expect(screen.getByPlaceholderText(/magnet:\?xt/i)).toBeInTheDocument();
+  });
+
+  it('calls onAddMagnet with the typed URI when the magnet form is submitted', async () => {
+    const onAddMagnet = jest.fn().mockResolvedValue(true);
+    render(<PlaylistPanel {...defaultProps} onAddMagnet={onAddMagnet} />);
+    fireEvent.click(screen.getByRole('button', { name: /add magnet link/i }));
+    const input = screen.getByPlaceholderText(/magnet:\?xt/i);
+    fireEvent.change(input, { target: { value: 'magnet:?xt=urn:btih:08ada5a7a6183aae1e09d831df6748d566095a10' } });
+    await act(async () => {
+      fireEvent.submit(input.closest('form')!);
+    });
+    expect(onAddMagnet).toHaveBeenCalledWith('magnet:?xt=urn:btih:08ada5a7a6183aae1e09d831df6748d566095a10');
+  });
+
+  it('clears the input and closes the magnet form when onAddMagnet resolves true', async () => {
+    const onAddMagnet = jest.fn().mockResolvedValue(true);
+    render(<PlaylistPanel {...defaultProps} onAddMagnet={onAddMagnet} />);
+    fireEvent.click(screen.getByRole('button', { name: /add magnet link/i }));
+    const input = screen.getByPlaceholderText(/magnet:\?xt/i) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'magnet:?xt=urn:btih:08ada5a7a6183aae1e09d831df6748d566095a10' } });
+    await act(async () => {
+      fireEvent.submit(input.closest('form')!);
+    });
+    // Form should be hidden and input cleared
+    await waitFor(() => {
+      expect(screen.queryByPlaceholderText(/magnet:\?xt/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it('keeps the input visible when onAddMagnet resolves false (disclaimer flow)', async () => {
+    const onAddMagnet = jest.fn().mockResolvedValue(false);
+    render(<PlaylistPanel {...defaultProps} onAddMagnet={onAddMagnet} />);
+    fireEvent.click(screen.getByRole('button', { name: /add magnet link/i }));
+    const input = screen.getByPlaceholderText(/magnet:\?xt/i) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'magnet:?xt=urn:btih:08ada5a7a6183aae1e09d831df6748d566095a10' } });
+    await act(async () => {
+      fireEvent.submit(input.closest('form')!);
+    });
+    // Input should still be present (disclaimer was triggered, not items added)
+    expect(screen.getByPlaceholderText(/magnet:\?xt/i)).toBeInTheDocument();
+  });
+
+  it('shows an error message when onAddMagnet rejects', async () => {
+    const onAddMagnet = jest.fn().mockRejectedValue(new Error('Not a valid magnet link'));
+    render(<PlaylistPanel {...defaultProps} onAddMagnet={onAddMagnet} />);
+    fireEvent.click(screen.getByRole('button', { name: /add magnet link/i }));
+    const input = screen.getByPlaceholderText(/magnet:\?xt/i);
+    fireEvent.change(input, { target: { value: 'not-a-magnet' } });
+    await act(async () => {
+      fireEvent.submit(input.closest('form')!);
+    });
+    await waitFor(() => {
+      expect(screen.getByText('Not a valid magnet link')).toBeInTheDocument();
+    });
+  });
+
+  it('shows "Fetching torrent info…" when torrentStatus is loading-metadata', () => {
+    render(<PlaylistPanel {...defaultProps} torrentStatus={{ ...idleTorrentStatus, status: 'loading-metadata' }} />);
+    fireEvent.click(screen.getByRole('button', { name: /add magnet link/i }));
+    expect(screen.getByText(/fetching torrent info/i)).toBeInTheDocument();
+  });
+
+  it('disables the load button while loading metadata', () => {
+    render(<PlaylistPanel {...defaultProps} torrentStatus={{ ...idleTorrentStatus, status: 'loading-metadata' }} />);
+    fireEvent.click(screen.getByRole('button', { name: /add magnet link/i }));
+    expect(screen.getByRole('button', { name: /load magnet link/i })).toBeDisabled();
+  });
+
+  it('shows download progress bar when torrentStatus is ready with progress < 1', () => {
+    render(<PlaylistPanel {...defaultProps} torrentStatus={{ ...idleTorrentStatus, status: 'ready', progress: 0.45, numPeers: 7, downloadSpeed: 512 * 1024, uploadSpeed: 0, torrentName: 'Test', error: null }} />);
+    expect(screen.getByText(/45%/)).toBeInTheDocument();
+    expect(screen.getByText(/7 peers/)).toBeInTheDocument();
+  });
+
+  it('shows peer count with singular label when there is exactly 1 peer', () => {
+    render(<PlaylistPanel {...defaultProps} torrentStatus={{ ...idleTorrentStatus, status: 'ready', progress: 0.1, numPeers: 1, downloadSpeed: 0, uploadSpeed: 0, torrentName: 'Test', error: null }} />);
+    const el = screen.getByText(/· 1 peer/);
+    expect(el).toBeInTheDocument();
+    expect(el.textContent).not.toMatch(/peers/);
+  });
+
+  it('does not show progress bar when progress is 1 (complete)', () => {
+    render(<PlaylistPanel {...defaultProps} torrentStatus={{ ...idleTorrentStatus, status: 'ready', progress: 1, numPeers: 3, downloadSpeed: 0, uploadSpeed: 0, torrentName: 'Test', error: null }} />);
+    expect(screen.queryByText(/%/)).not.toBeInTheDocument();
   });
 });

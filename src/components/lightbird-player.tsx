@@ -26,6 +26,20 @@ import { parseMediaError, validateFile, type ParsedMediaError } from "@/lib/medi
 import { loadShortcuts } from "@/lib/keyboard-shortcuts";
 import type { ShortcutBinding } from "@/lib/keyboard-shortcuts";
 import { ProgressEstimator } from "@/lib/progress-estimator";
+import { useMagnet } from "@/hooks/use-magnet";
+import { hasAcceptedDisclaimer, acceptDisclaimer } from "@/lib/magnet-player";
+import { useBooleanFlagValue } from "@openfeature/react-sdk";
+import { FLAG_MAGNET_LINK } from "@/lib/feature-flags";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const MAX_RETRIES = 3;
 
@@ -50,6 +64,9 @@ const LightBirdPlayer = () => {
   const fullscreen = useFullscreen(containerRef);
   const { metadata: videoMetadata } = useVideoInfo(videoRef, playlist.currentItem?.file ?? null);
   useProgressPersistence(videoRef, playlist.currentItem?.name ?? null);
+  const magnetLinkEnabled = useBooleanFlagValue(FLAG_MAGNET_LINK, false);
+  const magnet = useMagnet();
+  const [disclaimerPendingUri, setDisclaimerPendingUri] = useState<string | null>(null);
 
   const [shortcuts, setShortcuts] = useState<ShortcutBinding[]>(() => loadShortcuts());
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
@@ -414,6 +431,42 @@ const LightBirdPlayer = () => {
     }
   }, [playlist, subtitles]);
 
+  const handleAddMagnet = useCallback(async (uri: string): Promise<boolean> => {
+    if (!hasAcceptedDisclaimer()) {
+      setDisclaimerPendingUri(uri);
+      return false;
+    }
+    const items = await magnet.addMagnet(uri);
+    const startIndex = playlist.playlist.length;
+    items.forEach((item) => playlist.appendItem(item));
+    if (playlist.currentIndex === null && items.length > 0) {
+      playlist.selectItem(startIndex);
+      if (videoRef.current) videoRef.current.src = items[0].url;
+      subtitles.reset();
+      setAudioTracks([]);
+      setActiveAudioTrack("0");
+      isStreamRef.current = true;
+      startStallDetection();
+    }
+    if (items.length > 1) {
+      toast({ title: `${items.length} videos added from torrent`, description: magnet.torrentStatus.torrentName });
+    }
+    return true;
+  }, [magnet, playlist, subtitles, toast]);
+
+  const handleDisclaimerAccepted = useCallback(async () => {
+    acceptDisclaimer();
+    const uri = disclaimerPendingUri;
+    setDisclaimerPendingUri(null);
+    if (uri) {
+      try {
+        await handleAddMagnet(uri);
+      } catch (err) {
+        toast({ title: "Magnet link failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
+      }
+    }
+  }, [disclaimerPendingUri, handleAddMagnet, toast]);
+
   const handleSubtitleChange = useCallback(async (id: string) => {
     subtitles.switchSubtitle(id);
     if (playerRef.current) {
@@ -660,6 +713,9 @@ const LightBirdPlayer = () => {
         onFilesAdded={handleFileChange}
         onFolderFilesAdded={handleFolderFilesAdded}
         onAddStream={handleAddStream}
+        onAddMagnet={handleAddMagnet}
+        torrentStatus={magnet.torrentStatus}
+        showMagnet={magnetLinkEnabled}
         onRemoveItem={handleRemoveItem}
         onReorder={handleReorder}
         onImportM3U={handleImportM3U}
@@ -670,6 +726,31 @@ const LightBirdPlayer = () => {
         onTogglePin={() => setPlaylistPinned((v) => !v)}
         onSizeChange={setPlaylistSize}
       />
+
+      {/* One-time legal disclaimer for magnet link feature (only shown when feature is enabled) */}
+      <AlertDialog open={magnetLinkEnabled && disclaimerPendingUri !== null} onOpenChange={(open: boolean) => { if (!open) setDisclaimerPendingUri(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Magnet Link Streaming</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  LightBird streams content via <strong className="text-foreground">BitTorrent</strong> (WebRTC/WebSocket) — the same technology used by applications like VLC and qBittorrent.
+                </p>
+                <p>
+                  <strong className="text-foreground">You are responsible</strong> for ensuring you have the legal right to access any content you stream. LightBird does not host, index, or endorse any content.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDisclaimerPendingUri(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDisclaimerAccepted}>
+              I Understand — Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

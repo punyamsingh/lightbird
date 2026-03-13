@@ -5,8 +5,20 @@ export interface PlaylistItem {
   name: string;
   url: string;
   type: 'video' | 'stream';
+  /** Set only on items added via magnet link. */
+  source?: 'torrent';
   file?: File;
   duration?: number;
+}
+
+export interface TorrentStatus {
+  status: 'idle' | 'loading-metadata' | 'ready' | 'error';
+  torrentName: string;
+  numPeers: number;
+  downloadSpeed: number;
+  uploadSpeed: number;
+  progress: number;
+  error: string | null;
 }
 
 export interface SubtitleCue {

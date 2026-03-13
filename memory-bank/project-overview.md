@@ -134,9 +134,10 @@ CI runs on every push and PR via `.github/workflows/test.yml`.
 | 09 | Video Info Panel | **DONE** |
 | 10 | Codebase Cleanup | **DONE** |
 | 11 | MKV Loading UX Improvements | **DONE** |
+| 12 | Magnet Link Player (WebTorrent) | **DONE** |
 | MS | Media Session API | **DONE** |
 
-Full plan details: `memory-bank/plans/01-test-suite.md` … `10-codebase-cleanup.md`, `memory-bank/plans/11-mkv-loading-ux/`, `memory-bank/plans/media-session/`
+Full plan details: `memory-bank/plans/01-test-suite.md` … `10-codebase-cleanup.md`, `memory-bank/plans/11-mkv-loading-ux/`, `memory-bank/plans/media-session/`, `memory-bank/plans/12-magnet-link-player.md`
 
 ---
 
@@ -151,6 +152,7 @@ Full plan details: `memory-bank/plans/01-test-suite.md` … `10-codebase-cleanup
 | Styling | Tailwind CSS + ShadCN UI | 3.4.1 |
 | Component primitives | Radix UI | various |
 | Video processing | FFmpeg.wasm (`@ffmpeg/ffmpeg`) | 0.12.10 |
+| Torrent streaming | WebTorrent (`webtorrent`) | 2.8.5 |
 | Icons | Lucide React | 0.475.0 |
 | Drag-and-drop | @dnd-kit/core + @dnd-kit/sortable + @dnd-kit/utilities | — |
 | Testing | Jest + React Testing Library | Jest 30, RTL 16 |
