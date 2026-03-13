@@ -18,7 +18,7 @@ beforeAll(() => {
   (global as unknown as { Worker: jest.Mock }).Worker = MockWorkerConstructor;
 });
 
-import { MKVPlayer, CancellationError, parseStreamInfo } from '@/lib/players/mkv-player';
+import { MKVPlayer, CancellationError, parseStreamInfo, canPlayNatively } from '@/lib/players/mkv-player';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -44,6 +44,9 @@ const DEFAULT_LOGS = [
 /**
  * Start initialize, then resolve it immediately with a successful REMUX_DONE.
  * Returns the resolved player file.
+ *
+ * NOTE: We need to flush the canPlayNatively microtask (one await) before
+ * postMessage is called, because initialize() awaits the native check first.
  */
 async function initializeSuccess(
   player: MKVPlayer,
@@ -51,7 +54,8 @@ async function initializeSuccess(
   logs = DEFAULT_LOGS,
 ) {
   const initPromise = player.initialize(videoEl);
-  // postMessage was called synchronously in sendToWorker's Promise executor
+  // Flush the _canPlayNatively microtask so the FFmpeg path continues
+  await Promise.resolve();
   const msg = mockWorkerInstance.postMessage.mock.calls[0][0];
   simulateWorkerMessage({
     id: msg.id,
@@ -75,6 +79,12 @@ beforeEach(() => {
     terminate: jest.fn(),
   };
   MockWorkerConstructor.mockReturnValue(mockWorkerInstance);
+  // Default: native check always returns false so existing tests use the FFmpeg path
+  jest.spyOn(MKVPlayer, '_canPlayNatively').mockResolvedValue(false);
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 // ---------------------------------------------------------------------------
@@ -143,6 +153,91 @@ describe('MKVPlayer.isCompatible', () => {
 });
 
 // ---------------------------------------------------------------------------
+// canPlayNatively()
+// ---------------------------------------------------------------------------
+
+describe('canPlayNatively()', () => {
+  // canPlayNatively receives a pre-created URL string — it does NOT call
+  // URL.createObjectURL or URL.revokeObjectURL.
+
+  it('resolves true when video fires canplay', async () => {
+    const mockVideo = {
+      oncanplay: null as (() => void) | null,
+      onerror: null as (() => void) | null,
+      src: '',
+      preload: '',
+      load: jest.fn(),
+      removeAttribute: jest.fn(),
+    };
+    jest.spyOn(document, 'createElement').mockReturnValue(mockVideo as unknown as HTMLVideoElement);
+    const revoke = jest.spyOn(URL, 'revokeObjectURL');
+
+    const promise = canPlayNatively('blob:test-url', 1000);
+    mockVideo.oncanplay?.();
+
+    await expect(promise).resolves.toBe(true);
+    // Must NOT revoke the URL (caller owns it)
+    expect(revoke).not.toHaveBeenCalled();
+  });
+
+  it('resolves false when video fires error', async () => {
+    const mockVideo = {
+      oncanplay: null as (() => void) | null,
+      onerror: null as (() => void) | null,
+      src: '',
+      preload: '',
+      load: jest.fn(),
+      removeAttribute: jest.fn(),
+    };
+    jest.spyOn(document, 'createElement').mockReturnValue(mockVideo as unknown as HTMLVideoElement);
+
+    const promise = canPlayNatively('blob:test-url', 1000);
+    mockVideo.onerror?.();
+
+    await expect(promise).resolves.toBe(false);
+  });
+
+  it('resolves false after timeout', async () => {
+    jest.useFakeTimers();
+    const mockVideo = {
+      oncanplay: null as (() => void) | null,
+      onerror: null as (() => void) | null,
+      src: '',
+      preload: '',
+      load: jest.fn(),
+      removeAttribute: jest.fn(),
+    };
+    jest.spyOn(document, 'createElement').mockReturnValue(mockVideo as unknown as HTMLVideoElement);
+
+    const promise = canPlayNatively('blob:test-url', 500);
+    jest.advanceTimersByTime(600);
+
+    await expect(promise).resolves.toBe(false);
+    jest.useRealTimers();
+  });
+
+  it('sets preload to metadata and assigns src before load()', async () => {
+    const mockVideo = {
+      oncanplay: null as (() => void) | null,
+      onerror: null as (() => void) | null,
+      src: '',
+      preload: '',
+      load: jest.fn(),
+      removeAttribute: jest.fn(),
+    };
+    jest.spyOn(document, 'createElement').mockReturnValue(mockVideo as unknown as HTMLVideoElement);
+
+    const promise = canPlayNatively('blob:check-url', 1000);
+    expect(mockVideo.preload).toBe('metadata');
+    expect(mockVideo.src).toBe('blob:check-url');
+    expect(mockVideo.load).toHaveBeenCalled();
+
+    mockVideo.onerror?.();
+    await promise;
+  });
+});
+
+// ---------------------------------------------------------------------------
 // MKVPlayer — worker integration
 // ---------------------------------------------------------------------------
 
@@ -152,8 +247,9 @@ describe('MKVPlayer worker integration', () => {
     const videoEl = document.createElement('video');
 
     const initPromise = player.initialize(videoEl);
+    // Flush the _canPlayNatively microtask before checking postMessage
+    await Promise.resolve();
 
-    // postMessage was called synchronously before the first await resolved
     expect(mockWorkerInstance.postMessage).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'REMUX' }),
     );
@@ -213,6 +309,7 @@ describe('MKVPlayer fallback (worker ERROR)', () => {
     const videoEl = document.createElement('video');
 
     const initPromise = player.initialize(videoEl);
+    await Promise.resolve(); // flush _canPlayNatively microtask
     const msg = mockWorkerInstance.postMessage.mock.calls[0][0];
     simulateWorkerMessage({ id: msg.id, type: 'ERROR', error: 'FFmpeg failed' });
 
@@ -228,6 +325,7 @@ describe('MKVPlayer fallback (worker ERROR)', () => {
     const videoEl = document.createElement('video');
 
     const initPromise = player.initialize(videoEl);
+    await Promise.resolve(); // flush _canPlayNatively microtask
     const msg = mockWorkerInstance.postMessage.mock.calls[0][0];
     simulateWorkerMessage({ id: msg.id, type: 'ERROR', error: 'fail' });
 
@@ -259,6 +357,58 @@ describe('MKVPlayer with successful REMUX_DONE', () => {
     expect(subs).toHaveLength(1);
     expect(subs[0].type).toBe('embedded');
     expect(subs[0].lang).toBe('eng');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// MKVPlayer — native path (canPlayNatively returns true)
+// ---------------------------------------------------------------------------
+
+describe('MKVPlayer.initialize() native path', () => {
+  it('keeps probeUrl on this.objectUrl when canPlayNatively returns true', async () => {
+    jest.spyOn(MKVPlayer, '_canPlayNatively').mockResolvedValue(true);
+    jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:probe-url');
+    const revoke = jest.spyOn(URL, 'revokeObjectURL');
+
+    const player = new MKVPlayer(makeFile());
+    const videoEl = document.createElement('video');
+    const result = await player.initialize(videoEl);
+
+    expect(videoEl.src).toContain('blob:probe-url');
+    // URL must NOT be revoked — it's now the active playback URL
+    expect(revoke).not.toHaveBeenCalledWith('blob:probe-url');
+    // Worker must NOT have been invoked
+    expect(mockWorkerInstance.postMessage).not.toHaveBeenCalled();
+    expect(result.audioTracks).toHaveLength(1);
+  });
+
+  it('calls onProgress(1) immediately on native path', async () => {
+    jest.spyOn(MKVPlayer, '_canPlayNatively').mockResolvedValue(true);
+    const onProgress = jest.fn();
+    const player = new MKVPlayer(makeFile(), onProgress);
+    const videoEl = document.createElement('video');
+
+    await player.initialize(videoEl);
+
+    expect(onProgress).toHaveBeenCalledWith(1);
+    expect(onProgress).toHaveBeenCalledTimes(1);
+  });
+
+  it('revokes probeUrl and proceeds to FFmpeg when canPlayNatively returns false', async () => {
+    // _canPlayNatively is already mocked to false in beforeEach
+    const probeUrl = 'blob:probe-url';
+    jest.spyOn(URL, 'createObjectURL').mockReturnValue(probeUrl);
+    const revoke = jest.spyOn(URL, 'revokeObjectURL');
+
+    const player = new MKVPlayer(makeFile());
+    const videoEl = document.createElement('video');
+
+    // Start but don't await — check state after native check resolves
+    player.initialize(videoEl).catch(() => {});
+    await Promise.resolve(); // flush microtask
+
+    expect(revoke).toHaveBeenCalledWith(probeUrl);
+    expect(mockWorkerInstance.postMessage).toHaveBeenCalled();
   });
 });
 
@@ -298,6 +448,7 @@ describe('MKVPlayer lifecycle', () => {
     const videoEl = document.createElement('video');
     // Fallback path — subtitleTrackMap stays empty
     const initPromise = player.initialize(videoEl);
+    await Promise.resolve(); // flush _canPlayNatively microtask
     const msg = mockWorkerInstance.postMessage.mock.calls[0][0];
     simulateWorkerMessage({ id: msg.id, type: 'ERROR', error: 'fail' });
     await initPromise;
@@ -311,12 +462,29 @@ describe('MKVPlayer lifecycle', () => {
 // ---------------------------------------------------------------------------
 
 describe('MKVPlayer cancellation', () => {
-  it('terminates worker and rejects with CancellationError on cancel()', async () => {
+  it('rejects with CancellationError when cancel() is called during native check phase', async () => {
     const player = new MKVPlayer(makeFile());
     const videoEl = document.createElement('video');
 
-    // Start initialize (don't await — cancel before it resolves)
+    // Start initialize (don't await — cancel before native check resolves)
     const initPromise = player.initialize(videoEl);
+
+    player.cancel();
+
+    await expect(initPromise).rejects.toBeInstanceOf(CancellationError);
+    // Worker was never created because cancel was called before the FFmpeg phase
+    expect(mockWorkerInstance.terminate).not.toHaveBeenCalled();
+  });
+
+  it('terminates worker and rejects with CancellationError on cancel() during FFmpeg phase', async () => {
+    const player = new MKVPlayer(makeFile());
+    const videoEl = document.createElement('video');
+
+    const initPromise = player.initialize(videoEl);
+    await Promise.resolve(); // flush native check microtask → FFmpeg phase begins
+
+    // Worker should now exist
+    expect(mockWorkerInstance.postMessage).toHaveBeenCalled();
 
     player.cancel();
 
@@ -324,12 +492,14 @@ describe('MKVPlayer cancellation', () => {
     expect(mockWorkerInstance.terminate).toHaveBeenCalledTimes(1);
   });
 
-  it('clears pendingOperations after cancel()', () => {
+  it('clears pendingOperations after cancel() during FFmpeg phase', async () => {
     const player = new MKVPlayer(makeFile());
     const videoEl = document.createElement('video');
 
-    // Start initialize to populate pendingOperations
     player.initialize(videoEl).catch(() => {});
+    await Promise.resolve(); // flush native check → pendingOperations now populated
+
+    expect(player['pendingOperations'].size).toBe(1);
 
     player.cancel();
 
@@ -346,6 +516,7 @@ describe('MKVPlayer cancellation', () => {
     const videoEl = document.createElement('video');
 
     const initPromise = player.initialize(videoEl);
+    await Promise.resolve(); // flush _canPlayNatively microtask
     const msg = mockWorkerInstance.postMessage.mock.calls[0][0];
     simulateWorkerMessage({ id: msg.id, type: 'ERROR', error: 'FFmpeg failed' });
 

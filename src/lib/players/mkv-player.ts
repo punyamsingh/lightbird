@@ -4,6 +4,41 @@ import type { AudioTrack, Subtitle } from "@/types";
 import { SubtitleConverter } from "@/lib/subtitle-converter";
 import type { WorkerInbound, WorkerOutbound } from "@/lib/workers/ffmpeg-worker";
 
+/**
+ * Tests whether the browser can natively play a file given a pre-created objectURL.
+ *
+ * The CALLER owns the objectURL — this function never creates or revokes it.
+ *
+ * @param objectUrl  An objectURL already created by the caller (URL.createObjectURL).
+ * @param timeoutMs  Maximum ms to wait for canplay before giving up (default 3000).
+ * @returns          true if canplay fired, false if error or timeout.
+ */
+export async function canPlayNatively(
+  objectUrl: string,
+  timeoutMs = 3000,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+
+    const cleanup = (result: boolean) => {
+      clearTimeout(timer);
+      video.removeAttribute('src');
+      video.load(); // stop any pending fetch on the probe element
+      resolve(result);
+      // NOTE: do NOT revoke objectUrl here — the caller owns it
+    };
+
+    const timer = setTimeout(() => cleanup(false), timeoutMs);
+
+    video.oncanplay = () => cleanup(true);
+    video.onerror  = () => cleanup(false);
+
+    video.preload = 'metadata'; // only fetch the container header
+    video.src = objectUrl;
+    video.load();
+  });
+}
+
 export class CancellationError extends Error {
   constructor() {
     super('MKVPlayer: operation cancelled');
@@ -60,10 +95,17 @@ export function parseStreamInfo(logs: string): {
 }
 
 export class MKVPlayer {
+  /**
+   * Overrideable in tests to avoid real browser playback probes.
+   * @internal
+   */
+  static _canPlayNatively: (url: string, timeoutMs?: number) => Promise<boolean> = canPlayNatively;
+
   private file: File;
   private playerFile: MKVPlayerFile;
   private videoElement: HTMLVideoElement | null = null;
   private objectUrl: string | null = null;
+  private _cancelled = false;
   // Maps subtitle track ID → ffmpeg subtitle stream index
   private subtitleTrackMap: Map<string, number> = new Map();
   // Maps subtitle track ID → blob URL for cleanup
@@ -141,8 +183,35 @@ export class MKVPlayer {
 
   async initialize(videoElement: HTMLVideoElement): Promise<MKVPlayerFile> {
     this.videoElement = videoElement;
+    this._cancelled = false;
 
     try {
+      // ── Fast path: try native playback first ─────────────────────────────
+      // initialize() owns this URL for the entire native path.
+      const probeUrl = URL.createObjectURL(this.file);
+      const nativeOk = await MKVPlayer._canPlayNatively(probeUrl);
+
+      if (this._cancelled) {
+        URL.revokeObjectURL(probeUrl);
+        throw new CancellationError();
+      }
+
+      if (nativeOk) {
+        // Keep the URL — store it for later cleanup in destroy()
+        this.objectUrl = probeUrl;
+        this.playerFile.videoUrl = probeUrl;
+        // Native playback: browser exposes audio tracks via HTMLMediaElement.audioTracks
+        // but that API has limited browser support. Use a safe default.
+        this.playerFile.audioTracks = [{ id: '0', name: 'Default Audio', lang: 'unknown' }];
+        videoElement.src = probeUrl;
+        this.onProgress?.(1);
+        return this.playerFile;
+      }
+
+      // Probe URL is no longer needed — revoke it before FFmpeg creates its own.
+      URL.revokeObjectURL(probeUrl);
+
+      // ── Slow path: FFmpeg remux ───────────────────────────────────────────
       const opId = crypto.randomUUID();
       const result = await this.sendToWorker<{ type: 'REMUX_DONE'; data: Uint8Array; logs: string }>({
         id: opId,
@@ -327,6 +396,8 @@ export class MKVPlayer {
   }
 
   cancel(): void {
+    this._cancelled = true;
+
     if (!this.worker) return;
 
     this.worker.terminate();
