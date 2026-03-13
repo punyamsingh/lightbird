@@ -13,6 +13,7 @@ export interface VideoPlayer {
   switchAudioTrack(trackId: string): Promise<void>;
   switchSubtitle(trackId: string): Promise<void>;
   destroy(): void;
+  cancel?(): void;
 }
 
 class SimplePlayerAdapter implements VideoPlayer {
@@ -76,6 +77,10 @@ class MKVPlayerAdapter implements VideoPlayer {
 
   destroy(): void {
     this.player.destroy();
+  }
+
+  cancel(): void {
+    this.player.cancel();
   }
 }
 

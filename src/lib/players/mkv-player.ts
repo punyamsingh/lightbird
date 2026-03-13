@@ -4,6 +4,13 @@ import type { AudioTrack, Subtitle } from "@/types";
 import { SubtitleConverter } from "@/lib/subtitle-converter";
 import type { WorkerInbound, WorkerOutbound } from "@/lib/workers/ffmpeg-worker";
 
+export class CancellationError extends Error {
+  constructor() {
+    super('MKVPlayer: operation cancelled');
+    this.name = 'CancellationError';
+  }
+}
+
 export interface MKVPlayerFile {
   name: string;
   file: File;
@@ -178,6 +185,9 @@ export class MKVPlayer {
 
       this.onProgress?.(1);
     } catch (error) {
+      if (error instanceof CancellationError) {
+        throw error;
+      }
       console.error('MKVPlayer: Worker failed, falling back to native playback', error);
       // Fallback: hand the raw file to the browser and hope for the best
       const url = URL.createObjectURL(this.file);
@@ -305,6 +315,18 @@ export class MKVPlayer {
 
   getActiveSubtitleTrack(): string {
     return this.playerFile.activeSubtitleTrack;
+  }
+
+  cancel(): void {
+    if (!this.worker) return;
+
+    this.worker.terminate();
+    this.worker = null;
+
+    for (const { reject } of this.pendingOperations.values()) {
+      reject(new CancellationError());
+    }
+    this.pendingOperations.clear();
   }
 
   destroy(): void {
