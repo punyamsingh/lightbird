@@ -18,7 +18,7 @@ beforeAll(() => {
   (global as unknown as { Worker: jest.Mock }).Worker = MockWorkerConstructor;
 });
 
-import { MKVPlayer, parseStreamInfo } from '@/lib/players/mkv-player';
+import { MKVPlayer, CancellationError, parseStreamInfo } from '@/lib/players/mkv-player';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -303,6 +303,54 @@ describe('MKVPlayer lifecycle', () => {
     await initPromise;
 
     await expect(player.switchSubtitle('99')).resolves.toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// MKVPlayer — cancellation
+// ---------------------------------------------------------------------------
+
+describe('MKVPlayer cancellation', () => {
+  it('terminates worker and rejects with CancellationError on cancel()', async () => {
+    const player = new MKVPlayer(makeFile());
+    const videoEl = document.createElement('video');
+
+    // Start initialize (don't await — cancel before it resolves)
+    const initPromise = player.initialize(videoEl);
+
+    player.cancel();
+
+    await expect(initPromise).rejects.toBeInstanceOf(CancellationError);
+    expect(mockWorkerInstance.terminate).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears pendingOperations after cancel()', () => {
+    const player = new MKVPlayer(makeFile());
+    const videoEl = document.createElement('video');
+
+    // Start initialize to populate pendingOperations
+    player.initialize(videoEl).catch(() => {});
+
+    player.cancel();
+
+    expect(player['pendingOperations'].size).toBe(0);
+  });
+
+  it('is a no-op when called before worker is created', () => {
+    const player = new MKVPlayer(makeFile());
+    expect(() => player.cancel()).not.toThrow();
+  });
+
+  it('does not reject with CancellationError when worker sends ERROR (fallback path)', async () => {
+    const player = new MKVPlayer(makeFile());
+    const videoEl = document.createElement('video');
+
+    const initPromise = player.initialize(videoEl);
+    const msg = mockWorkerInstance.postMessage.mock.calls[0][0];
+    simulateWorkerMessage({ id: msg.id, type: 'ERROR', error: 'FFmpeg failed' });
+
+    // Should resolve (fallback), not reject
+    await expect(initPromise).resolves.toBeDefined();
   });
 });
 
