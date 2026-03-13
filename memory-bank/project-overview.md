@@ -1,7 +1,7 @@
 # LightBird — Project Overview
 
-> **Last updated:** 2026-03-12
-> **Branch context:** Plans 01–06 implemented; Plans 08 (Keyboard Shortcut Customisation), 09 (Video Info Panel), and 10 (Codebase Cleanup) now also implemented.
+> **Last updated:** 2026-03-13
+> **Branch context:** Plans 01–06 implemented; Plans 08 (Keyboard Shortcut Customisation), 09 (Video Info Panel), and 10 (Codebase Cleanup) now also implemented. Media Session API plan (MS-01, MS-02) implemented.
 
 ---
 
@@ -45,6 +45,7 @@ src/app/page.tsx
 | `src/hooks/use-keyboard-shortcuts.ts` | Keyboard event registration (Space/Arrows/M/F) |
 | `src/hooks/use-fullscreen.ts` | Fullscreen enter/exit/detect |
 | `src/hooks/use-progress-persistence.ts` | localStorage save (debounced 5s) and restore |
+| `src/hooks/use-media-session.ts` | MediaSession API: metadata (title + artwork), hardware key handlers (play/pause/next/prev/seek) |
 
 ### Supporting Libraries
 
@@ -61,6 +62,7 @@ src/app/page.tsx
 | `src/components/player-error-display.tsx` | Error overlay with Retry/Skip/Dismiss (Plan 05) |
 | `src/components/player-error-boundary.tsx` | React class Error Boundary (Plan 05) |
 | `src/lib/m3u-parser.ts` | M3U8 export and import parsing (Plan 06) |
+| `src/lib/video-thumbnail.ts` | Captures a JPEG thumbnail frame from a video element (seek-and-draw) for MediaSession artwork |
 
 ---
 
@@ -132,8 +134,9 @@ CI runs on every push and PR via `.github/workflows/test.yml`.
 | 09 | Video Info Panel | **DONE** |
 | 10 | Codebase Cleanup | **DONE** |
 | 11 | MKV Loading UX Improvements | **DONE** |
+| MS | Media Session API | **DONE** |
 
-Full plan details: `memory-bank/plans/01-test-suite.md` … `10-codebase-cleanup.md`, `memory-bank/plans/11-mkv-loading-ux/`
+Full plan details: `memory-bank/plans/01-test-suite.md` … `10-codebase-cleanup.md`, `memory-bank/plans/11-mkv-loading-ux/`, `memory-bank/plans/media-session/`
 
 ---
 
