@@ -17,7 +17,7 @@ Create a `usePictureInPicture` hook that abstracts the browser PiP API.
 
 ## Acceptance Criteria
 
-- [ ] `src/hooks/use-picture-in-picture.ts` is created.
+- [x] `src/hooks/use-picture-in-picture.ts` is created.
 - [ ] Signature:
   ```ts
   function usePictureInPicture(videoRef: RefObject<HTMLVideoElement>): {

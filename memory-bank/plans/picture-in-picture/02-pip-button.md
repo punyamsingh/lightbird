@@ -17,7 +17,7 @@ Add a PiP toggle button to `PlayerControls` and wire it to the hook in `lightbir
 
 ## Acceptance Criteria
 
-- [ ] `PlayerControls` receives two new props: `onTogglePiP: () => void` and `isPiP: boolean` and `pipSupported: boolean`.
+- [x] `PlayerControls` receives two new props: `onTogglePiP: () => void` and `isPiP: boolean` and `pipSupported: boolean`.
 - [ ] When `pipSupported` is `false`, the button is not rendered.
 - [ ] When `pipSupported` is `true`:
   - A `PictureInPicture2` icon (lucide-react) button is rendered near the fullscreen button.
