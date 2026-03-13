@@ -1,6 +1,6 @@
 # Sub-plan 05 — Native Playback First (Skip FFmpeg When Possible)
 
-## Status: PENDING
+## Status: DONE
 
 ## Independent Of Sub-plans 1–4
 
