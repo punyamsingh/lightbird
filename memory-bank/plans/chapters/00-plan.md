@@ -1,6 +1,15 @@
 # Chapters & Cue Points — Master Plan
 
-**Status:** 🔲 PENDING
+**Status:** ✅ DONE
+
+## Implementation Summary (2026-03-13)
+
+All four issues (CH-01 through CH-04) implemented end-to-end:
+
+- **CH-01**: `src/lib/chapter-parser.ts` — `parseChaptersFromFFmpegLog` and `parseChaptersFromVtt`; `Chapter` type added to `src/types/index.ts`; `MKVPlayer` parses chapters from FFmpeg logs and exposes `getChapters()`; `VideoPlayer` interface gains optional `getChapters?()`.
+- **CH-02**: `src/hooks/use-chapters.ts` — `useChapters(videoRef, playerRef)` hook providing `{ chapters, currentChapter, goToChapter }`; wired into `lightbird-player.tsx`.
+- **CH-03**: `PlayerControls` renders chapter tick marks (absolute-positioned, `pointer-events:none`) on the seek bar, with hover tooltips showing title + timestamp.
+- **CH-04**: Current chapter name displayed below seek bar; "Chapters" button (Lucide `List` icon) opens a popover menu listing all chapters with highlighted active row; `[`/`]` keyboard shortcuts for prev/next chapter added to the shortcut registry and wired in `lightbird-player.tsx`.
 **Priority:** LOW-MEDIUM
 **New dependencies:** None
 

@@ -1,7 +1,7 @@
 # LightBird — Project Overview
 
 > **Last updated:** 2026-03-13
-> **Branch context:** Plans 01–06 implemented; Plans 08 (Keyboard Shortcut Customisation), 09 (Video Info Panel), and 10 (Codebase Cleanup) now also implemented. Media Session API plan (MS-01, MS-02) implemented. Picture-in-Picture plan (PIP-01, PIP-02) implemented.
+> **Branch context:** Plans 01–06 implemented; Plans 08 (Keyboard Shortcut Customisation), 09 (Video Info Panel), and 10 (Codebase Cleanup) now also implemented. Media Session API plan (MS-01, MS-02) implemented. Picture-in-Picture plan (PIP-01, PIP-02) implemented. Chapters plan (CH-01–CH-04) implemented.
 
 ---
 
@@ -137,6 +137,7 @@ CI runs on every push and PR via `.github/workflows/test.yml`.
 | 11 | MKV Loading UX Improvements | **DONE** |
 | MS | Media Session API | **DONE** |
 | PIP | Picture-in-Picture | **DONE** |
+| CH | Chapters & Cue Points (CH-01–CH-04) | **DONE** |
 
 Full plan details: `memory-bank/plans/01-test-suite.md` … `10-codebase-cleanup.md`, `memory-bank/plans/11-mkv-loading-ux/`, `memory-bank/plans/media-session/`
 

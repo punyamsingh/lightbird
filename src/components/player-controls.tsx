@@ -1,7 +1,7 @@
 
 "use client";
-import React, { useMemo } from "react";
-import type { Subtitle, VideoFilters, AudioTrack } from "@/types";
+import React, { useMemo, useState } from "react";
+import type { Subtitle, VideoFilters, AudioTrack, Chapter } from "@/types";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -10,9 +10,10 @@ import { Label } from "@/components/ui/label";
 import {
   Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward,
   FastForward, Rewind, RotateCcw, Settings2, Subtitles, Camera, AudioLines, Plus, X,
-  Info, Keyboard, PictureInPicture2
+  Info, Keyboard, List, PictureInPicture2
 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
+import { cn } from "@/lib/utils";
 
 interface PlayerControlsProps {
   isPlaying: boolean;
@@ -29,6 +30,8 @@ interface PlayerControlsProps {
   activeSubtitle: string;
   audioTracks: AudioTrack[];
   activeAudioTrack: string;
+  chapters?: Chapter[];
+  currentChapter?: Chapter | null;
   onPlayPause: () => void;
   onSeek: (value: number) => void;
   onVolumeChange: (value: number) => void;
@@ -48,6 +51,7 @@ interface PlayerControlsProps {
   onSubtitleRemove?: (id: string) => void;
   onShowInfo?: () => void;
   onOpenShortcuts?: () => void;
+  onGoToChapter?: (index: number) => void;
   onTogglePiP?: () => void;
   isPiP?: boolean;
   pipSupported?: boolean;
@@ -64,25 +68,57 @@ const formatTime = (time: number) => {
 export const PlayerControls = React.memo(function PlayerControls({
   isPlaying, progress, duration, volume, isMuted, playbackRate, loop, isFullScreen,
   filters, zoom, subtitles, activeSubtitle, audioTracks, activeAudioTrack,
+  chapters = [], currentChapter = null,
   onPlayPause, onSeek, onVolumeChange, onMuteToggle, onPlaybackRateChange, onLoopToggle,
   onFullScreenToggle, onFrameStep, onScreenshot, onNext, onPrevious, onFiltersChange,
   onZoomChange, onSubtitleChange, onAudioTrackChange, onSubtitleUpload, onSubtitleRemove,
-  onShowInfo, onOpenShortcuts, onTogglePiP, isPiP = false, pipSupported = false,
+  onShowInfo, onOpenShortcuts, onGoToChapter, onTogglePiP, isPiP = false, pipSupported = false,
 }: PlayerControlsProps) {
   const formattedProgress = useMemo(() => formatTime(progress), [progress]);
   const formattedDuration = useMemo(() => formatTime(duration), [duration]);
+  const [chaptersMenuOpen, setChaptersMenuOpen] = useState(false);
 
   return (
     <TooltipProvider>
       <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col gap-2">
-        {/* Progress Bar */}
-        <Slider
-          value={[progress]}
-          max={duration}
-          step={1}
-          onValueChange={([val]) => onSeek(val)}
-          className="w-full h-2"
-        />
+        {/* Seek bar with chapter tick marks */}
+        <div className="relative w-full">
+          <Slider
+            value={[progress]}
+            max={duration}
+            step={1}
+            onValueChange={([val]) => onSeek(val)}
+            className="w-full h-2"
+          />
+          {chapters.length > 0 && duration > 0 && chapters.slice(1).map((chapter) => (
+            <Tooltip key={chapter.index}>
+              <TooltipTrigger asChild>
+                <div
+                  data-testid="chapter-tick"
+                  style={{
+                    position: 'absolute',
+                    left: `${(chapter.startTime / duration) * 100}%`,
+                    top: 0,
+                    width: '2px',
+                    height: '100%',
+                    background: 'white',
+                    opacity: 0.5,
+                    pointerEvents: 'none',
+                    transform: 'translateX(-1px)',
+                  }}
+                />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{chapter.title} — {formatTime(chapter.startTime)}</p>
+              </TooltipContent>
+            </Tooltip>
+          ))}
+        </div>
+
+        {/* Current chapter name */}
+        {currentChapter && (
+          <span className="text-xs text-muted-foreground">{currentChapter.title}</span>
+        )}
 
         {/* Main Controls */}
         <div className="flex items-center justify-between text-white">
@@ -163,9 +199,9 @@ export const PlayerControls = React.memo(function PlayerControls({
                   <div className="space-y-3">
                       <div className="flex items-center justify-between">
                           <Label className="text-sm font-medium">Subtitles</Label>
-                          <Button 
-                              variant="outline" 
-                              size="sm" 
+                          <Button
+                              variant="outline"
+                              size="sm"
                               onClick={onSubtitleUpload}
                               className="h-7 px-2"
                           >
@@ -173,7 +209,6 @@ export const PlayerControls = React.memo(function PlayerControls({
                               Add
                           </Button>
                       </div>
-                      
                       {subtitles.length > 0 ? (
                           <RadioGroup value={activeSubtitle} onValueChange={onSubtitleChange}>
                               <div className="flex items-center space-x-2">
@@ -187,9 +222,9 @@ export const PlayerControls = React.memo(function PlayerControls({
                                           <Label htmlFor={`sub-${sub.id}`} className="truncate">{sub.name}</Label>
                                       </div>
                                       {sub.type === 'external' && onSubtitleRemove && (
-                                          <Button 
-                                              variant="ghost" 
-                                              size="sm" 
+                                          <Button
+                                              variant="ghost"
+                                              size="sm"
                                               onClick={() => onSubtitleRemove(sub.id)}
                                               className="h-6 w-6 p-0"
                                           >
@@ -207,6 +242,42 @@ export const PlayerControls = React.memo(function PlayerControls({
                   </div>
               </PopoverContent>
             </Popover>
+            {chapters.length > 0 && (
+              <Popover open={chaptersMenuOpen} onOpenChange={setChaptersMenuOpen}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <PopoverTrigger asChild>
+                      <Button variant="ghost" size="icon" aria-label="Chapters">
+                        <List className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent><p>Chapters</p></TooltipContent>
+                </Tooltip>
+                <PopoverContent className="w-72 p-0">
+                  <div className="flex flex-col max-h-64 overflow-y-auto">
+                    {chapters.map((chapter) => (
+                      <button
+                        key={chapter.index}
+                        className={cn(
+                          "flex items-center justify-between px-4 py-2 text-sm hover:bg-accent transition-colors text-left",
+                          currentChapter?.index === chapter.index && "bg-accent font-medium",
+                        )}
+                        onClick={() => {
+                          onGoToChapter?.(chapter.index);
+                          setChaptersMenuOpen(false);
+                        }}
+                      >
+                        <span className="flex-1 truncate">{chapter.title}</span>
+                        <span className="ml-4 font-mono text-xs text-muted-foreground shrink-0">
+                          {formatTime(chapter.startTime)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
             <Popover>
               <PopoverTrigger asChild><Button variant="ghost" size="icon"><Settings2 /></Button></PopoverTrigger>
               <PopoverContent className="w-64 space-y-4">

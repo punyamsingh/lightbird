@@ -22,6 +22,7 @@ import { usePictureInPicture } from "@/hooks/use-picture-in-picture";
 import { useProgressPersistence } from "@/hooks/use-progress-persistence";
 import { useVideoInfo } from "@/hooks/use-video-info";
 import { useMediaSession } from "@/hooks/use-media-session";
+import { useChapters } from "@/hooks/use-chapters";
 import { captureVideoThumbnail } from "@/lib/video-thumbnail";
 import { parseMediaError, validateFile, type ParsedMediaError } from "@/lib/media-error";
 import { loadShortcuts } from "@/lib/keyboard-shortcuts";
@@ -52,6 +53,7 @@ const LightBirdPlayer = () => {
   const pip = usePictureInPicture(videoRef);
   const { metadata: videoMetadata } = useVideoInfo(videoRef, playlist.currentItem?.file ?? null);
   useProgressPersistence(videoRef, playlist.currentItem?.name ?? null);
+  const { chapters, currentChapter, goToChapter } = useChapters(videoRef, playerRef);
 
   const [shortcuts, setShortcuts] = useState<ShortcutBinding[]>(() => loadShortcuts());
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
@@ -84,8 +86,27 @@ const LightBirdPlayer = () => {
     'prev-item': () => handlePrevious(),
     'screenshot': () => captureScreenshot(),
     'show-shortcuts': () => setShowShortcutsHelp((v) => !v),
+    'next-chapter': () => {
+      const el = videoRef.current;
+      if (!el || chapters.length === 0) return;
+      const next = chapters.find((c) => c.startTime > el.currentTime);
+      if (next) el.currentTime = next.startTime;
+    },
+    'prev-chapter': () => {
+      const el = videoRef.current;
+      if (!el || chapters.length === 0) return;
+      const cur = currentChapter;
+      if (!cur) return;
+      // If we're more than 3s into the current chapter, restart it
+      if (el.currentTime > cur.startTime + 3) {
+        el.currentTime = cur.startTime;
+      } else {
+        const prev = chapters[cur.index - 1];
+        if (prev) el.currentTime = prev.startTime;
+      }
+    },
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [playback.togglePlay, playback.seek, playback.setVolume, playback.toggleMute, fullscreen.toggle]);
+  }), [playback.togglePlay, playback.seek, playback.setVolume, playback.toggleMute, fullscreen.toggle, chapters, currentChapter]);
 
   useKeyboardShortcuts(shortcuts, shortcutHandlers);
 
@@ -622,6 +643,9 @@ const LightBirdPlayer = () => {
             onSubtitleRemove={subtitles.removeSubtitle}
             onShowInfo={() => setShowInfo((v) => !v)}
             onOpenShortcuts={() => setShowShortcutsDialog(true)}
+            chapters={chapters}
+            currentChapter={currentChapter}
+            onGoToChapter={goToChapter}
             onTogglePiP={pip.toggle}
             isPiP={pip.isPiP}
             pipSupported={!!pip.isSupported}

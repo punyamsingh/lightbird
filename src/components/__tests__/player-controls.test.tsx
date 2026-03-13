@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import PlayerControls from '@/components/player-controls';
-import type { VideoFilters } from '@/types';
+import type { VideoFilters, Chapter } from '@/types';
 
 const defaultFilters: VideoFilters = {
   brightness: 100,
@@ -147,5 +147,56 @@ describe('PlayerControls', () => {
       render(<PlayerControls {...defaultProps} pipSupported={true} isPiP={false} onTogglePiP={jest.fn()} />);
       expect(screen.getByLabelText('Enter picture-in-picture')).toBeInTheDocument();
     });
+  });
+});
+
+const mockChapters: Chapter[] = [
+  { index: 0, title: 'Introduction', startTime: 0, endTime: 142.5 },
+  { index: 1, title: 'Act 1', startTime: 142.5, endTime: 300 },
+  { index: 2, title: 'Credits', startTime: 300, endTime: 600 },
+];
+
+describe('PlayerControls — chapters', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('renders no chapter tick marks when chapters prop is empty', () => {
+    render(<PlayerControls {...defaultProps} chapters={[]} duration={600} />);
+    expect(screen.queryAllByTestId('chapter-tick')).toHaveLength(0);
+  });
+
+  it('renders n-1 chapter tick marks for n chapters (skips first)', () => {
+    render(<PlayerControls {...defaultProps} chapters={mockChapters} duration={600} />);
+    const ticks = screen.getAllByTestId('chapter-tick');
+    // 3 chapters → 2 ticks (skip index 0)
+    expect(ticks).toHaveLength(2);
+  });
+
+  it('does not show the chapters button when chapters is empty', () => {
+    render(<PlayerControls {...defaultProps} chapters={[]} />);
+    expect(screen.queryByRole('button', { name: /chapters/i })).toBeNull();
+  });
+
+  it('shows the chapters button when chapters are provided', () => {
+    render(<PlayerControls {...defaultProps} chapters={mockChapters} duration={600} />);
+    expect(screen.getByRole('button', { name: /chapters/i })).toBeInTheDocument();
+  });
+
+  it('calls onGoToChapter with correct index when a chapter item is clicked', () => {
+    const onGoToChapter = jest.fn();
+    render(
+      <PlayerControls
+        {...defaultProps}
+        chapters={mockChapters}
+        duration={600}
+        onGoToChapter={onGoToChapter}
+      />,
+    );
+    // Open the chapters popover
+    fireEvent.click(screen.getByRole('button', { name: /chapters/i }));
+    // Click 'Act 1' (index 1)
+    fireEvent.click(screen.getByText('Act 1'));
+    expect(onGoToChapter).toHaveBeenCalledWith(1);
   });
 });
