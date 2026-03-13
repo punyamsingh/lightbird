@@ -101,6 +101,7 @@ Shared setup: `jest.setup.ts` (root)
 | 10 | Codebase Cleanup | **DONE** |
 | 11 | MKV Loading UX Improvements | **DONE** |
 | 12 | npm Library Extraction | **DONE** |
+| 13 | Magnet Link Player (WebTorrent) | **DONE** |
 | MS | Media Session API | **DONE** |
 | PIP | Picture-in-Picture | **DONE** |
 | CH | Chapters & Cue Points | **DONE** |
@@ -118,7 +119,8 @@ Shared setup: `jest.setup.ts` (root)
 | Language | TypeScript | 5.x |
 | Styling | Tailwind CSS + ShadCN UI | 3.4.1 |
 | Component primitives | Radix UI | various |
-| Video processing | FFmpeg.wasm | 0.12.10 |
+| Video processing | FFmpeg.wasm (`@ffmpeg/ffmpeg`) | 0.12.10 |
+| Torrent streaming | WebTorrent (`webtorrent`) | 2.8.5 |
 | Icons | Lucide React | 0.475.0 |
 | Drag-and-drop | @dnd-kit | 6.x/10.x |
 | List virtualisation | @tanstack/react-virtual | 3.x |
