@@ -1,6 +1,15 @@
 # Picture-in-Picture — Master Plan
 
-**Status:** 🔲 PENDING
+**Status:** ✅ DONE
+
+## Implementation Summary
+
+- Created `src/hooks/use-picture-in-picture.ts` — `usePictureInPicture(videoRef)` hook that wraps the browser PiP API (`requestPictureInPicture` / `document.exitPictureInPicture`). Exposes `{ isPiP, isSupported, enter, exit, toggle }`. State is kept in sync via `enterpictureinpicture` / `leavepictureinpicture` event listeners, cleaned up on unmount.
+- Created `src/hooks/__tests__/use-picture-in-picture.test.ts` — 10 tests covering support detection, event-driven state sync, enter/exit/toggle calls, null-ref safety, and listener cleanup.
+- Modified `src/components/player-controls.tsx` — added optional `onTogglePiP`, `isPiP`, `pipSupported` props; added `PictureInPicture2` button (lucide-react) before the fullscreen button, hidden when `pipSupported=false`, aria-label and `text-primary` class reflect `isPiP` state.
+- Modified `src/components/lightbird-player.tsx` — calls `usePictureInPicture(videoRef)` and passes `onTogglePiP`, `isPiP`, `pipSupported` to `PlayerControls`.
+- Added 5 PiP tests to `src/components/__tests__/player-controls.test.tsx`.
+- All 296 tests pass.
 **Priority:** MEDIUM
 **New dependencies:** None (browser API)
 

@@ -119,4 +119,33 @@ describe('PlayerControls', () => {
     fireEvent.click(twoXLabel);
     expect(defaultProps.onPlaybackRateChange).toHaveBeenCalledWith(2);
   });
+
+  describe('Picture-in-Picture button', () => {
+    it('does not render PiP button when pipSupported=false', () => {
+      render(<PlayerControls {...defaultProps} pipSupported={false} />);
+      expect(screen.queryByLabelText(/picture-in-picture/i)).not.toBeInTheDocument();
+    });
+
+    it('renders PiP button when pipSupported=true', () => {
+      render(<PlayerControls {...defaultProps} pipSupported={true} onTogglePiP={jest.fn()} />);
+      expect(screen.getByLabelText('Enter picture-in-picture')).toBeInTheDocument();
+    });
+
+    it('clicking PiP button calls onTogglePiP', () => {
+      const onTogglePiP = jest.fn();
+      render(<PlayerControls {...defaultProps} pipSupported={true} onTogglePiP={onTogglePiP} />);
+      fireEvent.click(screen.getByLabelText('Enter picture-in-picture'));
+      expect(onTogglePiP).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows "Exit picture-in-picture" label when isPiP=true', () => {
+      render(<PlayerControls {...defaultProps} pipSupported={true} isPiP={true} onTogglePiP={jest.fn()} />);
+      expect(screen.getByLabelText('Exit picture-in-picture')).toBeInTheDocument();
+    });
+
+    it('shows "Enter picture-in-picture" label when isPiP=false', () => {
+      render(<PlayerControls {...defaultProps} pipSupported={true} isPiP={false} onTogglePiP={jest.fn()} />);
+      expect(screen.getByLabelText('Enter picture-in-picture')).toBeInTheDocument();
+    });
+  });
 });

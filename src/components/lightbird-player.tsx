@@ -18,6 +18,7 @@ import { useSubtitles } from "@/hooks/use-subtitles";
 import { usePlaylist } from "@/hooks/use-playlist";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useFullscreen } from "@/hooks/use-fullscreen";
+import { usePictureInPicture } from "@/hooks/use-picture-in-picture";
 import { useProgressPersistence } from "@/hooks/use-progress-persistence";
 import { useVideoInfo } from "@/hooks/use-video-info";
 import { useMediaSession } from "@/hooks/use-media-session";
@@ -48,6 +49,7 @@ const LightBirdPlayer = () => {
   const filters = useVideoFilters(videoRef);
   const subtitles = useSubtitles();
   const fullscreen = useFullscreen(containerRef);
+  const pip = usePictureInPicture(videoRef);
   const { metadata: videoMetadata } = useVideoInfo(videoRef, playlist.currentItem?.file ?? null);
   useProgressPersistence(videoRef, playlist.currentItem?.name ?? null);
 
@@ -620,6 +622,9 @@ const LightBirdPlayer = () => {
             onSubtitleRemove={subtitles.removeSubtitle}
             onShowInfo={() => setShowInfo((v) => !v)}
             onOpenShortcuts={() => setShowShortcutsDialog(true)}
+            onTogglePiP={pip.toggle}
+            isPiP={pip.isPiP}
+            pipSupported={!!pip.isSupported}
           />
         )}
 

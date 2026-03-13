@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import {
   Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward,
   FastForward, Rewind, RotateCcw, Settings2, Subtitles, Camera, AudioLines, Plus, X,
-  Info, Keyboard
+  Info, Keyboard, PictureInPicture2
 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 
@@ -48,6 +48,9 @@ interface PlayerControlsProps {
   onSubtitleRemove?: (id: string) => void;
   onShowInfo?: () => void;
   onOpenShortcuts?: () => void;
+  onTogglePiP?: () => void;
+  isPiP?: boolean;
+  pipSupported?: boolean;
 }
 
 const formatTime = (time: number) => {
@@ -64,7 +67,7 @@ export const PlayerControls = React.memo(function PlayerControls({
   onPlayPause, onSeek, onVolumeChange, onMuteToggle, onPlaybackRateChange, onLoopToggle,
   onFullScreenToggle, onFrameStep, onScreenshot, onNext, onPrevious, onFiltersChange,
   onZoomChange, onSubtitleChange, onAudioTrackChange, onSubtitleUpload, onSubtitleRemove,
-  onShowInfo, onOpenShortcuts,
+  onShowInfo, onOpenShortcuts, onTogglePiP, isPiP = false, pipSupported = false,
 }: PlayerControlsProps) {
   const formattedProgress = useMemo(() => formatTime(progress), [progress]);
   const formattedDuration = useMemo(() => formatTime(duration), [duration]);
@@ -249,6 +252,22 @@ export const PlayerControls = React.memo(function PlayerControls({
               <TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={onLoopToggle} data-active={loop} className="data-[active=true]:text-primary"><RotateCcw /></Button></TooltipTrigger>
               <TooltipContent><p>Loop</p></TooltipContent>
             </Tooltip>
+            {pipSupported && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onTogglePiP}
+                    aria-label={isPiP ? "Exit picture-in-picture" : "Enter picture-in-picture"}
+                    className={isPiP ? "text-primary" : ""}
+                  >
+                    <PictureInPicture2 />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent><p>{isPiP ? "Exit picture-in-picture" : "Enter picture-in-picture"}</p></TooltipContent>
+              </Tooltip>
+            )}
             <Tooltip>
               <TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={onFullScreenToggle}>{isFullScreen ? <Minimize /> : <Maximize />}</Button></TooltipTrigger>
               <TooltipContent><p>Fullscreen (F)</p></TooltipContent>

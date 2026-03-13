@@ -1,7 +1,7 @@
 # LightBird — Project Overview
 
 > **Last updated:** 2026-03-13
-> **Branch context:** Plans 01–06 implemented; Plans 08 (Keyboard Shortcut Customisation), 09 (Video Info Panel), and 10 (Codebase Cleanup) now also implemented. Media Session API plan (MS-01, MS-02) implemented.
+> **Branch context:** Plans 01–06 implemented; Plans 08 (Keyboard Shortcut Customisation), 09 (Video Info Panel), and 10 (Codebase Cleanup) now also implemented. Media Session API plan (MS-01, MS-02) implemented. Picture-in-Picture plan (PIP-01, PIP-02) implemented.
 
 ---
 
@@ -46,6 +46,7 @@ src/app/page.tsx
 | `src/hooks/use-fullscreen.ts` | Fullscreen enter/exit/detect |
 | `src/hooks/use-progress-persistence.ts` | localStorage save (debounced 5s) and restore |
 | `src/hooks/use-media-session.ts` | MediaSession API: metadata (title + artwork), hardware key handlers (play/pause/next/prev/seek) |
+| `src/hooks/use-picture-in-picture.ts` | PiP enter/exit/toggle/detect (`requestPictureInPicture` + events) |
 
 ### Supporting Libraries
 
@@ -110,7 +111,7 @@ npm run test:coverage # with coverage report
 | `src/lib/__tests__/ffmpeg-singleton.test.ts` | Singleton lifecycle, lazy loading, reset |
 | `src/lib/__tests__/mkv-player.test.ts` | parseStreamInfo, MKVPlayer fallback, progress, embedded subs |
 | `src/lib/__tests__/media-error.test.ts` | parseMediaError all codes, validateFile extension/size checks |
-| `src/components/__tests__/player-controls.test.tsx` | Control buttons, speed selector, callbacks |
+| `src/components/__tests__/player-controls.test.tsx` | Control buttons, speed selector, callbacks, PiP button |
 | `src/components/__tests__/playlist-panel.test.tsx` | Empty state, item rendering, selection, stream URL |
 | `src/components/__tests__/player-error-display.test.tsx` | Error display rendering, button callbacks |
 | `src/components/__tests__/player-error-boundary.test.tsx` | Error boundary fallback UI, reset |
@@ -135,6 +136,7 @@ CI runs on every push and PR via `.github/workflows/test.yml`.
 | 10 | Codebase Cleanup | **DONE** |
 | 11 | MKV Loading UX Improvements | **DONE** |
 | MS | Media Session API | **DONE** |
+| PIP | Picture-in-Picture | **DONE** |
 
 Full plan details: `memory-bank/plans/01-test-suite.md` … `10-codebase-cleanup.md`, `memory-bank/plans/11-mkv-loading-ux/`, `memory-bank/plans/media-session/`
 
