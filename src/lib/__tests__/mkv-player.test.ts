@@ -611,12 +611,18 @@ describe('MKVPlayer remux cache', () => {
 
 describe('subtitle blob URL cleanup', () => {
   const revokeObjectURL = jest.fn();
+  let originalRevoke: typeof URL.revokeObjectURL;
+
+  beforeAll(() => {
+    originalRevoke = URL.revokeObjectURL;
+    Object.defineProperty(URL, 'revokeObjectURL', { value: revokeObjectURL, writable: true });
+  });
+
+  afterAll(() => {
+    Object.defineProperty(URL, 'revokeObjectURL', { value: originalRevoke, writable: true });
+  });
 
   beforeEach(() => {
-    Object.defineProperty(URL, 'revokeObjectURL', {
-      value: revokeObjectURL,
-      writable: true,
-    });
     revokeObjectURL.mockClear();
   });
 
@@ -633,8 +639,7 @@ describe('subtitle blob URL cleanup', () => {
     await initializeSuccess(player, videoEl, logsWithSub);
 
     // Mock createObjectURL for the subtitle blob
-    const createObjectURL = jest.fn().mockReturnValue('blob:subtitle-url');
-    Object.defineProperty(URL, 'createObjectURL', { value: createObjectURL, writable: true });
+    jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:subtitle-url');
 
     // Patch _extractSubtitle to avoid a second worker round-trip
     (player as unknown as { _extractSubtitle: jest.Mock })._extractSubtitle =
