@@ -70,6 +70,9 @@ export class MKVPlayer {
   private subtitleBlobUrls: Map<string, string> = new Map();
   private onProgress?: (progress: number) => void;
 
+  // Maps audioTrackIndex → blob URL of the remuxed video
+  private remuxCache: Map<number, string> = new Map();
+
   // Worker management
   private worker: Worker | null = null;
   private pendingOperations: Map<string, {
@@ -178,7 +181,7 @@ export class MKVPlayer {
 
       const blob = new Blob([result.data], { type: 'video/mp4' });
       const url = URL.createObjectURL(blob);
-      if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
+      this.remuxCache.set(0, url);
       this.objectUrl = url;
       this.playerFile.videoUrl = url;
       videoElement.src = url;
@@ -202,6 +205,10 @@ export class MKVPlayer {
   }
 
   private async _remux(audioTrackIndex: number): Promise<string> {
+    // Cache hit: return the previously remuxed URL instantly (no FFmpeg)
+    const cached = this.remuxCache.get(audioTrackIndex);
+    if (cached) return cached;
+
     const opId = crypto.randomUUID();
     const result = await this.sendToWorker<{ type: 'REMUX_DONE'; data: Uint8Array; logs: string }>({
       id: opId,
@@ -215,7 +222,9 @@ export class MKVPlayer {
 
     const blob = new Blob([result.data], { type: 'video/mp4' });
     const url = URL.createObjectURL(blob);
-    if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
+
+    // Store in cache — revocation happens only in destroy()
+    this.remuxCache.set(audioTrackIndex, url);
     this.objectUrl = url;
     return url;
   }
@@ -337,10 +346,19 @@ export class MKVPlayer {
     }
     this.pendingOperations.clear();
 
+    // Revoke all remux cache entries
+    for (const url of this.remuxCache.values()) {
+      URL.revokeObjectURL(url);
+    }
+    this.remuxCache.clear();
+
+    // Also revoke objectUrl explicitly (handles native fallback URL which is
+    // stored in this.objectUrl but NOT in remuxCache)
     if (this.objectUrl) {
-      URL.revokeObjectURL(this.objectUrl);
+      URL.revokeObjectURL(this.objectUrl); // safe to call twice — second call is a no-op
       this.objectUrl = null;
     }
+
     for (const url of this.subtitleBlobUrls.values()) {
       URL.revokeObjectURL(url);
     }
