@@ -1,9 +1,13 @@
-# Issue MS-01 — useMediaSession Hook
+# Issue MS-01 — useMediaSession Hook [DONE]
 
 **Plan:** media-session
 **Labels:** `enhancement`
 **Depends on:** —
 **Blocks:** MS-02
+
+## Implementation Summary
+
+Created `src/hooks/use-media-session.ts` with `useMediaSession` hook. Sets `navigator.mediaSession.metadata` (title + artwork) via a `useEffect` keyed on `title`/`artwork`. Registers all six action handlers in a second `useEffect` keyed on callback props; clears them on unmount. Feature-detected with `'mediaSession' in navigator && navigator.mediaSession` guard. Tests in `src/hooks/__tests__/use-media-session.test.ts`. Global `MediaMetadata` polyfill added to `jest.setup.ts`.
 
 ---
 

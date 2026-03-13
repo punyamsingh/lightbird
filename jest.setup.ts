@@ -77,6 +77,22 @@ if (typeof HTMLTrackElement !== 'undefined') {
   });
 }
 
+// Mock MediaMetadata (Media Session API — not available in jsdom)
+if (typeof global.MediaMetadata === 'undefined') {
+  (global as any).MediaMetadata = class MediaMetadata {
+    title: string;
+    artist: string;
+    album: string;
+    artwork: MediaImage[];
+    constructor(init: MediaMetadataInit = {}) {
+      this.title = init.title ?? '';
+      this.artist = init.artist ?? '';
+      this.album = init.album ?? '';
+      this.artwork = init.artwork ? [...init.artwork] : [];
+    }
+  };
+}
+
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
   writable: true,

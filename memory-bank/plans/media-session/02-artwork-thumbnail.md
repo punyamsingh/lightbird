@@ -1,8 +1,12 @@
-# Issue MS-02 — Auto-Generate Artwork Thumbnail
+# Issue MS-02 — Auto-Generate Artwork Thumbnail [DONE]
 
 **Plan:** media-session
 **Labels:** `enhancement`
 **Depends on:** MS-01
+
+## Implementation Summary
+
+Created `src/lib/video-thumbnail.ts` with `captureVideoThumbnail(videoEl, atSeconds?)`. Saves `currentTime`, adds a one-time `seeked` listener, seeks to `min(atSeconds, duration)`, draws to an offscreen 320×180 canvas, returns `canvas.toDataURL('image/jpeg', 0.7)`, restores `currentTime`. Returns `null` on any error. `lightbird-player.tsx` listens for `loadeddata` to trigger capture and stores result in `mediaThumbnail` state, passed to `useMediaSession`. Clears on empty playlist. Tests in `src/lib/__tests__/video-thumbnail.test.ts`.
 **Blocks:** —
 
 ---

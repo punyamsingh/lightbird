@@ -1,6 +1,6 @@
 # Media Session API — Master Plan
 
-**Status:** 🔲 PENDING
+**Status:** ✅ DONE
 **Priority:** MEDIUM
 **New dependencies:** None (browser API)
 

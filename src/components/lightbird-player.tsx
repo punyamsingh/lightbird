@@ -20,6 +20,8 @@ import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useFullscreen } from "@/hooks/use-fullscreen";
 import { useProgressPersistence } from "@/hooks/use-progress-persistence";
 import { useVideoInfo } from "@/hooks/use-video-info";
+import { useMediaSession } from "@/hooks/use-media-session";
+import { captureVideoThumbnail } from "@/lib/video-thumbnail";
 import { parseMediaError, validateFile, type ParsedMediaError } from "@/lib/media-error";
 import { loadShortcuts } from "@/lib/keyboard-shortcuts";
 import type { ShortcutBinding } from "@/lib/keyboard-shortcuts";
@@ -64,6 +66,7 @@ const LightBirdPlayer = () => {
   const [processingThroughput, setProcessingThroughput] = useState<number | null>(null);
   const [playerError, setPlayerError] = useState<ParsedMediaError | null>(null);
   const [cancellableProcessing, setCancellableProcessing] = useState(false);
+  const [mediaThumbnail, setMediaThumbnail] = useState<string | null>(null);
 
   const shortcutHandlers = useMemo(() => ({
     'play-pause': () => playback.togglePlay(),
@@ -295,6 +298,26 @@ const LightBirdPlayer = () => {
     };
   }, []);
 
+  // Capture thumbnail for media session artwork when a new video loads
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    const onLoadedData = () => {
+      captureVideoThumbnail(el).then((dataUrl) => {
+        setMediaThumbnail(dataUrl);
+      });
+    };
+    el.addEventListener("loadeddata", onLoadedData);
+    return () => el.removeEventListener("loadeddata", onLoadedData);
+  }, []);
+
+  // Clear thumbnail when playlist is empty
+  useEffect(() => {
+    if (!playlist.currentItem) {
+      setMediaThumbnail(null);
+    }
+  }, [playlist.currentItem]);
+
   // Auto-hide the playlist sidebar when playing (unless pinned); restore when paused
   useEffect(() => {
     if (playback.isPlaying) {
@@ -459,6 +482,27 @@ const LightBirdPlayer = () => {
     wasAutoHiddenRef.current = false;
     setPlaylistOpen((v) => !v);
   };
+
+  const handleMediaSeekForward = useCallback(() => {
+    const el = videoRef.current;
+    if (el) playback.seek(el.currentTime + 10);
+  }, [playback.seek]);
+
+  const handleMediaSeekBackward = useCallback(() => {
+    const el = videoRef.current;
+    if (el) playback.seek(el.currentTime - 10);
+  }, [playback.seek]);
+
+  useMediaSession({
+    title: playlist.currentItem?.name ?? null,
+    artwork: mediaThumbnail,
+    onPlay: playback.togglePlay,
+    onPause: playback.togglePlay,
+    onNext: handleNext,
+    onPrev: handlePrevious,
+    onSeekForward: handleMediaSeekForward,
+    onSeekBackward: handleMediaSeekBackward,
+  });
 
   return (
     <div className="flex flex-1 w-full h-full">
