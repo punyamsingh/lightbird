@@ -18,7 +18,7 @@ LightBird is a modern, lightweight, browser-based video player built with Next.j
 | Player | Handles | Implementation |
 |---|---|---|
 | `SimplePlayer` | MP4, WebM, AVI, MOV, WMV, FLV, OGV | Native HTML5 `<video>` element |
-| `MKVPlayer` | MKV | FFmpeg.wasm — probes streams, remuxes to fragmented MP4, extracts embedded subtitles; falls back to native on failure |
+| `MKVPlayer` | MKV | FFmpeg.wasm running in a **Web Worker** — probes streams, remuxes to fragmented MP4, extracts embedded subtitles; `destroy()` calls `worker.terminate()`; falls back to native on failure |
 
 The factory function `createVideoPlayer(file)` in `src/lib/video-processor.ts` selects the right player based on file extension.
 
@@ -131,8 +131,9 @@ CI runs on every push and PR via `.github/workflows/test.yml`.
 | 08 | Keyboard Customisation | **DONE** |
 | 09 | Video Info Panel | **DONE** |
 | 10 | Codebase Cleanup | **DONE** |
+| 11 | MKV Loading UX Improvements | **DONE** |
 
-Full plan details: `memory-bank/plans/01-test-suite.md` … `10-codebase-cleanup.md`
+Full plan details: `memory-bank/plans/01-test-suite.md` … `10-codebase-cleanup.md`, `memory-bank/plans/11-mkv-loading-ux/`
 
 ---
 
