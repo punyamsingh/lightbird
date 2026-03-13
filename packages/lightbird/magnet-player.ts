@@ -24,7 +24,7 @@ export const DISCLAIMER_KEY = "lightbird_magnet_disclaimer_accepted";
  */
 export function isMagnetUri(str: unknown): boolean {
   if (typeof str !== "string" || !str.trim()) return false;
-  return /^magnet:\?xt=urn:bt(ih|mh):[a-zA-Z0-9]{20,}/i.test(str.trim());
+  return /^magnet:\?xt=urn:(btih:([a-f0-9]{40}|[a-z2-7]{32})|btmh:[a-z0-9]{20,})/i.test(str.trim());
 }
 
 /**

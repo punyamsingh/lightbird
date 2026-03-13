@@ -20,8 +20,9 @@ describe("isMagnetUri", () => {
   });
 
   it("accepts a btih URI with 32-char base32 hash", () => {
+    // 31 A's + "2" = 32 valid base32 chars (alphabet: A-Z, 2-7)
     expect(
-      isMagnetUri("magnet:?xt=urn:btih:MFRA2YLBORUGKY3VNFSXI2LGNNSXS"),
+      isMagnetUri("magnet:?xt=urn:btih:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA2"),
     ).toBe(true);
   });
 
@@ -51,6 +52,18 @@ describe("isMagnetUri", () => {
 
   it("rejects a magnet URI with a hash that is too short (< 20 chars)", () => {
     expect(isMagnetUri("magnet:?xt=urn:btih:abc123")).toBe(false);
+  });
+
+  it("rejects a btih URI with a 31-char base32 hash (one too short)", () => {
+    // Valid base32 alphabet but 31 chars — only 32 is accepted
+    expect(isMagnetUri("magnet:?xt=urn:btih:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")).toBe(false);
+  });
+
+  it("rejects a btih URI with a 39-char hex hash (one too short)", () => {
+    // 39 hex chars — only 40 is accepted
+    expect(
+      isMagnetUri("magnet:?xt=urn:btih:08ada5a7a6183aae1e09d831df6748d566095a1"),
+    ).toBe(false);
   });
 
   it("rejects an empty string", () => {
