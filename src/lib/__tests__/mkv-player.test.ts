@@ -355,6 +355,79 @@ describe('MKVPlayer cancellation', () => {
 });
 
 // ---------------------------------------------------------------------------
+// MKVPlayer — remux cache
+// ---------------------------------------------------------------------------
+
+describe('MKVPlayer remux cache', () => {
+  it('does not call FFmpeg again when switching back to a cached track', async () => {
+    const player = new MKVPlayer(makeFile());
+    const videoEl = document.createElement('video');
+    await initializeSuccess(player, videoEl);
+
+    // inject a pre-cached URL for track 1
+    player['remuxCache'].set(1, 'blob:cached-track-1');
+    mockWorkerInstance.postMessage.mockClear();
+
+    // switchAudioTrack should return the cached URL without hitting the worker
+    await player.switchAudioTrack('1');
+
+    expect(mockWorkerInstance.postMessage).not.toHaveBeenCalled();
+    expect(videoEl.src).toBe('blob:cached-track-1');
+  });
+
+  it('stores result in remuxCache after a fresh FFmpeg remux', async () => {
+    const player = new MKVPlayer(makeFile());
+    const videoEl = document.createElement('video');
+    await initializeSuccess(player, videoEl);
+
+    jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fresh-track-2');
+    const cacheSpy = jest.spyOn(player['remuxCache'], 'set');
+
+    const remuxPromise = player['_remux'](2);
+
+    const msg = mockWorkerInstance.postMessage.mock.calls[mockWorkerInstance.postMessage.mock.calls.length - 1][0];
+    simulateWorkerMessage({
+      id: msg.id,
+      type: 'REMUX_DONE',
+      data: new Uint8Array([0]),
+      logs: '',
+    });
+
+    await remuxPromise;
+
+    expect(cacheSpy).toHaveBeenCalledWith(2, 'blob:fresh-track-2');
+    cacheSpy.mockRestore();
+  });
+
+  it('does not call FFmpeg for track 0 when switching back after initialize', async () => {
+    const player = new MKVPlayer(makeFile());
+    const videoEl = document.createElement('video');
+    await initializeSuccess(player, videoEl);
+
+    // initialize() should have stored track 0 in the cache
+    expect(player['remuxCache'].has(0)).toBe(true);
+
+    mockWorkerInstance.postMessage.mockClear();
+    await player.switchAudioTrack('0');
+
+    // No new worker message — served from cache
+    expect(mockWorkerInstance.postMessage).not.toHaveBeenCalled();
+  });
+
+  it('revokes all cached URLs on destroy()', () => {
+    const revoke = jest.spyOn(URL, 'revokeObjectURL');
+    const player = new MKVPlayer(makeFile());
+    player['remuxCache'].set(0, 'blob:track-0');
+    player['remuxCache'].set(1, 'blob:track-1');
+
+    player.destroy();
+
+    expect(revoke).toHaveBeenCalledWith('blob:track-0');
+    expect(revoke).toHaveBeenCalledWith('blob:track-1');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // MKVPlayer — subtitle blob URL cleanup
 // ---------------------------------------------------------------------------
 
