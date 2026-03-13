@@ -58,9 +58,15 @@ async function getWorkerFFmpeg(): Promise<FFmpeg> {
   return ffmpeg;
 }
 
+// ─── Serial Queue ─────────────────────────────────────────────────────────────
+// Serialize all operations against the shared FFmpeg instance so that
+// concurrent messages don't interleave FS paths, event handlers, or ff.exec().
+
+let processingChain: Promise<void> = Promise.resolve();
+
 // ─── Message Handler ─────────────────────────────────────────────────────────
 
-self.onmessage = async (event: MessageEvent<WorkerInbound>) => {
+async function handleMessage(event: MessageEvent<WorkerInbound>): Promise<void> {
   const { id, type, payload } = event.data;
 
   try {
@@ -70,33 +76,35 @@ self.onmessage = async (event: MessageEvent<WorkerInbound>) => {
       const logs: string[] = [];
       const logHandler = ({ message }: { message: string }) => logs.push(message);
       ff.on('log', logHandler);
-
-      await ff.writeFile(payload.fileName, await fetchFile(payload.file));
       try {
-        await ff.exec(['-i', payload.fileName, '-f', 'null', '-']);
-      } catch {
-        // FFmpeg exits non-zero when output is /dev/null — expected
+        await ff.writeFile(payload.fileName, await fetchFile(payload.file));
+        try {
+          await ff.exec(['-i', payload.fileName, '-f', 'null', '-']);
+        } catch {
+          // FFmpeg exits non-zero when output is /dev/null — expected
+        }
+        self.postMessage({ id, type: 'PROBE_DONE', logs: logs.join('\n') } satisfies WorkerOutbound);
+      } finally {
+        ff.off('log', logHandler);
+        try { await ff.deleteFile(payload.fileName); } catch { /* ignore */ }
       }
 
-      ff.off('log', logHandler);
-
-      self.postMessage({ id, type: 'PROBE_DONE', logs: logs.join('\n') } satisfies WorkerOutbound);
-
     } else if (type === 'EXTRACT_SUBTITLE') {
-      await ff.writeFile(payload.fileName, await fetchFile(payload.file));
       const outputName = `subtitle_${payload.trackIndex}_${Date.now()}.srt`;
-
-      await ff.exec([
-        '-i', payload.fileName,
-        '-map', `0:s:${payload.trackIndex}`,
-        outputName,
-      ]);
-
-      const data = await ff.readFile(outputName) as Uint8Array;
-      try { await ff.deleteFile(outputName); } catch { /* ignore */ }
-
-      const srtText = new TextDecoder().decode(data);
-      self.postMessage({ id, type: 'EXTRACT_SUBTITLE_DONE', srtText } satisfies WorkerOutbound);
+      try {
+        await ff.writeFile(payload.fileName, await fetchFile(payload.file));
+        await ff.exec([
+          '-i', payload.fileName,
+          '-map', `0:s:${payload.trackIndex}`,
+          outputName,
+        ]);
+        const data = await ff.readFile(outputName) as Uint8Array;
+        const srtText = new TextDecoder().decode(data);
+        self.postMessage({ id, type: 'EXTRACT_SUBTITLE_DONE', srtText } satisfies WorkerOutbound);
+      } finally {
+        try { await ff.deleteFile(outputName); } catch { /* ignore */ }
+        try { await ff.deleteFile(payload.fileName); } catch { /* ignore */ }
+      }
 
     } else if (type === 'REMUX') {
       const progressHandler = ({ progress }: { progress: number }) => {
@@ -108,19 +116,19 @@ self.onmessage = async (event: MessageEvent<WorkerInbound>) => {
       };
       ff.on('progress', progressHandler);
 
-      try {
-        const logs: string[] = [];
-        const logHandler = ({ message }: { message: string }) => logs.push(message);
-        ff.on('log', logHandler);
+      let outputName: string | null = null;
+      const logs: string[] = [];
+      const logHandler = ({ message }: { message: string }) => logs.push(message);
+      ff.on('log', logHandler);
 
+      try {
         await ff.writeFile(payload.fileName, await fetchFile(payload.file));
 
         try {
           await ff.exec(['-i', payload.fileName, '-f', 'null', '-']);
         } catch { /* expected */ }
-        ff.off('log', logHandler);
 
-        const outputName = `output_${Date.now()}.mp4`;
+        outputName = `output_${Date.now()}.mp4`;
         await ff.exec([
           '-i', payload.fileName,
           '-map', '0:v:0',
@@ -132,7 +140,6 @@ self.onmessage = async (event: MessageEvent<WorkerInbound>) => {
         ]);
 
         const data = await ff.readFile(outputName) as Uint8Array;
-        try { await ff.deleteFile(outputName); } catch { /* ignore */ }
 
         // Transfer the buffer (zero-copy) back to main thread
         self.postMessage(
@@ -142,6 +149,9 @@ self.onmessage = async (event: MessageEvent<WorkerInbound>) => {
 
       } finally {
         ff.off('progress', progressHandler);
+        ff.off('log', logHandler);
+        if (outputName) { try { await ff.deleteFile(outputName); } catch { /* ignore */ } }
+        try { await ff.deleteFile(payload.fileName); } catch { /* ignore */ }
       }
     }
 
@@ -152,4 +162,10 @@ self.onmessage = async (event: MessageEvent<WorkerInbound>) => {
       error: error instanceof Error ? error.message : String(error),
     } satisfies WorkerOutbound);
   }
+}
+
+self.onmessage = (event: MessageEvent<WorkerInbound>) => {
+  processingChain = processingChain
+    .then(() => handleMessage(event))
+    .catch(() => {}); // errors are reported as ERROR messages inside handleMessage
 };

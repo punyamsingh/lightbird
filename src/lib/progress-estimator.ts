@@ -19,6 +19,8 @@ export class ProgressEstimator {
   }
 
   update(progress: number): void {
+    if (!Number.isFinite(progress)) return;
+    progress = Math.min(1, Math.max(0, progress));
     if (progress > 0 && this.startTime === null) {
       this.startTime = Date.now(); // initialize on first real progress event
     }

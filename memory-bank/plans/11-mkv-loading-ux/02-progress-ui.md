@@ -1,4 +1,6 @@
-# Sub-plan 02 — Progress UI with Speed and ETA
+# Sub-plan 02 — Progress UI with Speed and ETA [DONE]
+
+All acceptance criteria met. `ProgressEstimator` (`src/lib/progress-estimator.ts`) computes throughput (MB/s) and ETA from the worker's `PROGRESS` stream; it withholds values for the first 500 ms to avoid jitter. `VideoOverlay` gained `throughputMBs` and `eta` props which render a speed/ETA line beneath the progress bar when both are non-null. `lightbird-player.tsx` creates a fresh estimator per file load and feeds worker progress events into it. Four new tests cover the estimator; all 243 tests pass.
 
 ## Status: DONE
 
@@ -252,10 +254,10 @@ describe('ProgressEstimator', () => {
 
 ## Acceptance Criteria
 
-- [ ] `ProgressEstimator` class exists at `src/lib/progress-estimator.ts`.
-- [ ] `lightbird-player.tsx` creates an estimator instance per file load.
-- [ ] `VideoOverlay` accepts `eta?: number | null` and `throughputMBs?: number | null` props.
-- [ ] `VideoOverlay` renders MB/s and ETA text beneath the progress bar when both are non-null.
-- [ ] Fields are omitted (null) and not rendered when not yet calculable (first 500ms).
-- [ ] The `loadingMessage` string does NOT contain speed/ETA text — those are separate props.
-- [ ] All new tests pass.
+- [x] `ProgressEstimator` class exists at `src/lib/progress-estimator.ts`.
+- [x] `lightbird-player.tsx` creates an estimator instance per file load.
+- [x] `VideoOverlay` accepts `eta?: number | null` and `throughputMBs?: number | null` props.
+- [x] `VideoOverlay` renders MB/s and ETA text beneath the progress bar when both are non-null.
+- [x] Fields are omitted (null) and not rendered when not yet calculable (first 500ms).
+- [x] The `loadingMessage` string does NOT contain speed/ETA text — those are separate props.
+- [x] All new tests pass.
