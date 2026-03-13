@@ -2,7 +2,7 @@
 
 import { SimplePlayer, type SimplePlayerFile } from './players/simple-player';
 import { MKVPlayer, type MKVPlayerFile } from './players/mkv-player';
-import type { AudioTrack, Subtitle } from "@/types";
+import type { AudioTrack, Subtitle, Chapter } from "@/types";
 
 export type ProcessedFile = SimplePlayerFile | MKVPlayerFile;
 
@@ -10,6 +10,7 @@ export interface VideoPlayer {
   initialize(videoElement: HTMLVideoElement): Promise<ProcessedFile>;
   getAudioTracks(): AudioTrack[];
   getSubtitles(): Subtitle[];
+  getChapters?(): Chapter[];
   switchAudioTrack(trackId: string): Promise<void>;
   switchSubtitle(trackId: string): Promise<void>;
   destroy(): void;
@@ -65,6 +66,10 @@ class MKVPlayerAdapter implements VideoPlayer {
 
   getSubtitles(): Subtitle[] {
     return this.player.getSubtitles();
+  }
+
+  getChapters(): Chapter[] {
+    return this.player.getChapters();
   }
 
   async switchAudioTrack(trackId: string): Promise<void> {

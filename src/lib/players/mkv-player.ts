@@ -1,7 +1,8 @@
 "use client";
 
-import type { AudioTrack, Subtitle } from "@/types";
+import type { AudioTrack, Subtitle, Chapter } from "@/types";
 import { SubtitleConverter } from "@/lib/subtitle-converter";
+import { parseChaptersFromFFmpegLog } from "@/lib/chapter-parser";
 import type { WorkerInbound, WorkerOutbound } from "@/lib/workers/ffmpeg-worker";
 
 /**
@@ -111,6 +112,9 @@ export class MKVPlayer {
   // Maps subtitle track ID → blob URL for cleanup
   private subtitleBlobUrls: Map<string, string> = new Map();
   private onProgress?: (progress: number) => void;
+
+  // Parsed chapter data
+  private chapters: Chapter[] = [];
 
   // Maps audioTrackIndex → blob URL of the remuxed video
   private remuxCache: Map<number, string> = new Map();
@@ -229,6 +233,9 @@ export class MKVPlayer {
 
       const { audioTracks, subtitleTracks } = parseStreamInfo(result.logs);
 
+      // Parse chapter metadata from the FFmpeg probe logs
+      this.chapters = parseChaptersFromFFmpegLog(result.logs, videoElement.duration || 0);
+
       // Build audio track metadata
       this.playerFile.audioTracks =
         audioTracks.length > 0
@@ -322,6 +329,10 @@ export class MKVPlayer {
 
   getSubtitles(): Subtitle[] {
     return this.playerFile.subtitleTracks;
+  }
+
+  getChapters(): Chapter[] {
+    return this.chapters;
   }
 
   async switchAudioTrack(trackId: string): Promise<void> {

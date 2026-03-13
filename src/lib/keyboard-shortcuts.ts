@@ -11,7 +11,9 @@ export type ShortcutAction =
   | 'next-item'
   | 'prev-item'
   | 'screenshot'
-  | 'show-shortcuts';
+  | 'show-shortcuts'
+  | 'next-chapter'
+  | 'prev-chapter';
 
 export interface ShortcutBinding {
   action: ShortcutAction;
@@ -39,6 +41,8 @@ export const DEFAULT_SHORTCUTS: ShortcutBinding[] = [
   { action: 'prev-item',        label: 'Previous in Playlist', defaultKey: 'p',          key: 'p' },
   { action: 'screenshot',       label: 'Screenshot',           defaultKey: 's',          key: 's', modifiers: { ctrl: true } },
   { action: 'show-shortcuts',   label: 'Show Shortcuts Help',  defaultKey: '?',          key: '?' },
+  { action: 'next-chapter',     label: 'Next Chapter',         defaultKey: ']',          key: ']' },
+  { action: 'prev-chapter',     label: 'Previous Chapter',     defaultKey: '[',          key: '[' },
 ];
 
 const STORAGE_KEY = 'lightbird-shortcuts';

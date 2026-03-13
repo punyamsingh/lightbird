@@ -18,8 +18,8 @@ function makeKeyEvent(
 }
 
 describe("DEFAULT_SHORTCUTS", () => {
-  it("contains 13 bindings", () => {
-    expect(DEFAULT_SHORTCUTS).toHaveLength(13);
+  it("contains 15 bindings", () => {
+    expect(DEFAULT_SHORTCUTS).toHaveLength(15);
   });
 
   it("every binding has an action, label, defaultKey and key", () => {

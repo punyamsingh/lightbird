@@ -1,4 +1,10 @@
 
+export interface Chapter {
+  index: number;
+  title: string;
+  startTime: number;   // seconds
+  endTime: number;     // seconds (= next chapter's startTime, or video duration)
+}
 
 export interface PlaylistItem {
   id: string;
