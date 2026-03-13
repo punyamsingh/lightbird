@@ -74,31 +74,45 @@ export function useMagnet(): UseMagnetReturn {
     }
 
     return new Promise<PlaylistItem[]>((resolve, reject) => {
+      let settled = false;
       let torrent: import("webtorrent").Torrent | undefined;
 
+      // Guard: ensures only the first resolution/rejection path runs
+      const settle = (fn: () => void) => {
+        if (settled) return;
+        settled = true;
+        fn();
+      };
+
       const timeout = setTimeout(() => {
-        torrent?.destroy?.();
-        const msg = "Could not connect to peers. Check the link and try again.";
-        setTorrentStatus((s) => ({ ...s, status: "error", error: msg }));
-        reject(new Error(msg));
+        settle(() => {
+          torrent?.destroy?.();
+          const msg = "Could not connect to peers. Check the link and try again.";
+          setTorrentStatus((s) => ({ ...s, status: "error", error: msg }));
+          reject(new Error(msg));
+        });
       }, METADATA_TIMEOUT_MS);
 
       try {
         torrent = client.add(uri.trim(), { announce: DEFAULT_TRACKERS });
         activeTorrentRef.current = torrent;
       } catch (err) {
-        clearTimeout(timeout);
-        const msg = "Failed to add torrent";
-        setTorrentStatus((s) => ({ ...s, status: "error", error: msg }));
-        reject(new Error(msg));
+        settle(() => {
+          clearTimeout(timeout);
+          const msg = "Failed to add torrent";
+          setTorrentStatus((s) => ({ ...s, status: "error", error: msg }));
+          reject(new Error(msg));
+        });
         return;
       }
 
       torrent.on("error", (err: Error) => {
-        clearTimeout(timeout);
-        const msg = err?.message ?? "Torrent error";
-        setTorrentStatus((s) => ({ ...s, status: "error", error: msg }));
-        reject(new Error(msg));
+        settle(() => {
+          clearTimeout(timeout);
+          const msg = err?.message ?? "Torrent error";
+          setTorrentStatus((s) => ({ ...s, status: "error", error: msg }));
+          reject(new Error(msg));
+        });
       });
 
       torrent.on("ready", () => {
@@ -107,32 +121,36 @@ export function useMagnet(): UseMagnetReturn {
         const videoFiles = getVideoFiles(torrent);
 
         if (videoFiles.length === 0) {
-          torrent.destroy();
-          activeTorrentRef.current = null;
-          const msg = "No video files found in this torrent";
-          setTorrentStatus((s) => ({ ...s, status: "error", error: msg }));
-          reject(new Error(msg));
+          settle(() => {
+            torrent.destroy();
+            activeTorrentRef.current = null;
+            const msg = "No video files found in this torrent";
+            setTorrentStatus((s) => ({ ...s, status: "error", error: msg }));
+            reject(new Error(msg));
+          });
           return;
         }
 
-        setTorrentStatus((s) => ({
-          ...s,
-          status: "ready",
-          torrentName: torrent.name ?? "",
-          progress: torrent.progress ?? 0,
-        }));
+        settle(() => {
+          setTorrentStatus((s) => ({
+            ...s,
+            status: "ready",
+            torrentName: torrent.name ?? "",
+            progress: torrent.progress ?? 0,
+          }));
 
-        // Build playlist items using the SW-backed stream URL for each file
-        const items: PlaylistItem[] = videoFiles.map((file) => ({
-          id: crypto.randomUUID(),
-          name: file.name,
-          url: (file as { streamURL?: string }).streamURL ?? "",
-          type: "stream" as const,
-          source: "torrent" as const,
-          duration: undefined,
-        }));
+          // Build playlist items using the SW-backed stream URL for each file
+          const items: PlaylistItem[] = videoFiles.map((file) => ({
+            id: crypto.randomUUID(),
+            name: file.name,
+            url: (file as { streamURL?: string }).streamURL ?? "",
+            type: "stream" as const,
+            source: "torrent" as const,
+            duration: undefined,
+          }));
 
-        resolve(items);
+          resolve(items);
+        });
 
         // Live progress updates
         torrent.on("download", () => {

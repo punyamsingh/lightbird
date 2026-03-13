@@ -176,6 +176,8 @@ interface PlaylistPanelProps {
   /** Returns true if items were added, false if a disclaimer prompt was triggered. Throws on error. */
   onAddMagnet: (uri: string) => Promise<boolean>;
   torrentStatus: TorrentStatus;
+  /** When false, hides the magnet link button and input entirely. Defaults to true. */
+  showMagnet?: boolean;
   onRemoveItem: (index: number) => void;
   onReorder: (newPlaylist: PlaylistItem[]) => void;
   onImportM3U: (items: Omit<PlaylistItem, "id">[]) => void;
@@ -196,6 +198,7 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
   onAddStream,
   onAddMagnet,
   torrentStatus,
+  showMagnet = true,
   onRemoveItem,
   onReorder,
   onImportM3U,
@@ -482,24 +485,26 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
               <Button type="submit" size="icon" variant="secondary" className="h-8 w-8 shrink-0">
                 <Link className="h-3.5 w-3.5" />
               </Button>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant={showMagnetInput ? "default" : "outline"}
-                    className="h-8 w-8 shrink-0"
-                    onClick={() => { setShowMagnetInput((v) => !v); setMagnetError(null); }}
-                    aria-label="Add magnet link"
-                  >
-                    <Link2 className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom"><p>Add Magnet Link</p></TooltipContent>
-              </Tooltip>
+              {showMagnet && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant={showMagnetInput ? "default" : "outline"}
+                      className="h-8 w-8 shrink-0"
+                      onClick={() => { setShowMagnetInput((v) => !v); setMagnetError(null); }}
+                      aria-label="Add magnet link"
+                    >
+                      <Link2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom"><p>Add Magnet Link</p></TooltipContent>
+                </Tooltip>
+              )}
             </form>
 
-            {showMagnetInput && (
+            {showMagnet && showMagnetInput && (
               <form onSubmit={handleMagnetSubmit} className="space-y-1.5">
                 <div className="flex gap-1.5">
                   <Input
@@ -538,7 +543,7 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
             )}
 
             {/* Torrent download progress bar */}
-            {torrentStatus.status === "ready" && torrentStatus.progress < 1 && (
+            {showMagnet && torrentStatus.status === "ready" && torrentStatus.progress < 1 && (
               <div className="space-y-1">
                 <div className="w-full bg-muted rounded-full h-1 overflow-hidden">
                   <div

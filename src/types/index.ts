@@ -5,8 +5,8 @@ export interface PlaylistItem {
   name: string;
   url: string;
   type: 'video' | 'stream';
-  /** Distinguishes items added via magnet link from regular files/streams. */
-  source?: 'file' | 'stream' | 'torrent';
+  /** Set only on items added via magnet link. */
+  source?: 'torrent';
   file?: File;
   duration?: number;
 }
