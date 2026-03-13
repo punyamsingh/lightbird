@@ -15,7 +15,7 @@ function makeVideoElement(overrides: Partial<HTMLVideoElement> = {}): HTMLVideoE
       }
     }),
     _fireEvent: (event: string) => {
-      listeners[event]?.forEach((l) => l(new Event(event)));
+      listeners[event]?.forEach((l) => { l(new Event(event)); });
     },
     ...overrides,
   } as unknown as HTMLVideoElement & { _fireEvent: (event: string) => void };
@@ -39,11 +39,12 @@ describe("captureVideoThumbnail", () => {
       toDataURL: jest.fn(() => "data:image/jpeg;base64,mockeddata"),
     } as unknown as HTMLCanvasElement;
 
+    const originalCreateElement = document.createElement.bind(document);
     createElementSpy = jest
       .spyOn(document, "createElement")
       .mockImplementation((tag: string) => {
         if (tag === "canvas") return mockCanvas;
-        return document.createElement(tag);
+        return originalCreateElement(tag);
       });
   });
 

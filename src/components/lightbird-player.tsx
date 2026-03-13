@@ -298,24 +298,25 @@ const LightBirdPlayer = () => {
     };
   }, []);
 
-  // Capture thumbnail for media session artwork when a new video loads
+  // Capture thumbnail for media session artwork, scoped to the current playlist item
   useEffect(() => {
     const el = videoRef.current;
-    if (!el) return;
+    if (!el || !playlist.currentItem) {
+      setMediaThumbnail(null);
+      return;
+    }
+    setMediaThumbnail(null);
+    let cancelled = false;
     const onLoadedData = () => {
       captureVideoThumbnail(el).then((dataUrl) => {
-        setMediaThumbnail(dataUrl);
+        if (!cancelled) setMediaThumbnail(dataUrl);
       });
     };
     el.addEventListener("loadeddata", onLoadedData);
-    return () => el.removeEventListener("loadeddata", onLoadedData);
-  }, []);
-
-  // Clear thumbnail when playlist is empty
-  useEffect(() => {
-    if (!playlist.currentItem) {
-      setMediaThumbnail(null);
-    }
+    return () => {
+      cancelled = true;
+      el.removeEventListener("loadeddata", onLoadedData);
+    };
   }, [playlist.currentItem]);
 
   // Auto-hide the playlist sidebar when playing (unless pinned); restore when paused
@@ -483,6 +484,16 @@ const LightBirdPlayer = () => {
     setPlaylistOpen((v) => !v);
   };
 
+  const handleMediaPlay = useCallback(() => {
+    const el = videoRef.current;
+    if (el) el.play().catch(() => {});
+  }, []);
+
+  const handleMediaPause = useCallback(() => {
+    const el = videoRef.current;
+    if (el) el.pause();
+  }, []);
+
   const handleMediaSeekForward = useCallback(() => {
     const el = videoRef.current;
     if (el) playback.seek(el.currentTime + 10);
@@ -496,8 +507,8 @@ const LightBirdPlayer = () => {
   useMediaSession({
     title: playlist.currentItem?.name ?? null,
     artwork: mediaThumbnail,
-    onPlay: playback.togglePlay,
-    onPause: playback.togglePlay,
+    onPlay: handleMediaPlay,
+    onPause: handleMediaPause,
     onNext: handleNext,
     onPrev: handlePrevious,
     onSeekForward: handleMediaSeekForward,
