@@ -1,6 +1,14 @@
-# Plan 12 — Magnet Link Player
+# Plan 12 — Magnet Link Player [DONE]
 
-> **Status:** Pending
+> **Status:** Implemented (2026-03-13)
+>
+> **Summary:** Added magnet link / BitTorrent streaming via WebTorrent v2. New files:
+> `src/lib/magnet-player.ts`, `src/hooks/use-magnet.ts`, `src/types/webtorrent.d.ts`,
+> `src/components/ui/alert-dialog.tsx`, `public/webtorrent-sw.js`.
+> Modified: `src/types/index.ts` (added `source` field + `TorrentStatus`),
+> `src/components/playlist-panel.tsx` (magnet input UI + progress bar),
+> `src/components/lightbird-player.tsx` (wired hook + disclaimer dialog).
+> 44 new tests added. All 281 tests pass.
 > **Goal:** Allow users to paste a magnet URI into LightBird and stream video content
 > directly in the browser via WebTorrent (BitTorrent over WebRTC/WebSocket).
 > Single-video torrents play immediately; multi-file torrents add all videos to
