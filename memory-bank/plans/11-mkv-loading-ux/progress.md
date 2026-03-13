@@ -1,4 +1,8 @@
-# Plan 11 — MKV Loading UX — Progress
+# Plan 11 — MKV Loading UX — Progress [DONE]
+
+## Implementation Summary
+
+Sub-plan 1 moved all FFmpeg.wasm processing off the main thread into a dedicated Web Worker (`src/lib/workers/ffmpeg-worker.ts`). The `MKVPlayer` class now communicates with the worker via a typed message protocol (`WorkerInbound` / `WorkerOutbound`); `destroy()` calls `worker.terminate()` to kill the WASM thread. `next.config.ts` was updated to set `output.globalObject = 'self'` so the Worker bundle resolves globals correctly. Sub-plans 2–5 built on this foundation to add progress speed/ETA display, cancellation support, audio-track remux caching, and a native-first probe strategy respectively.
 
 | Sub-plan | Title | Status | Branch | Notes |
 |---|---|---|---|---|

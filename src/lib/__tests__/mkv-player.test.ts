@@ -14,8 +14,15 @@ let mockWorkerInstance: {
 // The constructor mock is defined at module level so it can be set on global
 const MockWorkerConstructor = jest.fn(() => mockWorkerInstance);
 
+let originalWorker: typeof Worker | undefined;
+
 beforeAll(() => {
+  originalWorker = (global as unknown as { Worker?: typeof Worker }).Worker;
   (global as unknown as { Worker: jest.Mock }).Worker = MockWorkerConstructor;
+});
+
+afterAll(() => {
+  (global as unknown as { Worker: typeof Worker | undefined }).Worker = originalWorker;
 });
 
 import { MKVPlayer, CancellationError, parseStreamInfo, canPlayNatively } from '@/lib/players/mkv-player';
