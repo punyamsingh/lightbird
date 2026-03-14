@@ -15,6 +15,12 @@ export interface VideoPlayer {
   switchSubtitle(trackId: string): Promise<void>;
   destroy(): void;
   cancel?(): void;
+  /**
+   * Resolves when track metadata is fully populated. Only meaningful for
+   * MKVPlayer on the native path (where the probe runs after initialize()).
+   * For all other players/paths this is already resolved when initialize() returns.
+   */
+  tracksReady?: Promise<void>;
 }
 
 class SimplePlayerAdapter implements VideoPlayer {
@@ -86,6 +92,10 @@ class MKVPlayerAdapter implements VideoPlayer {
 
   cancel(): void {
     this.player.cancel();
+  }
+
+  get tracksReady(): Promise<void> {
+    return this.player.tracksReady;
   }
 }
 
