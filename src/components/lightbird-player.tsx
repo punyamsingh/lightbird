@@ -196,6 +196,16 @@ const LightBirdPlayer = () => {
       setIsLoading(false);
       setLoadingMessage("");
       setProcessingProgress(0);
+
+      // On the MKV native path the probe runs after initialize() returns.
+      // Refresh track state once it completes without blocking the UI.
+      player.tracksReady?.then(() => {
+        if (playerRef.current !== player) return; // player was replaced
+        subtitles.importSubtitles(player.getSubtitles());
+        const updatedTracks = player.getAudioTracks();
+        setAudioTracks(updatedTracks);
+        setActiveAudioTrack(updatedTracks[0]?.id || "0");
+      }).catch(() => {});
     } catch (error) {
       if (!(error instanceof CancellationError)) {
         console.error(error);

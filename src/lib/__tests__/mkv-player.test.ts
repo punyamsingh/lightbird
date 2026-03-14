@@ -388,30 +388,33 @@ describe('MKVPlayer with successful REMUX_DONE', () => {
 // ---------------------------------------------------------------------------
 
 describe('MKVPlayer.initialize() native path', () => {
-  it('keeps probeUrl on this.objectUrl and discovers tracks via PROBE', async () => {
+  it('returns immediately and discovers tracks via background PROBE', async () => {
     jest.spyOn(MKVPlayer, '_canPlayNatively').mockResolvedValue(true);
     jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:probe-url');
     const revoke = jest.spyOn(URL, 'revokeObjectURL');
 
     const player = new MKVPlayer(makeFile());
     const videoEl = document.createElement('video');
+
+    // initialize() must resolve without waiting for the probe
     const initPromise = player.initialize(videoEl);
+    await Promise.resolve(); // flush canPlayNatively
+    const result = await initPromise; // resolves before probe completes
 
-    // Flush the canPlayNatively microtask so initialize() sends the PROBE
-    await Promise.resolve();
+    expect(videoEl.src).toContain('blob:probe-url');
+    expect(revoke).not.toHaveBeenCalledWith('blob:probe-url');
+    // Defaults while probe is still in flight
+    expect(result.audioTracks).toHaveLength(1);
+    expect(result.subtitleTracks).toHaveLength(0);
 
-    // Simulate PROBE_DONE so initialize() can complete
+    // Resolve the background probe — tracksReady fulfils with real track data
     const msg = mockWorkerInstance.postMessage.mock.calls[0][0];
     expect(msg.type).toBe('PROBE');
     simulateWorkerMessage({ id: msg.id, type: 'PROBE_DONE', logs: DEFAULT_LOGS });
-    const result = await initPromise;
+    await player.tracksReady;
 
-    expect(videoEl.src).toContain('blob:probe-url');
-    // URL must NOT be revoked — it's the active playback URL
-    expect(revoke).not.toHaveBeenCalledWith('blob:probe-url');
-    // Track metadata must come from the probe logs
-    expect(result.audioTracks).toHaveLength(2); // eng aac + jpn ac3
-    expect(result.subtitleTracks).toHaveLength(1);
+    expect(player.getAudioTracks()).toHaveLength(2); // eng aac + jpn ac3
+    expect(player.getSubtitles()).toHaveLength(1);
   });
 
   it('calls onProgress(1) before probe completes (playback starts immediately)', async () => {
@@ -421,16 +424,17 @@ describe('MKVPlayer.initialize() native path', () => {
     const videoEl = document.createElement('video');
 
     const initPromise = player.initialize(videoEl);
+    await Promise.resolve(); // flush canPlayNatively
+    await initPromise;
 
-    // Flush canPlayNatively — onProgress(1) should have been called by now
-    await Promise.resolve();
+    // onProgress(1) fires immediately, not waiting for the probe
     expect(onProgress).toHaveBeenCalledWith(1);
     expect(onProgress).toHaveBeenCalledTimes(1);
 
-    // Resolve the probe so the test doesn't leak a pending operation
+    // Clean up: resolve probe so no pending operation is left
     const msg = mockWorkerInstance.postMessage.mock.calls[0][0];
     simulateWorkerMessage({ id: msg.id, type: 'PROBE_DONE', logs: DEFAULT_LOGS });
-    await initPromise;
+    await player.tracksReady;
   });
 
   it('falls back to default audio track when native-path probe fails', async () => {
@@ -439,16 +443,19 @@ describe('MKVPlayer.initialize() native path', () => {
 
     const player = new MKVPlayer(makeFile());
     const videoEl = document.createElement('video');
+
     const initPromise = player.initialize(videoEl);
-
     await Promise.resolve(); // flush canPlayNatively
+    const result = await initPromise; // returns immediately
 
+    expect(videoEl.src).toContain('blob:probe-url');
+
+    // Simulate probe failure
     const msg = mockWorkerInstance.postMessage.mock.calls[0][0];
     simulateWorkerMessage({ id: msg.id, type: 'ERROR', error: 'probe failed' });
-    const result = await initPromise;
+    await player.tracksReady;
 
-    // Playback URL must still be set; track metadata falls back to safe default
-    expect(videoEl.src).toContain('blob:probe-url');
+    // result is a live reference to playerFile — fallback is applied in-place
     expect(result.audioTracks).toEqual([{ id: '0', name: 'Default Audio', lang: 'unknown' }]);
     expect(result.subtitleTracks).toHaveLength(0);
   });

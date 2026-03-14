@@ -126,6 +126,14 @@ export class MKVPlayer {
     reject: (reason: unknown) => void;
   }> = new Map();
 
+  /**
+   * Resolves when track metadata (audio + subtitle) is fully populated.
+   * On the FFmpeg path this resolves after initialize() itself. On the native
+   * path the probe runs in the background so initialize() returns first —
+   * callers that need the real track list should await this promise.
+   */
+  tracksReady: Promise<void> = Promise.resolve();
+
   constructor(file: File, onProgress?: (progress: number) => void) {
     this.file = file;
     this.onProgress = onProgress;
@@ -208,47 +216,17 @@ export class MKVPlayer {
         // Keep the URL — store it for later cleanup in destroy()
         this.objectUrl = probeUrl;
         this.playerFile.videoUrl = probeUrl;
+        // Set safe default so callers have something to render immediately
+        this.playerFile.audioTracks = [{ id: '0', name: 'Default Audio', lang: 'unknown' }];
         videoElement.src = probeUrl;
         this.onProgress?.(1); // playback starts immediately
 
-        // Probe in the background to discover real audio/subtitle tracks.
-        // Video is already playing; this just enriches the track metadata.
-        try {
-          const probeOpId = crypto.randomUUID();
-          const probeResult = await this.sendToWorker<{ type: 'PROBE_DONE'; logs: string }>({
-            id: probeOpId,
-            type: 'PROBE',
-            payload: { file: this.file, fileName: this.file.name },
-          });
-
-          if (!this._cancelled) {
-            const { audioTracks, subtitleTracks } = parseStreamInfo(probeResult.logs);
-
-            this.playerFile.audioTracks =
-              audioTracks.length > 0
-                ? audioTracks.map((t, i) => ({
-                    id: String(i),
-                    name: t.title ?? (t.lang ? `Audio ${i + 1} (${t.lang})` : `Audio ${i + 1}`),
-                    lang: t.lang ?? 'unknown',
-                  }))
-                : [{ id: '0', name: 'Default Audio', lang: 'unknown' }];
-
-            this.subtitleTrackMap.clear();
-            this.playerFile.subtitleTracks = subtitleTracks.map((t, i) => {
-              const id = String(i);
-              this.subtitleTrackMap.set(id, i);
-              return {
-                id,
-                name: t.title ?? (t.lang ? `Subtitle ${i + 1} (${t.lang})` : `Subtitle ${i + 1}`),
-                lang: t.lang ?? 'unknown',
-                type: 'embedded' as const,
-              };
-            });
-          }
-        } catch {
-          // Probe failed — fall back to the safe single-track default
+        // Probe in the background so initialize() returns right away.
+        // Callers that need real track metadata should await tracksReady.
+        this.tracksReady = this._probeForTracks().catch(() => {
+          // Probe failed — restore the safe single-track default
           this.playerFile.audioTracks = [{ id: '0', name: 'Default Audio', lang: 'unknown' }];
-        }
+        });
 
         return this.playerFile;
       }
@@ -319,6 +297,40 @@ export class MKVPlayer {
     }
 
     return this.playerFile;
+  }
+
+  private async _probeForTracks(): Promise<void> {
+    const probeOpId = crypto.randomUUID();
+    const probeResult = await this.sendToWorker<{ type: 'PROBE_DONE'; logs: string }>({
+      id: probeOpId,
+      type: 'PROBE',
+      payload: { file: this.file, fileName: this.file.name },
+    });
+
+    if (this._cancelled) return;
+
+    const { audioTracks, subtitleTracks } = parseStreamInfo(probeResult.logs);
+
+    this.playerFile.audioTracks =
+      audioTracks.length > 0
+        ? audioTracks.map((t, i) => ({
+            id: String(i),
+            name: t.title ?? (t.lang ? `Audio ${i + 1} (${t.lang})` : `Audio ${i + 1}`),
+            lang: t.lang ?? 'unknown',
+          }))
+        : [{ id: '0', name: 'Default Audio', lang: 'unknown' }];
+
+    this.subtitleTrackMap.clear();
+    this.playerFile.subtitleTracks = subtitleTracks.map((t, i) => {
+      const id = String(i);
+      this.subtitleTrackMap.set(id, i);
+      return {
+        id,
+        name: t.title ?? (t.lang ? `Subtitle ${i + 1} (${t.lang})` : `Subtitle ${i + 1}`),
+        lang: t.lang ?? 'unknown',
+        type: 'embedded' as const,
+      };
+    });
   }
 
   private async _remux(audioTrackIndex: number): Promise<string> {
