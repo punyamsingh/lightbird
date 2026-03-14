@@ -388,33 +388,69 @@ describe('MKVPlayer with successful REMUX_DONE', () => {
 // ---------------------------------------------------------------------------
 
 describe('MKVPlayer.initialize() native path', () => {
-  it('keeps probeUrl on this.objectUrl when canPlayNatively returns true', async () => {
+  it('keeps probeUrl on this.objectUrl and discovers tracks via PROBE', async () => {
     jest.spyOn(MKVPlayer, '_canPlayNatively').mockResolvedValue(true);
     jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:probe-url');
     const revoke = jest.spyOn(URL, 'revokeObjectURL');
 
     const player = new MKVPlayer(makeFile());
     const videoEl = document.createElement('video');
-    const result = await player.initialize(videoEl);
+    const initPromise = player.initialize(videoEl);
+
+    // Flush the canPlayNatively microtask so initialize() sends the PROBE
+    await Promise.resolve();
+
+    // Simulate PROBE_DONE so initialize() can complete
+    const msg = mockWorkerInstance.postMessage.mock.calls[0][0];
+    expect(msg.type).toBe('PROBE');
+    simulateWorkerMessage({ id: msg.id, type: 'PROBE_DONE', logs: DEFAULT_LOGS });
+    const result = await initPromise;
 
     expect(videoEl.src).toContain('blob:probe-url');
-    // URL must NOT be revoked — it's now the active playback URL
+    // URL must NOT be revoked — it's the active playback URL
     expect(revoke).not.toHaveBeenCalledWith('blob:probe-url');
-    // Worker must NOT have been invoked
-    expect(mockWorkerInstance.postMessage).not.toHaveBeenCalled();
-    expect(result.audioTracks).toHaveLength(1);
+    // Track metadata must come from the probe logs
+    expect(result.audioTracks).toHaveLength(2); // eng aac + jpn ac3
+    expect(result.subtitleTracks).toHaveLength(1);
   });
 
-  it('calls onProgress(1) immediately on native path', async () => {
+  it('calls onProgress(1) before probe completes (playback starts immediately)', async () => {
     jest.spyOn(MKVPlayer, '_canPlayNatively').mockResolvedValue(true);
     const onProgress = jest.fn();
     const player = new MKVPlayer(makeFile(), onProgress);
     const videoEl = document.createElement('video');
 
-    await player.initialize(videoEl);
+    const initPromise = player.initialize(videoEl);
 
+    // Flush canPlayNatively — onProgress(1) should have been called by now
+    await Promise.resolve();
     expect(onProgress).toHaveBeenCalledWith(1);
     expect(onProgress).toHaveBeenCalledTimes(1);
+
+    // Resolve the probe so the test doesn't leak a pending operation
+    const msg = mockWorkerInstance.postMessage.mock.calls[0][0];
+    simulateWorkerMessage({ id: msg.id, type: 'PROBE_DONE', logs: DEFAULT_LOGS });
+    await initPromise;
+  });
+
+  it('falls back to default audio track when native-path probe fails', async () => {
+    jest.spyOn(MKVPlayer, '_canPlayNatively').mockResolvedValue(true);
+    jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:probe-url');
+
+    const player = new MKVPlayer(makeFile());
+    const videoEl = document.createElement('video');
+    const initPromise = player.initialize(videoEl);
+
+    await Promise.resolve(); // flush canPlayNatively
+
+    const msg = mockWorkerInstance.postMessage.mock.calls[0][0];
+    simulateWorkerMessage({ id: msg.id, type: 'ERROR', error: 'probe failed' });
+    const result = await initPromise;
+
+    // Playback URL must still be set; track metadata falls back to safe default
+    expect(videoEl.src).toContain('blob:probe-url');
+    expect(result.audioTracks).toEqual([{ id: '0', name: 'Default Audio', lang: 'unknown' }]);
+    expect(result.subtitleTracks).toHaveLength(0);
   });
 
   it('revokes probeUrl and proceeds to FFmpeg when canPlayNatively returns false', async () => {

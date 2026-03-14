@@ -208,11 +208,48 @@ export class MKVPlayer {
         // Keep the URL — store it for later cleanup in destroy()
         this.objectUrl = probeUrl;
         this.playerFile.videoUrl = probeUrl;
-        // Native playback: browser exposes audio tracks via HTMLMediaElement.audioTracks
-        // but that API has limited browser support. Use a safe default.
-        this.playerFile.audioTracks = [{ id: '0', name: 'Default Audio', lang: 'unknown' }];
         videoElement.src = probeUrl;
-        this.onProgress?.(1);
+        this.onProgress?.(1); // playback starts immediately
+
+        // Probe in the background to discover real audio/subtitle tracks.
+        // Video is already playing; this just enriches the track metadata.
+        try {
+          const probeOpId = crypto.randomUUID();
+          const probeResult = await this.sendToWorker<{ type: 'PROBE_DONE'; logs: string }>({
+            id: probeOpId,
+            type: 'PROBE',
+            payload: { file: this.file, fileName: this.file.name },
+          });
+
+          if (!this._cancelled) {
+            const { audioTracks, subtitleTracks } = parseStreamInfo(probeResult.logs);
+
+            this.playerFile.audioTracks =
+              audioTracks.length > 0
+                ? audioTracks.map((t, i) => ({
+                    id: String(i),
+                    name: t.title ?? (t.lang ? `Audio ${i + 1} (${t.lang})` : `Audio ${i + 1}`),
+                    lang: t.lang ?? 'unknown',
+                  }))
+                : [{ id: '0', name: 'Default Audio', lang: 'unknown' }];
+
+            this.subtitleTrackMap.clear();
+            this.playerFile.subtitleTracks = subtitleTracks.map((t, i) => {
+              const id = String(i);
+              this.subtitleTrackMap.set(id, i);
+              return {
+                id,
+                name: t.title ?? (t.lang ? `Subtitle ${i + 1} (${t.lang})` : `Subtitle ${i + 1}`),
+                lang: t.lang ?? 'unknown',
+                type: 'embedded' as const,
+              };
+            });
+          }
+        } catch {
+          // Probe failed — fall back to the safe single-track default
+          this.playerFile.audioTracks = [{ id: '0', name: 'Default Audio', lang: 'unknown' }];
+        }
+
         return this.playerFile;
       }
 
