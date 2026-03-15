@@ -26,7 +26,7 @@ export function SubtitleOverlay({ videoRef, activeSubtitle }: SubtitleOverlayPro
       );
       if (targetIdx === -1) return false;
 
-      const textTrack = video!.textTracks[targetIdx];
+      const textTrack = trackElements[targetIdx].track;
       if (!textTrack) return false;
 
       const handleCueChange = () => {
