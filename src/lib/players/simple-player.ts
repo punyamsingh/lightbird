@@ -114,22 +114,17 @@ export class SimplePlayer {
         if (textTrack) {
           // Check if track element is loaded
           if (trackElement.readyState === 2) { // LOADED
-            textTrack.mode = 'showing';
+            textTrack.mode = 'hidden';
             this.currentSubtitleTrackIndex = i;
           } else {
             // Wait for track to load
             const onLoad = () => {
-              textTrack.mode = 'showing';
+              textTrack.mode = 'hidden';
               this.currentSubtitleTrackIndex = i;
               trackElement.removeEventListener('load', onLoad);
             };
             trackElement.addEventListener('load', onLoad);
-            
-            // Force load by setting mode to hidden first, then showing
             textTrack.mode = 'hidden';
-            setTimeout(() => {
-              textTrack.mode = 'showing';
-            }, 100);
           }
         }
         break;

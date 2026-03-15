@@ -28,6 +28,7 @@ import { parseMediaError, validateFile, type ParsedMediaError } from "@/lib/medi
 import { loadShortcuts } from "@/lib/keyboard-shortcuts";
 import type { ShortcutBinding } from "@/lib/keyboard-shortcuts";
 import { ProgressEstimator } from "@/lib/progress-estimator";
+import { SubtitleOverlay } from "@/components/subtitle-overlay";
 
 const MAX_RETRIES = 3;
 
@@ -568,6 +569,7 @@ const LightBirdPlayer = () => {
           crossOrigin="anonymous"
         />
         <canvas ref={canvasRef} className="hidden" />
+        <SubtitleOverlay videoRef={videoRef} activeSubtitle={subtitles.activeSubtitle} />
         <VideoOverlay
           isLoading={isLoading}
           loadingMessage={loadingMessage}

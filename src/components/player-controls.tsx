@@ -82,7 +82,7 @@ export const PlayerControls = React.memo(function PlayerControls({
 
   return (
     <TooltipProvider>
-      <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col gap-2">
+      <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-in-out flex flex-col gap-2">
         {/* Seek bar with chapter tick marks */}
         <div className="relative w-full">
           <Slider

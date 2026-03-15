@@ -185,17 +185,14 @@ export class UniversalSubtitleManager {
         const textTrack = tracks[i];
         if (textTrack) {
           if (trackElement.readyState === 2) {
-            textTrack.mode = "showing";
+            textTrack.mode = "hidden";
           } else {
             const onLoad = () => {
-              textTrack.mode = "showing";
+              textTrack.mode = "hidden";
               trackElement.removeEventListener("load", onLoad);
             };
             trackElement.addEventListener("load", onLoad);
             textTrack.mode = "hidden";
-            setTimeout(() => {
-              textTrack.mode = "showing";
-            }, 100);
           }
         }
         break;
