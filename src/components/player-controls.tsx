@@ -177,14 +177,16 @@ export const PlayerControls = React.memo(function PlayerControls({
                     </Button>
                 </PopoverTrigger>
                 <PopoverContent>
-                    <RadioGroup value={activeAudioTrack} onValueChange={onAudioTrackChange}>
-                        {audioTracks.map(track => (
-                            <div key={track.id} className="flex items-center space-x-2">
-                                <RadioGroupItem value={track.id} id={`audio-${track.id}`} />
-                                <Label htmlFor={`audio-${track.id}`}>{track.name}</Label>
-                            </div>
-                        ))}
-                    </RadioGroup>
+                    <div className="max-h-48 overflow-y-auto overscroll-contain pr-1">
+                      <RadioGroup value={activeAudioTrack} onValueChange={onAudioTrackChange}>
+                          {audioTracks.map(track => (
+                              <div key={track.id} className="flex items-center space-x-2">
+                                  <RadioGroupItem value={track.id} id={`audio-${track.id}`} />
+                                  <Label htmlFor={`audio-${track.id}`}>{track.name}</Label>
+                              </div>
+                          ))}
+                      </RadioGroup>
+                    </div>
                 </PopoverContent>
               </Popover>
             )}
@@ -210,30 +212,32 @@ export const PlayerControls = React.memo(function PlayerControls({
                           </Button>
                       </div>
                       {subtitles.length > 0 ? (
-                          <RadioGroup value={activeSubtitle} onValueChange={onSubtitleChange}>
-                              <div className="flex items-center space-x-2">
-                                  <RadioGroupItem value="-1" id="sub-off" />
-                                  <Label htmlFor="sub-off">Off</Label>
-                              </div>
-                              {subtitles.map(sub => (
-                                  <div key={sub.id} className="flex items-center justify-between space-x-2">
-                                      <div className="flex items-center space-x-2 flex-1">
-                                          <RadioGroupItem value={sub.id} id={`sub-${sub.id}`} />
-                                          <Label htmlFor={`sub-${sub.id}`} className="truncate">{sub.name}</Label>
-                                      </div>
-                                      {sub.type === 'external' && onSubtitleRemove && (
-                                          <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={() => onSubtitleRemove(sub.id)}
-                                              className="h-6 w-6 p-0"
-                                          >
-                                              <X className="h-3 w-3" />
-                                          </Button>
-                                      )}
-                                  </div>
-                              ))}
-                          </RadioGroup>
+                          <div className="max-h-48 overflow-y-auto overscroll-contain pr-1">
+                            <RadioGroup value={activeSubtitle} onValueChange={onSubtitleChange}>
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="-1" id="sub-off" />
+                                    <Label htmlFor="sub-off">Off</Label>
+                                </div>
+                                {subtitles.map(sub => (
+                                    <div key={sub.id} className="flex items-center justify-between space-x-2">
+                                        <div className="flex items-center space-x-2 flex-1">
+                                            <RadioGroupItem value={sub.id} id={`sub-${sub.id}`} />
+                                            <Label htmlFor={`sub-${sub.id}`} className="truncate">{sub.name}</Label>
+                                        </div>
+                                        {sub.type === 'external' && onSubtitleRemove && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => onSubtitleRemove(sub.id)}
+                                                className="h-6 w-6 p-0"
+                                            >
+                                                <X className="h-3 w-3" />
+                                            </Button>
+                                        )}
+                                    </div>
+                                ))}
+                            </RadioGroup>
+                          </div>
                       ) : (
                           <p className="text-sm text-muted-foreground text-center py-2">
                               No subtitles available
