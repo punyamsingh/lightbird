@@ -81,9 +81,11 @@ async function handleMessage(event: MessageEvent<WorkerInbound>): Promise<void> 
       try {
         await ff.writeFile(payload.fileName, await fetchFile(payload.file));
         try {
-          await ff.exec(['-i', payload.fileName, '-f', 'null', '-']);
+          // No output specified — FFmpeg reads container headers and exits
+          // with code 1. That's expected; stream info is in the captured logs.
+          await ff.exec(['-i', payload.fileName]);
         } catch {
-          // FFmpeg exits non-zero when output is /dev/null — expected
+          // Non-zero exit is expected when no output file is given
         }
         self.postMessage({ id, type: 'PROBE_DONE', logs: logs.join('\n') } satisfies WorkerOutbound);
       } finally {
@@ -127,8 +129,9 @@ async function handleMessage(event: MessageEvent<WorkerInbound>): Promise<void> 
         await ff.writeFile(payload.fileName, await fetchFile(payload.file));
 
         try {
-          await ff.exec(['-i', payload.fileName, '-f', 'null', '-']);
-        } catch { /* expected */ }
+          // Header-only probe to discover streams before remuxing
+          await ff.exec(['-i', payload.fileName]);
+        } catch { /* non-zero exit expected with no output */ }
 
         outputName = `output_${Date.now()}.mp4`;
         await ff.exec([
