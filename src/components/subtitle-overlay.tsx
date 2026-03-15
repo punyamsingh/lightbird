@@ -84,7 +84,7 @@ export function SubtitleOverlay({ videoRef, activeSubtitle }: SubtitleOverlayPro
       <div
         className="text-white text-center whitespace-pre-line"
         style={{
-          fontSize: "1.5625em",
+          fontSize: "2em",
           lineHeight: "normal",
           fontWeight: "bolder",
           fontFamily: "Netflix Sans, Helvetica Neue, Helvetica, Arial, sans-serif",
