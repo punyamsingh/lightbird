@@ -426,7 +426,7 @@ export class MKVPlayer {
       ) as HTMLTrackElement | null;
 
       if (existing) {
-        existing.track.mode = 'showing';
+        existing.track.mode = 'hidden';
         return;
       }
 
@@ -444,8 +444,8 @@ export class MKVPlayer {
       track.setAttribute('data-mkv-id', trackId);
       this.videoElement.appendChild(track);
 
-      // Enable only this track
-      track.track.mode = 'showing';
+      // Enable only this track (hidden so our custom overlay can render cues)
+      track.track.mode = 'hidden';
     } catch (error) {
       console.error('MKVPlayer: Failed to extract subtitle', error);
     }
