@@ -78,8 +78,14 @@ export function SubtitleOverlay({ videoRef, activeSubtitle }: SubtitleOverlayPro
   return (
     <div className="absolute left-0 right-0 bottom-4 flex justify-center pointer-events-none z-10 px-8 translate-y-0 group-hover:-translate-y-24 transition-transform duration-300 ease-in-out">
       <div
-        className="bg-black/75 text-white text-base font-medium px-4 py-1.5 rounded text-center whitespace-pre-line leading-snug"
-        style={{ textShadow: "0 1px 4px rgba(0,0,0,1), 0 0 8px rgba(0,0,0,0.8)" }}
+        className="text-white text-center whitespace-pre-line"
+        style={{
+          fontSize: "25px",
+          lineHeight: "normal",
+          fontWeight: "bolder",
+          fontFamily: "Netflix Sans, Helvetica Neue, Helvetica, Arial, sans-serif",
+          textShadow: "#000000 0px 0px 7px",
+        }}
       >
         {cueText}
       </div>
