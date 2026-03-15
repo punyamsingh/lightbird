@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import {
   Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward,
   FastForward, Rewind, RotateCcw, Settings2, Subtitles, Camera, AudioLines, Plus, X,
-  Info, Keyboard, List, PictureInPicture2
+  Info, Keyboard, List, PictureInPicture2, Loader2
 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { cn } from "@/lib/utils";
@@ -47,6 +47,7 @@ interface PlayerControlsProps {
   onZoomChange: (zoom: number) => void;
   onSubtitleChange: (id: string) => void;
   onAudioTrackChange: (id: string) => void;
+  tracksLoading?: boolean;
   onSubtitleUpload?: () => void;
   onSubtitleRemove?: (id: string) => void;
   onShowInfo?: () => void;
@@ -71,7 +72,8 @@ export const PlayerControls = React.memo(function PlayerControls({
   chapters = [], currentChapter = null,
   onPlayPause, onSeek, onVolumeChange, onMuteToggle, onPlaybackRateChange, onLoopToggle,
   onFullScreenToggle, onFrameStep, onScreenshot, onNext, onPrevious, onFiltersChange,
-  onZoomChange, onSubtitleChange, onAudioTrackChange, onSubtitleUpload, onSubtitleRemove,
+  onZoomChange, onSubtitleChange, onAudioTrackChange, tracksLoading = false,
+  onSubtitleUpload, onSubtitleRemove,
   onShowInfo, onOpenShortcuts, onGoToChapter, onTogglePiP, isPiP = false, pipSupported = false,
 }: PlayerControlsProps) {
   const formattedProgress = useMemo(() => formatTime(progress), [progress]);
@@ -174,6 +176,7 @@ export const PlayerControls = React.memo(function PlayerControls({
                 <PopoverTrigger asChild>
                     <Button variant="ghost" size="icon" className="relative">
                         <AudioLines />
+                        {tracksLoading && <Loader2 className="absolute top-0 right-0 h-2.5 w-2.5 animate-spin text-primary" />}
                     </Button>
                 </PopoverTrigger>
                 <PopoverContent>
@@ -194,7 +197,10 @@ export const PlayerControls = React.memo(function PlayerControls({
               <PopoverTrigger asChild>
                   <Button variant="ghost" size="icon" className="relative">
                       <Subtitles />
-                      {activeSubtitle !== '-1' && <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-primary ring-2 ring-background" />}
+                      {tracksLoading
+                        ? <Loader2 className="absolute top-0 right-0 h-2.5 w-2.5 animate-spin text-primary" />
+                        : activeSubtitle !== '-1' && <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-primary ring-2 ring-background" />
+                      }
                   </Button>
               </PopoverTrigger>
               <PopoverContent className="w-64">
