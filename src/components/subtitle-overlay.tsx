@@ -48,7 +48,11 @@ export function SubtitleOverlay({ videoRef, activeSubtitle }: SubtitleOverlayPro
 
       textTrack.addEventListener("cuechange", handleCueChange);
       handleCueChange();
+      // The browser may not have populated activeCues yet when the track
+      // mode just changed — schedule a deferred check to catch that race.
+      const deferredCheck = setTimeout(handleCueChange, 0);
       cueChangeCleanup = () => {
+        clearTimeout(deferredCheck);
         textTrack.removeEventListener("cuechange", handleCueChange);
         setCueText("");
       };
@@ -80,7 +84,7 @@ export function SubtitleOverlay({ videoRef, activeSubtitle }: SubtitleOverlayPro
       <div
         className="text-white text-center whitespace-pre-line"
         style={{
-          fontSize: "25px",
+          fontSize: "1.5625em",
           lineHeight: "normal",
           fontWeight: "bolder",
           fontFamily: "Netflix Sans, Helvetica Neue, Helvetica, Arial, sans-serif",
