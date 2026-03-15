@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "copy:ffmpeg": "node scripts/copy-ffmpeg-wasm.js",
+    "predev": "npm run copy:ffmpeg",
     "dev": "next dev -p 9002",
+    "prebuild": "npm run copy:ffmpeg",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -16,6 +19,7 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@ffmpeg/core": "^0.12.6",
     "@ffmpeg/ffmpeg": "^0.12.10",
     "@ffmpeg/util": "^0.12.1",
     "@hookform/resolvers": "^4.1.3",

@@ -50,7 +50,9 @@ async function getWorkerFFmpeg(): Promise<FFmpeg> {
   if (ffmpeg) return ffmpeg;
 
   ffmpeg = new FFmpeg();
-  const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+  // Load from our own origin (public/ffmpeg/) — avoids COEP restrictions on
+  // cross-origin fetches that would block unpkg.com at runtime.
+  const baseURL = '/ffmpeg';
   await ffmpeg.load({
     coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
     wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
