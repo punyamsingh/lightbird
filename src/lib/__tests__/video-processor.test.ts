@@ -81,3 +81,42 @@ describe('createVideoPlayer', () => {
     expect(player.getAudioTracks()).toEqual([]);
   });
 });
+
+describe('tracksReady adapter surface', () => {
+  it('SimplePlayerAdapter (MP4) does not expose tracksReady — tracks are ready synchronously after initialize()', () => {
+    const player = createVideoPlayer(makeFile('video.mp4'));
+    // SimplePlayerAdapter has no tracksReady property.
+    // Callers guard with optional chaining (player.tracksReady?.then(...)) safely.
+    expect(player.tracksReady).toBeUndefined();
+  });
+
+  it('MKVPlayerAdapter (MKV) exposes tracksReady as a Promise even before initialize()', () => {
+    const player = createVideoPlayer(makeFile('video.mkv', 'video/x-matroska'));
+    // MKVPlayer initialises tracksReady to Promise.resolve() in the class field
+    expect(player.tracksReady).toBeInstanceOf(Promise);
+  });
+
+  it('MKVPlayerAdapter tracksReady resolves after initialize()', async () => {
+    const player = createVideoPlayer(makeFile('video.mkv', 'video/x-matroska'));
+    const videoEl = document.createElement('video');
+    await player.initialize(videoEl);
+    // In the test environment the worker is unavailable so the REMUX path hits
+    // the catch block; tracksReady stays as the initial Promise.resolve().
+    await expect(player.tracksReady).resolves.toBeUndefined();
+  });
+
+  it('player.tracksReady?.then() is safe on MP4 (undefined) and resolves for MKV', async () => {
+    const mp4Player = createVideoPlayer(makeFile('video.mp4'));
+    const mkvPlayer = createVideoPlayer(makeFile('video.mkv', 'video/x-matroska'));
+    const videoEl = document.createElement('video');
+    await mkvPlayer.initialize(videoEl);
+
+    // MP4: optional chain short-circuits on undefined — no throw, returns undefined
+    const mp4Result = await mp4Player.tracksReady?.then(() => 'resolved');
+    expect(mp4Result).toBeUndefined();
+
+    // MKV: optional chain runs .then() — resolves to the mapped value
+    const mkvResult = await mkvPlayer.tracksReady?.then(() => 'resolved');
+    expect(mkvResult).toBe('resolved');
+  });
+});
