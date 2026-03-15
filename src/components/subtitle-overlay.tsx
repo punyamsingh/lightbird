@@ -17,45 +17,59 @@ export function SubtitleOverlay({ videoRef, activeSubtitle }: SubtitleOverlayPro
       return;
     }
 
-    const trackElements = Array.from(video.querySelectorAll("track"));
-    const targetIdx = trackElements.findIndex(
-      (el) => el.getAttribute("data-id") === activeSubtitle
-    );
-    if (targetIdx === -1) {
-      setCueText("");
-      return;
-    }
+    let cueChangeCleanup: (() => void) | null = null;
 
-    const textTrack = video.textTracks[targetIdx];
-    if (!textTrack) {
-      setCueText("");
-      return;
-    }
+    function subscribeToTrack(): boolean {
+      const trackElements = Array.from(video!.querySelectorAll("track"));
+      const targetIdx = trackElements.findIndex(
+        (el) => el.getAttribute("data-id") === activeSubtitle
+      );
+      if (targetIdx === -1) return false;
 
-    const handleCueChange = () => {
-      const activeCues = textTrack.activeCues;
-      if (!activeCues || activeCues.length === 0) {
+      const textTrack = video!.textTracks[targetIdx];
+      if (!textTrack) return false;
+
+      const handleCueChange = () => {
+        const activeCues = textTrack.activeCues;
+        if (!activeCues || activeCues.length === 0) {
+          setCueText("");
+          return;
+        }
+        const texts: string[] = [];
+        for (let i = 0; i < activeCues.length; i++) {
+          const cue = activeCues[i] as VTTCue;
+          const cleaned = cue.text
+            .replace(/<br\s*\/?>/gi, "\n")
+            .replace(/<[^>]+>/g, "");
+          texts.push(cleaned);
+        }
+        setCueText(texts.join("\n"));
+      };
+
+      textTrack.addEventListener("cuechange", handleCueChange);
+      handleCueChange();
+      cueChangeCleanup = () => {
+        textTrack.removeEventListener("cuechange", handleCueChange);
         setCueText("");
-        return;
-      }
-      const texts: string[] = [];
-      for (let i = 0; i < activeCues.length; i++) {
-        const cue = activeCues[i] as VTTCue;
-        // Preserve line breaks, strip WebVTT markup tags
-        const cleaned = cue.text
-          .replace(/<br\s*\/?>/gi, "\n")
-          .replace(/<[^>]+>/g, "");
-        texts.push(cleaned);
-      }
-      setCueText(texts.join("\n"));
-    };
+      };
+      return true;
+    }
 
-    textTrack.addEventListener("cuechange", handleCueChange);
-    handleCueChange();
+    if (subscribeToTrack()) {
+      return () => cueChangeCleanup?.();
+    }
+
+    // Track not in DOM yet (async MKV extraction) — wait for it
+    const observer = new MutationObserver(() => {
+      if (subscribeToTrack()) {
+        observer.disconnect();
+      }
+    });
+    observer.observe(video, { childList: true });
 
     return () => {
-      textTrack.removeEventListener("cuechange", handleCueChange);
-      setCueText("");
+      observer.disconnect();
+      cueChangeCleanup?.();
     };
   }, [videoRef, activeSubtitle]);
 
