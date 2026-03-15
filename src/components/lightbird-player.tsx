@@ -377,19 +377,30 @@ const LightBirdPlayer = () => {
   const handleFileChange = async (files: FileList) => {
     const { videoFiles, subtitleFiles } = playlist.parseFiles(files);
     if (videoFiles.length === 0) return;
-    const videoFile = videoFiles[0];
 
-    const validation = validateFile(videoFile);
-    if (!validation.valid) {
-      toast({ title: "Cannot load file", description: validation.reason, variant: "destructive" });
-      return;
+    const validVideoFiles: File[] = [];
+    for (const file of videoFiles) {
+      const validation = validateFile(file);
+      if (!validation.valid) {
+        toast({ title: "Cannot load file", description: validation.reason, variant: "destructive" });
+      } else {
+        validVideoFiles.push(file);
+      }
     }
+    if (validVideoFiles.length === 0) return;
 
     if (subtitleFiles.length > 0) {
-      subtitleFilesMapRef.current.set(videoFile.name, subtitleFiles);
+      subtitleFilesMapRef.current.set(validVideoFiles[0].name, subtitleFiles);
     }
-    playlist.replaceWithFile(videoFile);
-    await processFile(videoFile, subtitleFiles);
+
+    const prevLen = playlist.playlist.length;
+    await playlist.addFiles(validVideoFiles);
+
+    // If nothing is playing, start the first newly added file
+    if (playlist.currentIndex === null) {
+      playlist.selectItem(prevLen);
+      await processFile(validVideoFiles[0], subtitleFiles);
+    }
   };
 
   const handleFolderFilesAdded = useCallback(
