@@ -71,6 +71,7 @@ const LightBirdPlayer = () => {
   const [playerError, setPlayerError] = useState<ParsedMediaError | null>(null);
   const [cancellableProcessing, setCancellableProcessing] = useState(false);
   const [mediaThumbnail, setMediaThumbnail] = useState<string | null>(null);
+  const [tracksLoading, setTracksLoading] = useState(false);
 
   const shortcutHandlers = useMemo(() => ({
     'play-pause': () => playback.togglePlay(),
@@ -159,6 +160,7 @@ const LightBirdPlayer = () => {
     setLoadingMessage("Initializing player...");
     setProcessingProgress(0);
     setPlayerError(null);
+    setTracksLoading(false);
     progressEstimatorRef.current = new ProgressEstimator(file.size);
     setProcessingEta(null);
     setProcessingThroughput(null);
@@ -198,14 +200,18 @@ const LightBirdPlayer = () => {
       setProcessingProgress(0);
 
       // On the MKV native path the probe runs after initialize() returns.
-      // Refresh track state once it completes without blocking the UI.
-      player.tracksReady?.then(() => {
-        if (playerRef.current !== player) return; // player was replaced
-        subtitles.importSubtitles(player.getSubtitles());
-        const updatedTracks = player.getAudioTracks();
-        setAudioTracks(updatedTracks);
-        setActiveAudioTrack(updatedTracks[0]?.id || "0");
-      }).catch(() => {});
+      // Show a small loader on the audio/subtitle buttons while it's in flight.
+      if (player.tracksReady) {
+        setTracksLoading(true);
+        player.tracksReady.then(() => {
+          if (playerRef.current !== player) { setTracksLoading(false); return; }
+          subtitles.importSubtitles(player.getSubtitles());
+          const updatedTracks = player.getAudioTracks();
+          setAudioTracks(updatedTracks);
+          setActiveAudioTrack(updatedTracks[0]?.id || "0");
+          setTracksLoading(false);
+        }).catch(() => { setTracksLoading(false); });
+      }
     } catch (error) {
       if (!(error instanceof CancellationError)) {
         console.error(error);
@@ -634,6 +640,7 @@ const LightBirdPlayer = () => {
             activeSubtitle={subtitles.activeSubtitle}
             audioTracks={audioTracks}
             activeAudioTrack={activeAudioTrack}
+            tracksLoading={tracksLoading}
             onPlayPause={playback.togglePlay}
             onSeek={playback.seek}
             onVolumeChange={playback.setVolume}
