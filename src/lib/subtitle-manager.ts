@@ -182,7 +182,7 @@ export class UniversalSubtitleManager {
     for (let i = 0; i < trackElements.length; i++) {
       const trackElement = trackElements[i] as HTMLTrackElement;
       if (trackElement.getAttribute("data-id") === id) {
-        const textTrack = tracks[i];
+        const textTrack = trackElement.track;
         if (textTrack) {
           if (trackElement.readyState === 2) {
             textTrack.mode = "hidden";

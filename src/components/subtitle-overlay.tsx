@@ -46,13 +46,41 @@ export function SubtitleOverlay({ videoRef, activeSubtitle }: SubtitleOverlayPro
         setCueText(texts.join("\n"));
       };
 
+      // Scan all loaded cues to find what's active at the current playback
+      // position. cuechange only fires on transitions, so without this seed
+      // step the player shows nothing until the next sentence boundary.
+      function seedFromCurrentTime() {
+        const allCues = textTrack.cues;
+        if (!allCues) return;
+        const currentTime = video!.currentTime;
+        const texts: string[] = [];
+        for (let i = 0; i < allCues.length; i++) {
+          const cue = allCues[i] as VTTCue;
+          if (cue.startTime <= currentTime && cue.endTime > currentTime) {
+            texts.push(
+              cue.text.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "")
+            );
+          }
+        }
+        setCueText(texts.join("\n"));
+      }
+
       textTrack.addEventListener("cuechange", handleCueChange);
-      handleCueChange();
-      // The browser may not have populated activeCues yet when the track
-      // mode just changed — schedule a deferred check to catch that race.
-      const deferredCheck = setTimeout(handleCueChange, 0);
+
+      const trackEl = trackElements[targetIdx];
+      if (trackEl.readyState === 2) {
+        // Cues already loaded — seed immediately.
+        seedFromCurrentTime();
+      } else {
+        // Wait for the VTT to finish parsing, then seed.
+        const onLoad = () => {
+          seedFromCurrentTime();
+          trackEl.removeEventListener("load", onLoad);
+        };
+        trackEl.addEventListener("load", onLoad);
+      }
+
       cueChangeCleanup = () => {
-        clearTimeout(deferredCheck);
         textTrack.removeEventListener("cuechange", handleCueChange);
         setCueText("");
       };
