@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 56" fill="none">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&amp;display=swap');
+    </style>
+    <linearGradient id="bird-g" x1="45" y1="30" x2="7" y2="30" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#50E0FF"/>
+      <stop offset="45%"  stop-color="#0088EE"/>
+      <stop offset="100%" stop-color="#003399"/>
+    </linearGradient>
+    <linearGradient id="text-g" x1="56" y1="0" x2="280" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#40DDFF"/>
+      <stop offset="100%" stop-color="#CCEEFF"/>
+    </linearGradient>
+    <filter id="bird-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Wake / speed lines behind bird -->
+  <line x1="2"  y1="27" x2="10" y2="27" stroke="#0077BB" stroke-width="1.2" stroke-linecap="round" opacity="0.5"/>
+  <line x1="2"  y1="30" x2="14" y2="30" stroke="#0099CC" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+  <line x1="2"  y1="33" x2="10" y2="33" stroke="#0077BB" stroke-width="1.2" stroke-linecap="round" opacity="0.5"/>
+
+  <!-- Geometric swift (scaled ×1.6 from 32-space, centered in 56px height) -->
+  <!-- Original path M27,16 … scaled ×1.6 and offset to (x-1.5, y+4) -->
+  <path
+    d="M45,30 L24,25 L7,12 L20,28 L18,30 L20,31 L7,47 L24,34 Z"
+    fill="url(#bird-g)"
+    filter="url(#bird-glow)"
+  />
+  <!-- Beak light point -->
+  <circle cx="45" cy="30" r="2.5" fill="#AAEEFF" opacity="0.9"/>
+
+  <!-- LIGHTBIRD wordmark -->
+  <text
+    x="57"
+    y="39"
+    font-family="Orbitron, 'Courier New', monospace"
+    font-weight="900"
+    font-size="26"
+    letter-spacing="3"
+    fill="url(#text-g)"
+  >LIGHTBIRD</text>
+</svg>
