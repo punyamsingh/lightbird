@@ -1,0 +1,207 @@
+export function Logo({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 560 200"
+      fill="none"
+      role="img"
+      aria-label="LightBird"
+      className={className}
+    >
+      <defs>
+        {/* Feather gradient: white-cyan at base → transparent deep-blue at tips */}
+        <linearGradient id="lb-fg" x1="155" y1="125" x2="75" y2="15" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#E8F8FF"/>
+          <stop offset="20%"  stopColor="#22DDFF"/>
+          <stop offset="60%"  stopColor="#0088CC"/>
+          <stop offset="100%" stopColor="#002266" stopOpacity="0"/>
+        </linearGradient>
+
+        {/* Badge frame gradient */}
+        <linearGradient id="lb-bfg" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%"   stopColor="#0077AA"/>
+          <stop offset="35%"  stopColor="#00CCEE"/>
+          <stop offset="65%"  stopColor="#00AADD"/>
+          <stop offset="100%" stopColor="#006699"/>
+        </linearGradient>
+
+        {/* Text gradient */}
+        <linearGradient id="lb-tg" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%"   stopColor="#00BBEE"/>
+          <stop offset="50%"  stopColor="#55EEFF"/>
+          <stop offset="100%" stopColor="#00AADD"/>
+        </linearGradient>
+
+        {/* Head interior ambient */}
+        <radialGradient id="lb-hag" cx="62%" cy="50%" r="55%">
+          <stop offset="0%"   stopColor="#00293F" stopOpacity="0.65"/>
+          <stop offset="100%" stopColor="#000810" stopOpacity="0"/>
+        </radialGradient>
+
+        {/* Atmospheric glow (wide) */}
+        <filter id="lb-fa" x="-200%" y="-200%" width="500%" height="500%">
+          <feGaussianBlur stdDeviation="20"/>
+        </filter>
+
+        {/* Medium glow */}
+        <filter id="lb-fm" x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur stdDeviation="5" result="b"/>
+          <feMerge>
+            <feMergeNode in="b"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+
+        {/* Sharp glow */}
+        <filter id="lb-fs" x="-25%" y="-25%" width="150%" height="150%">
+          <feGaussianBlur stdDeviation="1.8" result="b"/>
+          <feMerge>
+            <feMergeNode in="b"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+
+        {/* Intense neon (sparkles) */}
+        <filter id="lb-fn" x="-400%" y="-400%" width="900%" height="900%">
+          <feGaussianBlur stdDeviation="12" result="b1"/>
+          <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="b2"/>
+          <feMerge>
+            <feMergeNode in="b1"/>
+            <feMergeNode in="b1"/>
+            <feMergeNode in="b2"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+
+      {/* Atmospheric background glow */}
+      <ellipse cx="195" cy="108" rx="210" ry="88" fill="#0077AA" opacity="0.05" filter="url(#lb-fa)"/>
+
+      {/* === FEATHERS — 3 passes === */}
+
+      {/* Pass 1: Wide atmospheric halo */}
+      <g fill="#0055AA" opacity={0.22} filter="url(#lb-fa)">
+        <polygon points="159,122 18,5 151,124"/>
+        <polygon points="159,122 95,12 151,124"/>
+        <polygon points="158,121 72,18 152,123"/>
+        <polygon points="158,120 57,38 152,124"/>
+        <polygon points="157,120 52,64 153,124"/>
+        <polygon points="156,120 60,89 154,124"/>
+        <polygon points="155,120 68,109 155,124"/>
+        <polygon points="159,123 154,10 151,123"/>
+        <polygon points="159,123 166,20 152,123"/>
+        <polygon points="158,124 176,38 153,122"/>
+        <polygon points="158,122 184,58 154,123"/>
+        <polygon points="157,121 179,76 155,123"/>
+      </g>
+
+      {/* Pass 2: Main feather fills with gradient */}
+      <g filter="url(#lb-fm)">
+        <polygon points="159,122 18,5 151,124"   fill="url(#lb-fg)" opacity="0.94"/>
+        <polygon points="159,122 95,12 151,124"  fill="url(#lb-fg)" opacity="0.90"/>
+        <polygon points="158,121 72,18 152,123"  fill="url(#lb-fg)" opacity="0.92"/>
+        <polygon points="158,120 57,38 152,124"  fill="url(#lb-fg)" opacity="0.86"/>
+        <polygon points="157,120 52,64 153,124"  fill="url(#lb-fg)" opacity="0.80"/>
+        <polygon points="156,120 60,89 154,124"  fill="url(#lb-fg)" opacity="0.72"/>
+        <polygon points="155,120 68,109 155,124" fill="url(#lb-fg)" opacity="0.60"/>
+        <polygon points="159,123 154,10 151,123" fill="url(#lb-fg)" opacity="0.82"/>
+        <polygon points="159,123 166,20 152,123" fill="url(#lb-fg)" opacity="0.76"/>
+        <polygon points="158,124 176,38 153,122" fill="url(#lb-fg)" opacity="0.68"/>
+        <polygon points="158,122 184,58 154,123" fill="#0077AA" opacity="0.52"/>
+        <polygon points="157,121 179,76 155,123" fill="#005F8A" opacity="0.42"/>
+      </g>
+
+      {/* Pass 3: Bright highlight spine lines */}
+      <g strokeLinecap="round" filter="url(#lb-fs)">
+        <line x1="155" y1="122" x2="18"  y2="5"   stroke="#E0F4FF" strokeWidth="0.8" opacity="0.82"/>
+        <line x1="155" y1="122" x2="95"  y2="12"  stroke="#CCEEFF" strokeWidth="0.8" opacity="0.78"/>
+        <line x1="155" y1="121" x2="72"  y2="18"  stroke="#BBDDFF" strokeWidth="0.8" opacity="0.80"/>
+        <line x1="155" y1="120" x2="57"  y2="38"  stroke="#AACCFF" strokeWidth="0.8" opacity="0.74"/>
+        <line x1="155" y1="120" x2="52"  y2="64"  stroke="#99BBEE" strokeWidth="0.7" opacity="0.66"/>
+        <line x1="155" y1="120" x2="60"  y2="89"  stroke="#88AADE" strokeWidth="0.6" opacity="0.58"/>
+        <line x1="155" y1="122" x2="154" y2="10"  stroke="#DDEEFF" strokeWidth="0.8" opacity="0.72"/>
+        <line x1="155" y1="123" x2="166" y2="20"  stroke="#CCDDFF" strokeWidth="0.7" opacity="0.65"/>
+        <line x1="155" y1="123" x2="176" y2="38"  stroke="#BBCCFF" strokeWidth="0.6" opacity="0.58"/>
+      </g>
+
+      {/* === BIRD HEAD === */}
+      <path
+        d="M255,103 C238,89 216,81 196,79 C177,77 160,84 154,94 C149,104 152,116 160,122 C167,128 180,131 197,129 C214,127 235,119 250,108 Z"
+        fill="#030C18" stroke="#003850" strokeWidth="0.8" opacity="0.98"
+      />
+      {/* Interior ambient teal */}
+      <path
+        d="M255,103 C238,89 216,81 196,79 C177,77 160,84 154,94 C149,104 152,116 160,122 C167,128 180,131 197,129 C214,127 235,119 250,108 Z"
+        fill="url(#lb-hag)"
+      />
+      {/* Brow accent */}
+      <path d="M230,86 Q242,84 254,92" stroke="#004F72" strokeWidth="0.9" fill="none" opacity="0.65"/>
+      {/* Jaw accent */}
+      <path d="M232,119 Q243,119 252,110" stroke="#003D58" strokeWidth="0.7" fill="none" opacity="0.55"/>
+
+      {/* === BEAK === */}
+      <path d="M255,103 L287,98 L284,109 L255,112 Z"
+            fill="#030C18" stroke="#0088BB" strokeWidth="1.2" filter="url(#lb-fs)"/>
+      <line x1="255" y1="103" x2="287" y2="98" stroke="#00CCFF" strokeWidth="1.1" opacity="0.88" filter="url(#lb-fs)"/>
+      <line x1="255" y1="108" x2="279" y2="104" stroke="#010A14" strokeWidth="2.2"/>
+
+      {/* === EYE === */}
+      <circle cx="212" cy="92" r="7.5" fill="#020B16" stroke="#007AAA" strokeWidth="1.6" filter="url(#lb-fm)"/>
+      <circle cx="212" cy="92" r="4.2" fill="#001A38"/>
+      <circle cx="212" cy="92" r="2.2" fill="#0044AA" filter="url(#lb-fs)"/>
+      <circle cx="214" cy="90" r="1.4" fill="#CCF0FF" opacity="0.95"/>
+
+      {/* === BADGE BACKGROUND === */}
+      <path d="M238,84 L510,82 L544,96 L546,130 L514,146 L238,148 L221,134 L219,98 Z"
+            fill="#010508" fillOpacity="0.95"/>
+
+      {/* === BADGE OUTER FRAME === */}
+      <path d="M238,84 L510,82 L544,96 L546,130 L514,146 L238,148 L221,134 L219,98 Z"
+            stroke="url(#lb-bfg)" strokeWidth="1.8" fill="none" filter="url(#lb-fs)"/>
+
+      {/* === BADGE INNER FRAME === */}
+      <path d="M248,93 L506,91 L534,103 L535,123 L508,137 L248,139 L235,128 L233,106 Z"
+            stroke="#009FCC" strokeWidth="1" fill="none" filter="url(#lb-fs)"/>
+
+      {/* === CORNER ACCENT MARKS === */}
+      {/* Top-right outer */}
+      <polyline points="510,82 522,80" stroke="#00E5FF" strokeWidth="1.6" fill="none" filter="url(#lb-fs)"/>
+      <polyline points="544,96 545,84" stroke="#00E5FF" strokeWidth="1.6" fill="none" filter="url(#lb-fs)"/>
+      {/* Bottom-right outer */}
+      <polyline points="514,146 526,148" stroke="#00CCFF" strokeWidth="1.6" fill="none" filter="url(#lb-fs)"/>
+      <polyline points="546,130 547,142" stroke="#00CCFF" strokeWidth="1.6" fill="none" filter="url(#lb-fs)"/>
+      {/* Inner corner ticks */}
+      <polyline points="506,91 515,90" stroke="#0099BB" strokeWidth="1" fill="none" opacity="0.7" filter="url(#lb-fs)"/>
+      <polyline points="534,103 535,94" stroke="#0099BB" strokeWidth="1" fill="none" opacity="0.7" filter="url(#lb-fs)"/>
+      <polyline points="508,137 517,138" stroke="#0099BB" strokeWidth="1" fill="none" opacity="0.7" filter="url(#lb-fs)"/>
+      <polyline points="535,123 536,132" stroke="#0099BB" strokeWidth="1" fill="none" opacity="0.7" filter="url(#lb-fs)"/>
+      {/* Center top/bottom dashes */}
+      <line x1="382" y1="82"  x2="382" y2="93"  stroke="#0077AA" strokeWidth="1" opacity="0.55" filter="url(#lb-fs)"/>
+      <line x1="382" y1="137" x2="382" y2="148" stroke="#0077AA" strokeWidth="1" opacity="0.55" filter="url(#lb-fs)"/>
+
+      {/* === LIGHTBIRD TEXT ===
+          Orbitron is loaded by the page so it renders correctly inline */}
+      <text
+        x="391"
+        y="126"
+        textAnchor="middle"
+        fontFamily="Orbitron, monospace"
+        fontWeight="900"
+        fontSize="34"
+        letterSpacing="5"
+        fill="url(#lb-tg)"
+        filter="url(#lb-fs)"
+      >
+        LIGHTBIRD
+      </text>
+
+      {/* === SPARKLES === */}
+      <circle cx="18"  cy="5"   r="2.5" fill="#CCEFFF" filter="url(#lb-fn)" opacity="0.90"/>
+      <circle cx="154" cy="10"  r="2.2" fill="#AADDFF" filter="url(#lb-fn)" opacity="0.80"/>
+      <circle cx="52"  cy="64"  r="1.6" fill="#88CCFF" filter="url(#lb-fn)" opacity="0.55"/>
+      <circle cx="287" cy="98"  r="2.2" fill="#99EEFF" filter="url(#lb-fn)" opacity="0.75"/>
+      {/* Feather base glow point */}
+      <circle cx="155" cy="122" r="10" fill="#11AADD" filter="url(#lb-fa)" opacity="0.28"/>
+    </svg>
+  );
+}

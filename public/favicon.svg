@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <!-- Feather gradient: white-cyan at base, transparent deep-blue at tips -->
+    <linearGradient id="fg" x1="18" y1="22" x2="5" y2="3" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#CCEEFF"/>
+      <stop offset="30%"  stop-color="#00CCFF"/>
+      <stop offset="75%"  stop-color="#0077BB"/>
+      <stop offset="100%" stop-color="#002266" stop-opacity="0"/>
+    </linearGradient>
+    <!-- Glow filters -->
+    <filter id="gw" x="-200%" y="-200%" width="500%" height="500%">
+      <feGaussianBlur stdDeviation="3"/>
+    </filter>
+    <filter id="gm" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="1.2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="gs" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="0.6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Dark rounded background -->
+  <rect width="32" height="32" rx="6" fill="#06090F"/>
+
+  <!-- Atmospheric halo behind feathers -->
+  <g fill="#0066AA" opacity="0.25" filter="url(#gw)">
+    <polygon points="19,21 2,2 17,23"/>
+    <polygon points="19,21 6,5 17,23"/>
+    <polygon points="19,21 4,9 17,23"/>
+    <polygon points="19,21 3,14 17,23"/>
+    <polygon points="20,22 20,2 18,22"/>
+    <polygon points="20,22 24,4 18,22"/>
+  </g>
+
+  <!-- Main feather fills -->
+  <g filter="url(#gm)">
+    <polygon points="19,21 2,2 17,23"   fill="url(#fg)" opacity="0.92"/>
+    <polygon points="19,21 6,5 17,23"   fill="url(#fg)" opacity="0.88"/>
+    <polygon points="19,21 4,9 17,23"   fill="url(#fg)" opacity="0.85"/>
+    <polygon points="19,21 3,14 17,23"  fill="url(#fg)" opacity="0.78"/>
+    <polygon points="20,22 20,2 18,22"  fill="url(#fg)" opacity="0.80"/>
+    <polygon points="20,22 24,4 18,22"  fill="url(#fg)" opacity="0.70"/>
+    <polygon points="19,21 3,19 17,23"  fill="url(#fg)" opacity="0.58"/>
+  </g>
+
+  <!-- Bright highlight spine on each feather -->
+  <g stroke-linecap="round" filter="url(#gs)">
+    <line x1="18" y1="22" x2="2"  y2="2"  stroke="#DDEEFF" stroke-width="0.5" opacity="0.85"/>
+    <line x1="18" y1="22" x2="6"  y2="5"  stroke="#CCEEFF" stroke-width="0.5" opacity="0.80"/>
+    <line x1="18" y1="22" x2="4"  y2="9"  stroke="#BBDDFF" stroke-width="0.5" opacity="0.75"/>
+    <line x1="18" y1="22" x2="3"  y2="14" stroke="#AACCEE" stroke-width="0.5" opacity="0.65"/>
+    <line x1="18" y1="22" x2="20" y2="2"  stroke="#CCEEFF" stroke-width="0.5" opacity="0.70"/>
+    <line x1="18" y1="22" x2="24" y2="4"  stroke="#BBCCFF" stroke-width="0.5" opacity="0.60"/>
+  </g>
+
+  <!-- Bird head silhouette (dark, in front of feathers) -->
+  <path d="M30,16 C28,12 24,10 20,10 C17,10 15,12 14,15 C13,18 14,21 17,23 C19,25 22,25 25,23 C27,22 29,19 30,16 Z"
+        fill="#040D1A" stroke="#003A5C" stroke-width="0.5" opacity="0.98"/>
+
+  <!-- Beak -->
+  <path d="M30,16 L32,15 L32,18 L30,17 Z" fill="#040D1A" stroke="#0088BB" stroke-width="0.8" filter="url(#gs)"/>
+  <line x1="30" y1="16" x2="32" y2="15" stroke="#00CCFF" stroke-width="0.6" opacity="0.8" filter="url(#gs)"/>
+
+  <!-- Eye -->
+  <circle cx="25" cy="14" r="2.2" fill="#040D1A" stroke="#0088CC" stroke-width="1" filter="url(#gm)"/>
+  <circle cx="25" cy="14" r="1.1" fill="#003388" filter="url(#gs)"/>
+  <circle cx="26" cy="13" r="0.6" fill="#AAEEFF" opacity="0.95"/>
+
+  <!-- Feather-tip sparkles -->
+  <circle cx="2"  cy="2"  r="0.9" fill="#AADDFF" opacity="0.9" filter="url(#gm)"/>
+  <circle cx="20" cy="2"  r="0.8" fill="#AADDFF" opacity="0.8" filter="url(#gm)"/>
+</svg>
