@@ -69,6 +69,7 @@ await player.initialize(videoElement)
 | 9 | `09-dependency-cleanup.md` | Remove unused deps, audit what goes where |
 | 10 | `10-docs-page.md` | Build `/docs` route with installation, API reference, examples |
 | 11 | `11-npm-publishing.md` | README content, package.json metadata, publish checklist |
+| 12 | `12-cross-cutting-concerns.md` | CLAUDE.md update, CSS theme, copy-ffmpeg, .gitignore, LICENSE |
 
 ## Execution Order
 
@@ -77,5 +78,6 @@ Steps 6-7 make everything build and test again.
 Step 8 restores CI/CD.
 Step 9 is cleanup.
 Steps 10-11 are the public-facing deliverables.
+Step 12 runs in parallel with any phase — address each concern when its related phase is done.
 
 Total estimated effort: 2-3 focused sessions.

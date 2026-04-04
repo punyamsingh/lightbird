@@ -2,64 +2,15 @@
 
 ## Goal
 
-Remove unused dependencies and ensure each package only declares the dependencies it actually uses. This reduces install size for library consumers and eliminates phantom deps.
+Remove unused dependencies. Ensure each package declares only its own deps. Reduce install size for library consumers.
 
-## Current State
+## Definitive Audit: Unused Dependencies to REMOVE
 
-The current `package.json` has ~45 dependencies. Many are unused leftovers from the initial ShadCN scaffold or removed features (Firebase, Genkit, etc. were already removed in Plan 10, but several ShadCN-related deps remain).
+These are confirmed unused by grepping the entire `src/` directory:
 
-## Audit: What Goes Where
-
-### Dependencies that go to `packages/lightbird/`
-
-| Package | Type | Notes |
-|---------|------|-------|
-| `ass-compiler` | dependency | ASS/SSA subtitle parsing |
-| `chardet` | dependency | Encoding detection |
-| `@ffmpeg/ffmpeg` | optionalDependency | MKV remuxing |
-| `@ffmpeg/core` | optionalDependency | FFmpeg WASM core |
-| `@ffmpeg/util` | optionalDependency | FFmpeg utilities |
-
-### Dependencies that go to `packages/ui/`
-
-| Package | Type | Notes |
-|---------|------|-------|
-| `@dnd-kit/core` | dependency | Drag-and-drop |
-| `@dnd-kit/sortable` | dependency | Sortable lists |
-| `@dnd-kit/utilities` | dependency | DnD utilities |
-| `@radix-ui/react-dialog` | dependency | ShortcutSettingsDialog |
-| `@radix-ui/react-popover` | dependency | Chapter menu, audio track selector |
-| `@radix-ui/react-progress` | dependency | VideoOverlay progress bar |
-| `@radix-ui/react-scroll-area` | dependency | PlaylistPanel scroll |
-| `@radix-ui/react-select` | dependency | Speed selector, audio track |
-| `@radix-ui/react-separator` | dependency | Visual separators |
-| `@radix-ui/react-slider` | dependency | Volume, seek bar, subtitle offset |
-| `@radix-ui/react-slot` | dependency | Button component (Slot pattern) |
-| `@radix-ui/react-toast` | dependency | Toast notifications |
-| `@radix-ui/react-tooltip` | dependency | Button tooltips |
-| `@tanstack/react-virtual` | dependency | Playlist virtualization |
-| `class-variance-authority` | dependency | ShadCN component variants |
-| `clsx` | dependency | Class merging |
-| `lucide-react` | dependency | Icons |
-| `tailwind-merge` | dependency | Tailwind class dedup |
-| `tailwindcss-animate` | devDependency | Animation plugin |
-
-### Dependencies that go to `apps/web/`
-
-| Package | Type | Notes |
-|---------|------|-------|
-| `next` | dependency | Framework |
-| `react` | dependency | UI library |
-| `react-dom` | dependency | React DOM renderer |
-| `tailwindcss` | devDependency | Styling |
-| `postcss` | devDependency | CSS processing |
-| `typescript` | devDependency | Type checking |
-
-### Dependencies to REMOVE (unused)
-
-| Package | Why unused |
-|---------|-----------|
-| `date-fns` | Not imported anywhere in the codebase |
+| Package | Why it's unused |
+|---------|----------------|
+| `date-fns` | Not imported anywhere |
 | `dotenv` | Not imported anywhere |
 | `embla-carousel-react` | Not imported anywhere |
 | `react-day-picker` | Not imported anywhere |
@@ -67,74 +18,97 @@ The current `package.json` has ~45 dependencies. Many are unused leftovers from 
 | `@hookform/resolvers` | Not imported anywhere (depends on react-hook-form) |
 | `zod` | Not imported anywhere |
 
-### ShadCN UI components to VERIFY and likely REMOVE
+## Definitive Audit: ShadCN UI Components to DELETE
 
-Before deleting, grep for actual usage in player components:
+Confirmed by auditing all 9 player component import statements:
 
-| Package | Check import pattern | Likely verdict |
-|---------|---------------------|---------------|
-| `@radix-ui/react-accordion` | `from.*accordion` | REMOVE — not used by player |
-| `@radix-ui/react-alert-dialog` | `from.*alert-dialog` | REMOVE — not used by player |
-| `@radix-ui/react-avatar` | `from.*avatar` | REMOVE — not used by player |
-| `@radix-ui/react-checkbox` | `from.*checkbox` | CHECK — maybe shortcut settings? |
-| `@radix-ui/react-collapsible` | `from.*collapsible` | CHECK — maybe playlist? |
-| `@radix-ui/react-dropdown-menu` | `from.*dropdown-menu` | REMOVE — not used by player |
-| `@radix-ui/react-label` | `from.*label` | CHECK — maybe shortcut settings? |
-| `@radix-ui/react-menubar` | `from.*menubar` | REMOVE — not used by player |
-| `@radix-ui/react-radio-group` | `from.*radio-group` | REMOVE — not used by player |
-| `@radix-ui/react-switch` | `from.*switch` | CHECK — maybe settings? |
-| `@radix-ui/react-tabs` | `from.*tabs` | REMOVE — not used by player |
+| File | Verdict | Evidence |
+|------|---------|----------|
+| `ui/alert.tsx` | **DELETE** | Not imported by any player component |
+| `ui/badge.tsx` | **DELETE** | Not imported by any player component |
+| `ui/card.tsx` | **DELETE** | Not imported by any player component |
+| `ui/checkbox.tsx` | **DELETE** | Not imported by any player component |
+| `ui/collapsible.tsx` | **DELETE** | Not imported by any player component |
+| `ui/form.tsx` | **DELETE** | Not imported by any player component |
+| `ui/progress.tsx` | **DELETE** | Not imported by any player component |
+| `ui/separator.tsx` | **DELETE** | Not imported by any player component |
+| `ui/sheet.tsx` | **DELETE** | Not imported by any player component |
+| `ui/sidebar.tsx` | **DELETE** | Not imported by any player component |
+| `ui/skeleton.tsx` | **DELETE** | Not imported by any player component |
+| `ui/switch.tsx` | **DELETE** | Not imported by any player component |
+| `ui/table.tsx` | **DELETE** | Not imported by any player component |
+| `ui/textarea.tsx` | **DELETE** | Not imported by any player component |
 
-### ShadCN UI component files to REMOVE from `src/components/ui/`
+## Definitive Audit: ShadCN UI Components to KEEP
 
-Any `.tsx` file in `src/components/ui/` that isn't imported by a player component should be deleted (not moved to `packages/ui/`). Carry over only what's needed.
+| File | Used by |
+|------|---------|
+| `ui/button.tsx` | player-controls, playlist-panel, player-error-display, shortcut-settings-dialog |
+| `ui/slider.tsx` | player-controls |
+| `ui/popover.tsx` | player-controls |
+| `ui/tooltip.tsx` | player-controls, playlist-panel |
+| `ui/label.tsx` | player-controls |
+| `ui/radio-group.tsx` | player-controls |
+| `ui/scroll-area.tsx` | playlist-panel |
+| `ui/input.tsx` | playlist-panel |
+| `ui/select.tsx` | playlist-panel |
+| `ui/dialog.tsx` | shortcut-settings-dialog |
+| `ui/toast.tsx` | use-toast.ts, toaster.tsx |
+| `ui/toaster.tsx` | layout.tsx |
 
-## Execution Steps
+## Radix Dependencies to REMOVE from `@lightbird/ui`
 
-### 9.1 Grep for unused deps
+These Radix packages correspond to deleted ShadCN components:
 
-```bash
-# For each suspect dependency, search the entire codebase
-grep -r "date-fns" src/        # should return nothing
-grep -r "embla-carousel" src/  # should return nothing
-grep -r "react-day-picker" src/ # should return nothing
-grep -r "react-hook-form" src/ # should return nothing
-grep -r "zod" src/             # should return nothing
-grep -r "dotenv" src/          # should return nothing
-```
+| Package | Why |
+|---------|-----|
+| `@radix-ui/react-accordion` | No accordion component used |
+| `@radix-ui/react-alert-dialog` | No alert dialog used |
+| `@radix-ui/react-avatar` | No avatar used |
+| `@radix-ui/react-checkbox` | No checkbox used |
+| `@radix-ui/react-collapsible` | No collapsible used |
+| `@radix-ui/react-dropdown-menu` | No dropdown menu used |
+| `@radix-ui/react-menubar` | No menubar used |
+| `@radix-ui/react-progress` | No progress bar used |
+| `@radix-ui/react-separator` | No separator used |
+| `@radix-ui/react-switch` | No switch used |
+| `@radix-ui/react-tabs` | No tabs used |
 
-### 9.2 Grep for ShadCN component usage
+## Radix Dependencies to KEEP in `@lightbird/ui`
 
-```bash
-# For each Radix component, check if it's imported by a player component
-grep -r "accordion" src/components/lightbird-player.tsx src/components/player-controls.tsx src/components/playlist-panel.tsx
-# Repeat for each suspect package
-```
+| Package | Used by |
+|---------|---------|
+| `@radix-ui/react-dialog` | shortcut-settings-dialog |
+| `@radix-ui/react-label` | player-controls |
+| `@radix-ui/react-popover` | player-controls |
+| `@radix-ui/react-radio-group` | player-controls |
+| `@radix-ui/react-scroll-area` | playlist-panel |
+| `@radix-ui/react-select` | playlist-panel |
+| `@radix-ui/react-slider` | player-controls |
+| `@radix-ui/react-slot` | button component (Slot pattern) |
+| `@radix-ui/react-toast` | toast/toaster |
+| `@radix-ui/react-tooltip` | player-controls, playlist-panel |
 
-### 9.3 Remove unused deps
+## Execution Order
 
-After confirming they're unused, remove from the root `package.json` (before the monorepo migration) or from the relevant package (after migration).
+1. Delete 14 unused ShadCN component files from `src/components/ui/`
+2. Remove 7 unused npm packages from `package.json`
+3. Remove 11 unused Radix packages from `package.json`
+4. Run `pnpm install` to update lockfile
+5. Run `pnpm turbo test` to verify nothing breaks
+6. Run `pnpm turbo build` to verify build succeeds
 
-### 9.4 Delete unused ShadCN component files
+## Expected Savings
 
-Any file in `src/components/ui/` that is only imported by other unused ShadCN files (not by player components) gets deleted.
-
-## Expected Size Reduction
-
-Removing the 7 confirmed unused packages eliminates:
-- `date-fns`: ~72 kB gzip
-- `react-hook-form` + `@hookform/resolvers` + `zod`: ~45 kB gzip
-- `embla-carousel-react` + `react-day-picker`: ~30 kB gzip
-- `dotenv`: ~5 kB gzip
-
-**Total: ~150 kB reduction** from the app bundle, and none of these ever get into the library packages.
+- 7 unused packages: ~150 kB gzip removed from app bundle
+- 11 unused Radix packages: ~80 kB gzip removed from `@lightbird/ui` install
+- 14 deleted component files: cleaner codebase, faster IDE indexing
 
 ## Verification
 
-After this phase:
 - No unused dependencies in any `package.json`
 - Each package only declares its own dependencies
 - `pnpm install` has no peer dep warnings (except intentional optionals)
 - `pnpm turbo build` succeeds
 - `pnpm turbo test` passes
-- No unused `src/components/ui/*.tsx` files remain
+- No unused component files remain

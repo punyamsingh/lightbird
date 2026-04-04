@@ -33,46 +33,166 @@ Extract all framework-agnostic library code from `src/lib/` and `src/types/` int
 |--------|-------------|
 | `src/types/index.ts` | `packages/lightbird/src/types/index.ts` |
 
+## What Does NOT Move Here
+
+- `src/lib/utils.ts` (the `cn()` helper) — Tailwind utility, goes to `@lightbird/ui` (Phase 4)
+- No hooks — those move in Phase 3
+- No components — those move in Phase 4
+
 ## Code Changes Required
 
 ### 2.1 Remove `"use client"` directives
 
-Every file in `packages/lightbird/src/` must have `"use client"` removed. This is a Next.js-specific directive. A library doesn't dictate rendering strategy — the consuming app decides.
-
-Files that currently have `"use client"`:
+Remove from these files (they currently have it):
 - `video-processor.ts`
-- `subtitle-manager.ts`
-- `ass-renderer.ts`
-- `ffmpeg-singleton.ts`
-- `media-error.ts`
-- `keyboard-shortcuts.ts`
-- `progress-estimator.ts`
-- `subtitle-converter.ts`
-- `video-thumbnail.ts`
-- `video-info.ts`
 - `players/simple-player.ts`
 - `players/mkv-player.ts`
+- `ffmpeg-singleton.ts`
+- `subtitle-converter.ts`
+- `subtitle-manager.ts`
+- `subtitle-offset.ts`
+- `ass-renderer.ts`
+- `chapter-parser.ts`
+- `m3u-parser.ts`
 
-### 2.2 Replace `@/` import aliases with relative imports
+These files do NOT have `"use client"` (no change needed):
+- `workers/ffmpeg-worker.ts`
+- `media-error.ts`
+- `video-info.ts`
+- `video-thumbnail.ts`
+- `keyboard-shortcuts.ts`
+- `progress-estimator.ts`
+- `types/index.ts`
 
-Every `import ... from '@/types'` becomes `import ... from '../types'` (adjusted per file depth).
-Every `import ... from '@/lib/...'` becomes a relative import within the package.
+### 2.2 Exact Import Remapping — Every File
 
-**Mapping:**
+Each file's current imports and what they become:
 
-| In file | Old import | New import |
-|---------|-----------|------------|
-| `video-processor.ts` | `from '@/types'` | `from './types'` |
-| `video-processor.ts` | `from './players/simple-player'` | `from './players/simple-player'` (unchanged) |
-| `video-processor.ts` | `from './players/mkv-player'` | `from './players/mkv-player'` (unchanged) |
-| `simple-player.ts` | `from '@/types'` | `from '../types'` |
-| `mkv-player.ts` | `from '@/types'` | `from '../types'` |
-| `subtitle-manager.ts` | `from '@/types'` | `from '../types'` |
-| etc. | Pattern: `@/types` → relative | Adjust based on directory depth |
+**`video-processor.ts`** (destination: `src/video-processor.ts`)
+```
+OLD: import { SimplePlayer, type SimplePlayerFile } from './players/simple-player';
+NEW: import { SimplePlayer, type SimplePlayerFile } from './players/simple-player';  (unchanged — same relative path)
+
+OLD: import { MKVPlayer, type MKVPlayerFile } from './players/mkv-player';
+NEW: import { MKVPlayer, type MKVPlayerFile } from './players/mkv-player';  (unchanged)
+
+OLD: import type { AudioTrack, Subtitle, Chapter } from "@/types";
+NEW: import type { AudioTrack, Subtitle, Chapter } from "./types";
+```
+
+**`players/simple-player.ts`** (destination: `src/players/simple-player.ts`)
+```
+OLD: import type { AudioTrack, Subtitle } from "@/types";
+NEW: import type { AudioTrack, Subtitle } from "../types";
+```
+
+**`players/mkv-player.ts`** (destination: `src/players/mkv-player.ts`)
+```
+OLD: import type { AudioTrack, Subtitle, Chapter } from "@/types";
+NEW: import type { AudioTrack, Subtitle, Chapter } from "../types";
+
+OLD: import { SubtitleConverter } from "@/lib/subtitle-converter";
+NEW: import { SubtitleConverter } from "../subtitles/subtitle-converter";
+
+OLD: import { parseChaptersFromFFmpegLog } from "@/lib/chapter-parser";
+NEW: import { parseChaptersFromFFmpegLog } from "../parsers/chapter-parser";
+
+OLD: import type { WorkerInbound, WorkerOutbound } from "@/lib/workers/ffmpeg-worker";
+NEW: import type { WorkerInbound, WorkerOutbound } from "../workers/ffmpeg-worker";
+```
+
+**`workers/ffmpeg-worker.ts`** (destination: `src/workers/ffmpeg-worker.ts`)
+```
+import { FFmpeg } from '@ffmpeg/ffmpeg';         (unchanged — external dep)
+import { toBlobURL, fetchFile } from '@ffmpeg/util';  (unchanged — external dep)
+```
+No `@/` imports. No changes needed beyond removing `"use client"` if present (it's not).
+
+**`ffmpeg-singleton.ts`** (destination: `src/utils/ffmpeg-singleton.ts`)
+```
+import { FFmpeg } from '@ffmpeg/ffmpeg';     (unchanged — external dep)
+import { toBlobURL } from '@ffmpeg/util';    (unchanged — external dep)
+```
+No `@/` imports. Add config import (see 2.3).
+
+**`subtitle-converter.ts`** (destination: `src/subtitles/subtitle-converter.ts`)
+```
+No imports at all. Only remove "use client".
+```
+
+**`subtitle-manager.ts`** (destination: `src/subtitles/subtitle-manager.ts`)
+```
+OLD: import type { Subtitle, SubtitleCue } from "@/types";
+NEW: import type { Subtitle, SubtitleCue } from "../types";
+
+OLD: import { SubtitleConverter } from "./subtitle-converter";
+NEW: import { SubtitleConverter } from "./subtitle-converter";  (unchanged — same directory)
+
+OLD: import { applyOffsetToVtt, createOffsetVttUrl } from "./subtitle-offset";
+NEW: import { applyOffsetToVtt, createOffsetVttUrl } from "./subtitle-offset";  (unchanged)
+
+KEEP AS-IS: const chardet = require("chardet") as typeof import("chardet");
+```
+**Note:** `chardet` uses CommonJS `require()`. This works in Node and in bundlers but needs `esModuleInterop: true` in tsconfig (already set in our base config). tsup handles this correctly.
+
+**`subtitle-offset.ts`** (destination: `src/subtitles/subtitle-offset.ts`)
+```
+No imports at all. Only remove "use client".
+```
+
+**`ass-renderer.ts`** (destination: `src/subtitles/ass-renderer.ts`)
+```
+import { compile, type CompiledASS, type Dialogue, type CompiledASSStyle } from 'ass-compiler';
+(unchanged — external dep)
+```
+No `@/` imports.
+
+**`chapter-parser.ts`** (destination: `src/parsers/chapter-parser.ts`)
+```
+OLD: import type { Chapter } from "@/types";
+NEW: import type { Chapter } from "../types";
+```
+
+**`m3u-parser.ts`** (destination: `src/parsers/m3u-parser.ts`)
+```
+OLD: import type { PlaylistItem } from "@/types";
+NEW: import type { PlaylistItem } from "../types";
+```
+
+**`media-error.ts`** (destination: `src/utils/media-error.ts`)
+```
+No imports at all. No changes needed.
+```
+
+**`video-info.ts`** (destination: `src/utils/video-info.ts`)
+```
+OLD: import type { VideoMetadata } from "@/types";
+NEW: import type { VideoMetadata } from "../types";
+```
+
+**`video-thumbnail.ts`** (destination: `src/utils/video-thumbnail.ts`)
+```
+No imports at all. No changes needed.
+```
+
+**`keyboard-shortcuts.ts`** (destination: `src/utils/keyboard-shortcuts.ts`)
+```
+No imports at all. No changes needed.
+```
+
+**`progress-estimator.ts`** (destination: `src/utils/progress-estimator.ts`)
+```
+No imports at all. No changes needed.
+```
+
+**`types/index.ts`** (destination: `src/types/index.ts`)
+```
+No imports at all. No changes needed.
+```
 
 ### 2.3 Make FFmpeg CDN configurable
 
-Add to `packages/lightbird/src/config.ts`:
+Create new file `packages/lightbird/src/config.ts`:
 
 ```ts
 export interface LightBirdConfig {
@@ -90,14 +210,14 @@ export function getConfig(): LightBirdConfig {
 }
 ```
 
-Update `ffmpeg-singleton.ts` to read from config:
+Update `utils/ffmpeg-singleton.ts` to read from config:
 
 ```ts
 import { getConfig } from '../config'
 
 const defaultCDN = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd'
 
-// Use config.ffmpegCDN if set, otherwise default
+// Inside getFFmpeg(), use:
 const cdnBase = getConfig().ffmpegCDN || defaultCDN
 ```
 
@@ -122,21 +242,24 @@ export type { MKVPlayerFile } from './players/mkv-player'
 
 // Subtitle pipeline
 export { UniversalSubtitleManager } from './subtitles/subtitle-manager'
-export { convertSrtToVtt } from './subtitles/subtitle-converter'
-export { applySubtitleOffset } from './subtitles/subtitle-offset'
+export { SubtitleConverter } from './subtitles/subtitle-converter'
+export { applyOffsetToVtt, createOffsetVttUrl } from './subtitles/subtitle-offset'
 export { ASSRenderer } from './subtitles/ass-renderer'
 
 // Parsers
-export { parseChaptersFromFFmpegLog, parseVttChapters } from './parsers/chapter-parser'
-export { parseM3U, exportM3U } from './parsers/m3u-parser'
+export { parseChaptersFromFFmpegLog, parseChaptersFromVtt } from './parsers/chapter-parser'
+export { exportPlaylist, parseM3U8 } from './parsers/m3u-parser'
 
 // Utilities
 export { parseMediaError, validateFile } from './utils/media-error'
-export type { ParsedMediaError } from './utils/media-error'
-export { extractVideoMetadata } from './utils/video-info'
+export type { ParsedMediaError, MediaErrorType } from './utils/media-error'
+export { extractNativeMetadata } from './utils/video-info'
 export { captureVideoThumbnail } from './utils/video-thumbnail'
-export { loadShortcuts, saveShortcuts, matchShortcut, DEFAULT_SHORTCUTS } from './utils/keyboard-shortcuts'
-export type { ShortcutBinding } from './utils/keyboard-shortcuts'
+export {
+  loadShortcuts, saveShortcuts, matchesShortcut, isInteractiveElement,
+  formatShortcutKey, DEFAULT_SHORTCUTS
+} from './utils/keyboard-shortcuts'
+export type { ShortcutBinding, ShortcutAction } from './utils/keyboard-shortcuts'
 export { ProgressEstimator } from './utils/progress-estimator'
 export { getFFmpeg, resetFFmpeg } from './utils/ffmpeg-singleton'
 
@@ -154,6 +277,14 @@ export type {
 } from './types'
 ```
 
+**IMPORTANT:** The export names above match the ACTUAL function/class names in the source files:
+- `SubtitleConverter` (class with static methods), NOT `convertSrtToVtt`
+- `applyOffsetToVtt` and `createOffsetVttUrl`, NOT `applySubtitleOffset`
+- `extractNativeMetadata`, NOT `extractVideoMetadata`
+- `matchesShortcut` and `isInteractiveElement`, NOT `matchShortcut`
+- `exportPlaylist` and `parseM3U8`, NOT `parseM3U` and `exportM3U`
+- `parseChaptersFromVtt`, NOT `parseVttChapters`
+
 ### 2.5 Package.json
 
 See `06-build-config.md` for the full `package.json`. Key points:
@@ -166,14 +297,9 @@ See `06-build-config.md` for the full `package.json`. Key points:
 ## Verification
 
 After this phase:
-- `packages/lightbird/src/` contains all library code
-- All `"use client"` directives removed
-- All imports use relative paths (no `@/`)
-- `packages/lightbird/src/index.ts` exports the public API
-- Files compile with `tsc --noEmit`
-
-## What Does NOT Move
-
-- `src/lib/utils.ts` (the `cn()` helper) — this is a Tailwind utility, goes to `@lightbird/ui`
-- No hooks — those move in Phase 3
-- No components — those move in Phase 4
+- `packages/lightbird/src/` contains all 17 library files + types + config
+- All `"use client"` directives removed from the 10 files that have them
+- All `@/` imports replaced with exact relative paths as listed above
+- `packages/lightbird/src/index.ts` exports the public API with correct names
+- `tsc --noEmit` passes
+- `chardet` require() works correctly with esModuleInterop
