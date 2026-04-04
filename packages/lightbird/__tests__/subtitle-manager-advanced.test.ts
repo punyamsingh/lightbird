@@ -9,11 +9,6 @@ jest.mock('../src/subtitles/subtitle-converter', () => ({
   },
 }));
 
-// Mock chardet so tests don't need native Buffer
-jest.mock('chardet', () => ({
-  detect: jest.fn(() => 'UTF-8'),
-}));
-
 // Mock subtitle-offset so we control the output
 jest.mock('../src/subtitles/subtitle-offset', () => ({
   applyOffsetToVtt: jest.fn((text: string, offset: number) => {
