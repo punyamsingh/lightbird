@@ -29,4 +29,4 @@ jobs:
         run: pnpm turbo typecheck
 
       - name: Test
-        run: pnpm turbo test
+        run: pnpm turbo test --verbose
