@@ -31,7 +31,8 @@ jest.mock('@dnd-kit/utilities', () => ({
 }));
 
 // Mock m3u-parser to avoid DOM side effects in export tests
-jest.mock('../../lightbird/src/parsers/m3u-parser', () => ({
+jest.mock('lightbird', () => ({
+  ...jest.requireActual('lightbird'),
   exportPlaylist: jest.fn(),
   parseM3U8: jest.fn().mockReturnValue([]),
 }));

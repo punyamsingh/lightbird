@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "copy:ffmpeg": "node scripts/copy-ffmpeg-wasm.js",
-    "predev": "npm run copy:ffmpeg",
+    "predev": "pnpm run copy:ffmpeg",
     "dev": "next dev -p 9002",
-    "prebuild": "npm run copy:ffmpeg",
+    "prebuild": "pnpm run copy:ffmpeg",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

@@ -1,3 +1,4 @@
+"use client";
 import React, { useMemo, useState } from "react";
 import type { Subtitle, VideoFilters, AudioTrack, Chapter } from "lightbird";
 import { Slider } from "./primitives/slider";

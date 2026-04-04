@@ -1,3 +1,5 @@
+"use client";
+
 // Full drop-in player
 export { default as LightBirdPlayer } from './lightbird-player'
 

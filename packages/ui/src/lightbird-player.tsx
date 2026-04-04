@@ -1,3 +1,4 @@
+"use client";
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import type { PlaylistItem, AudioTrack } from "lightbird";
 import { cn } from "./utils/cn";
@@ -9,17 +10,19 @@ import { VideoInfoPanel } from "./video-info-panel";
 import { ShortcutSettingsDialog } from "./shortcut-settings-dialog";
 import { useToast } from "./hooks/use-toast";
 import { createVideoPlayer, type VideoPlayer, CancellationError } from "lightbird";
-import { useVideoPlayback } from "lightbird/react";
-import { useVideoFilters } from "lightbird/react";
-import { useSubtitles } from "lightbird/react";
-import { usePlaylist } from "lightbird/react";
-import { useKeyboardShortcuts } from "lightbird/react";
-import { useFullscreen } from "lightbird/react";
-import { usePictureInPicture } from "lightbird/react";
-import { useProgressPersistence } from "lightbird/react";
-import { useVideoInfo } from "lightbird/react";
-import { useMediaSession } from "lightbird/react";
-import { useChapters } from "lightbird/react";
+import {
+  useVideoPlayback,
+  useVideoFilters,
+  useSubtitles,
+  usePlaylist,
+  useKeyboardShortcuts,
+  useFullscreen,
+  usePictureInPicture,
+  useProgressPersistence,
+  useVideoInfo,
+  useMediaSession,
+  useChapters,
+} from "lightbird/react";
 import { captureVideoThumbnail, parseMediaError, validateFile, type ParsedMediaError, loadShortcuts, type ShortcutBinding, ProgressEstimator } from "lightbird";
 import { SubtitleOverlay } from "./subtitle-overlay";
 
@@ -83,7 +86,7 @@ const LightBirdPlayer = () => {
     'next-item': () => handleNext(),
     'prev-item': () => handlePrevious(),
     'screenshot': () => captureScreenshot(),
-    'show-shortcuts': () => setShowShortcutsHelp((v) => !v),
+    'show-shortcuts': () => setShowShortcutsHelp((v: boolean) => !v),
     'next-chapter': () => {
       const el = videoRef.current;
       if (!el || chapters.length === 0) return;
@@ -359,7 +362,7 @@ const LightBirdPlayer = () => {
   useEffect(() => {
     if (playback.isPlaying) {
       if (!playlistPinned) {
-        setPlaylistOpen((current) => {
+        setPlaylistOpen((current: boolean) => {
           if (current) wasAutoHiddenRef.current = true;
           return current ? false : current;
         });
@@ -418,14 +421,14 @@ const LightBirdPlayer = () => {
   }, [playlist]);
 
   const handleReorder = useCallback(
-    (newPlaylist: import("@/types").PlaylistItem[]) => {
+    (newPlaylist: PlaylistItem[]) => {
       playlist.reorderItems(newPlaylist);
     },
     [playlist]
   );
 
   const handleImportM3U = useCallback(
-    (items: Omit<import("@/types").PlaylistItem, "id">[]) => {
+    (items: Omit<PlaylistItem, "id">[]) => {
       items.forEach((item) => {
         playlist.appendItem({ ...item, id: crypto.randomUUID() });
       });
@@ -528,7 +531,7 @@ const LightBirdPlayer = () => {
 
   const handlePlaylistToggle = () => {
     wasAutoHiddenRef.current = false;
-    setPlaylistOpen((v) => !v);
+    setPlaylistOpen((v: boolean) => !v);
   };
 
   const handleMediaPlay = useCallback(() => {
@@ -613,7 +616,7 @@ const LightBirdPlayer = () => {
             >
               <h2 className="text-lg font-semibold mb-4">Keyboard Shortcuts</h2>
               <div className="space-y-1 max-h-80 overflow-y-auto">
-                {shortcuts.map((b) => {
+                {shortcuts.map((b: import("lightbird").ShortcutBinding) => {
                   const mods: string[] = [];
                   if (b.modifiers?.ctrl) mods.push("Ctrl");
                   if (b.modifiers?.shift) mods.push("Shift");
@@ -667,7 +670,7 @@ const LightBirdPlayer = () => {
             onAudioTrackChange={handleAudioTrackChange}
             onSubtitleUpload={handleSubtitleUpload}
             onSubtitleRemove={subtitles.removeSubtitle}
-            onShowInfo={() => setShowInfo((v) => !v)}
+            onShowInfo={() => setShowInfo((v: boolean) => !v)}
             onOpenShortcuts={() => setShowShortcutsDialog(true)}
             chapters={chapters}
             currentChapter={currentChapter}
@@ -722,7 +725,7 @@ const LightBirdPlayer = () => {
         isPinned={playlistPinned}
         size={playlistSize}
         onToggle={handlePlaylistToggle}
-        onTogglePin={() => setPlaylistPinned((v) => !v)}
+        onTogglePin={() => setPlaylistPinned((v: boolean) => !v)}
         onSizeChange={setPlaylistSize}
       />
     </div>

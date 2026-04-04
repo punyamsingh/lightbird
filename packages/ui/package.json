@@ -42,7 +42,7 @@
     "LICENSE"
   ],
   "sideEffects": [
-    "*.css"
+    "**/*.css"
   ],
   "scripts": {
     "build": "tsup",
@@ -81,6 +81,8 @@
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/jest": "^30.0.0",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
     "autoprefixer": "^10.0.0",
     "identity-obj-proxy": "^3.0.0",
     "jest": "^30.3.0",

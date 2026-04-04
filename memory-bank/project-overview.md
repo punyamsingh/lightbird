@@ -20,7 +20,7 @@ LightBird is a modern, lightweight, browser-based video player built as a **pnpm
 
 ### Monorepo Structure
 
-```
+```text
 apps/web/          — Next.js app (lightbird.vercel.app)
 packages/lightbird/ — Core library (npm: lightbird)
 packages/ui/        — UI components (npm: @lightbird/ui)
@@ -37,7 +37,7 @@ The factory function `createVideoPlayer(file)` in `packages/lightbird/src/video-
 
 ### Component Hierarchy
 
-```
+```text
 apps/web/src/app/page.tsx
 └── @lightbird/ui: PlayerErrorBoundary
     └── @lightbird/ui: LightBirdPlayer (coordinator)

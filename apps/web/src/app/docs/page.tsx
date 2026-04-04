@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   description: "Documentation for LightBird — a client-side video player engine.",
 };
 
-function CodeBlock({ children, lang }: { children: string; lang?: string }) {
+function CodeBlock({ children }: { children: string }) {
   return (
     <pre className="bg-[hsl(0,0%,8%)] border border-border rounded-lg p-4 overflow-x-auto text-sm">
       <code>{children}</code>
@@ -77,9 +77,9 @@ export default function DocsPage() {
       <SectionTitle id="install">Installation</SectionTitle>
 
       <h3 className="text-lg font-semibold mt-8 mb-3">Full UI (React)</h3>
-      <CodeBlock lang="bash">{`npm install lightbird @lightbird/ui`}</CodeBlock>
+      <CodeBlock>{`npm install lightbird @lightbird/ui`}</CodeBlock>
       <div className="mt-4">
-        <CodeBlock lang="tsx">{`"use client"
+        <CodeBlock>{`"use client"
 import { LightBirdPlayer } from '@lightbird/ui'
 
 export default function VideoPage() {
@@ -92,9 +92,9 @@ export default function VideoPage() {
       </p>
 
       <h3 className="text-lg font-semibold mt-8 mb-3">Headless React</h3>
-      <CodeBlock lang="bash">{`npm install lightbird`}</CodeBlock>
+      <CodeBlock>{`npm install lightbird`}</CodeBlock>
       <div className="mt-4">
-        <CodeBlock lang="tsx">{`"use client"
+        <CodeBlock>{`"use client"
 import { useRef } from 'react'
 import { useVideoPlayback, useSubtitles } from 'lightbird/react'
 import { createVideoPlayer } from 'lightbird'
@@ -120,9 +120,9 @@ export default function MyPlayer() {
       </div>
 
       <h3 className="text-lg font-semibold mt-8 mb-3">Any Framework (Vanilla JS)</h3>
-      <CodeBlock lang="bash">{`npm install lightbird`}</CodeBlock>
+      <CodeBlock>{`npm install lightbird`}</CodeBlock>
       <div className="mt-4">
-        <CodeBlock lang="ts">{`import { createVideoPlayer } from 'lightbird'
+        <CodeBlock>{`import { createVideoPlayer } from 'lightbird'
 
 const input = document.querySelector('input[type="file"]')
 const video = document.querySelector('video')
@@ -165,7 +165,7 @@ input.addEventListener('change', async (e) => {
       <SectionTitle id="api">API Reference</SectionTitle>
 
       <h3 className="text-lg font-semibold mt-8 mb-3">Core (<code>lightbird</code>)</h3>
-      <CodeBlock lang="ts">{`// Player factory
+      <CodeBlock>{`// Player factory
 createVideoPlayer(file: File, subtitleFiles?: File[], onProgress?: (n: number) => void): VideoPlayer
 
 interface VideoPlayer {

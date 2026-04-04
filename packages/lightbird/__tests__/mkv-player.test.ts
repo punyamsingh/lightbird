@@ -11,24 +11,10 @@ let mockWorkerInstance: {
   terminate: jest.Mock;
 };
 
-// Mock the create-worker module to avoid import.meta.url
+// Mock the create-worker module to avoid import.meta.url parse error in CJS
 jest.mock('../src/workers/create-worker', () => ({
   createFFmpegWorker: jest.fn(() => mockWorkerInstance),
 }));
-
-// The constructor mock is defined at module level so it can be set on global
-const MockWorkerConstructor = jest.fn(() => mockWorkerInstance);
-
-let originalWorker: typeof Worker | undefined;
-
-beforeAll(() => {
-  originalWorker = (global as unknown as { Worker?: typeof Worker }).Worker;
-  (global as unknown as { Worker: jest.Mock }).Worker = MockWorkerConstructor;
-});
-
-afterAll(() => {
-  (global as unknown as { Worker: typeof Worker | undefined }).Worker = originalWorker;
-});
 
 import { MKVPlayer, CancellationError, parseStreamInfo, canPlayNatively } from '../src/players/mkv-player';
 
@@ -90,7 +76,8 @@ beforeEach(() => {
     onerror: null,
     terminate: jest.fn(),
   };
-  MockWorkerConstructor.mockReturnValue(mockWorkerInstance);
+  // Set the worker factory to return our mock
+  MKVPlayer._workerFactory = () => mockWorkerInstance as unknown as Worker;
   // Default: native check always returns false so existing tests use the FFmpeg path
   jest.spyOn(MKVPlayer, '_canPlayNatively').mockResolvedValue(false);
 });

@@ -89,6 +89,12 @@ importers:
       '@types/jest':
         specifier: ^30.0.0
         version: 30.0.0
+      '@types/node':
+        specifier: ^20
+        version: 20.19.39
+      '@types/react':
+        specifier: ^18
+        version: 18.3.28
       jest:
         specifier: ^30.3.0
         version: 30.3.0(@types/node@20.19.39)
@@ -183,6 +189,12 @@ importers:
       '@types/jest':
         specifier: ^30.0.0
         version: 30.0.0
+      '@types/react':
+        specifier: ^18
+        version: 18.3.28
+      '@types/react-dom':
+        specifier: ^18
+        version: 18.3.7(@types/react@18.3.28)
       autoprefixer:
         specifier: ^10.0.0
         version: 10.4.27(postcss@8.5.8)

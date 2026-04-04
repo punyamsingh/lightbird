@@ -3,6 +3,7 @@ import { UniversalSubtitleManager } from '../src/subtitles/subtitle-manager';
 // Mock SubtitleConverter so tests don't depend on its implementation
 jest.mock('../src/subtitles/subtitle-converter', () => ({
   SubtitleConverter: {
+    convertSrtToVtt: jest.fn(async (text: string) => text),
     convertFileToVtt: jest.fn(async (file: File) => file),
   },
 }));

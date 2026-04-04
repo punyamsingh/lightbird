@@ -10,12 +10,20 @@ export default defineConfig([
     treeshake: true,
     clean: true,
     outDir: 'dist',
+    noExternal: [],
     external: [
       'react',
       '@ffmpeg/ffmpeg',
       '@ffmpeg/core',
       '@ffmpeg/util',
+      /workers\/create-worker/,
     ],
+  },
+  // Worker factory (separate chunk — uses import.meta.url)
+  {
+    entry: { 'workers/create-worker': 'src/workers/create-worker.ts' },
+    format: ['esm'],
+    outDir: 'dist',
   },
   // React subpath (hooks)
   {

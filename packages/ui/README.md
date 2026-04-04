@@ -48,7 +48,7 @@ import '@lightbird/ui/styles.css'
 
 ## Requires
 
-- `lightbird` (peer dependency)
+- `lightbird` (included as dependency)
 - `react` ^18.0.0 || ^19.0.0
 - `react-dom` ^18.0.0 || ^19.0.0
 

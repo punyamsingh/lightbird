@@ -100,6 +100,13 @@ export class MKVPlayer {
    */
   static _canPlayNatively: (url: string, timeoutMs?: number) => Promise<boolean> = canPlayNatively;
 
+  /**
+   * Overrideable factory for creating the FFmpeg worker. Tests override this
+   * to avoid `import.meta.url` (not available in CJS Jest).
+   * @internal
+   */
+  static _workerFactory: (() => Worker) | null = null;
+
   private file: File;
   private playerFile: MKVPlayerFile;
   private videoElement: HTMLVideoElement | null = null;
@@ -149,18 +156,22 @@ export class MKVPlayer {
     if (!this.worker) {
       // Worker creation is in a separate module so tests can mock it
       // without needing to parse import.meta.url
-      const { createFFmpegWorker } = require('../workers/create-worker');
-      this.worker = createFFmpegWorker();
-      this.worker.onmessage = (event: MessageEvent) => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { createFFmpegWorker } = require('../workers/create-worker') as { createFFmpegWorker: () => Worker };
+      const w: Worker = MKVPlayer._workerFactory
+        ? MKVPlayer._workerFactory()
+        : createFFmpegWorker();
+      w.onmessage = (event: MessageEvent) => {
         this._handleWorkerMessage(event.data);
       };
-      this.worker.onerror = (error) => {
+      w.onerror = (error) => {
         console.error('FFmpeg worker error:', error);
         for (const { reject } of this.pendingOperations.values()) {
           reject(error);
         }
         this.pendingOperations.clear();
       };
+      this.worker = w;
     }
     return this.worker;
   }
@@ -272,7 +283,7 @@ export class MKVPlayer {
         };
       });
 
-      const blob = new Blob([result.data], { type: 'video/mp4' });
+      const blob = new Blob([result.data as BlobPart], { type: 'video/mp4' });
       const url = URL.createObjectURL(blob);
       this.remuxCache.set(0, url);
       this.objectUrl = url;
@@ -347,7 +358,7 @@ export class MKVPlayer {
       },
     });
 
-    const blob = new Blob([result.data], { type: 'video/mp4' });
+    const blob = new Blob([result.data as BlobPart], { type: 'video/mp4' });
     const url = URL.createObjectURL(blob);
 
     // Store in cache — revocation happens only in destroy()
