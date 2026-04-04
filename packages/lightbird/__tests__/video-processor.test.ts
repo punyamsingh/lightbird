@@ -1,22 +1,4 @@
-// Mock the create-worker module to avoid import.meta.url parse error
-// The worker mock rejects immediately so MKVPlayer falls back to native playback
-jest.mock('../src/workers/create-worker', () => ({
-  createFFmpegWorker: jest.fn(() => {
-    const worker = {
-      postMessage: jest.fn(),
-      onmessage: null as ((e: MessageEvent) => void) | null,
-      onerror: null as ((e: ErrorEvent) => void) | null,
-      terminate: jest.fn(),
-    };
-    // Simulate immediate worker error so initialize() falls through to fallback
-    setTimeout(() => {
-      if (worker.onerror) {
-        worker.onerror(new ErrorEvent('error', { message: 'mock worker error' }));
-      }
-    }, 0);
-    return worker;
-  }),
-}));
+// createFFmpegWorker is globally mocked via moduleNameMapper in jest.config.ts
 
 // Prevent ESM parse error — @ffmpeg/* is transitively imported by mkv-player
 jest.mock('@ffmpeg/ffmpeg', () => ({
@@ -37,6 +19,33 @@ jest.mock('@ffmpeg/util', () => ({
 }));
 
 import { createVideoPlayer } from '../src/video-processor';
+import { MKVPlayer } from '../src/players/mkv-player';
+
+beforeEach(() => {
+  // Set up worker factory that immediately errors so MKV falls back to native
+  MKVPlayer._workerFactory = () => {
+    const worker = {
+      postMessage: jest.fn(),
+      onmessage: null as ((e: MessageEvent) => void) | null,
+      onerror: null as ((e: ErrorEvent) => void) | null,
+      terminate: jest.fn(),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+    };
+    setTimeout(() => {
+      if (worker.onerror) {
+        worker.onerror(new ErrorEvent('error', { message: 'mock worker error' }));
+      }
+    }, 0);
+    return worker as unknown as Worker;
+  };
+  jest.spyOn(MKVPlayer, '_canPlayNatively').mockResolvedValue(false);
+});
+
+afterEach(() => {
+  MKVPlayer._workerFactory = null;
+  jest.restoreAllMocks();
+});
 
 function makeFile(name: string, type = 'video/mp4'): File {
   return new File(['video-content'], name, { type });

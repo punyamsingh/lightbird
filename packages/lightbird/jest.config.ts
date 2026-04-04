@@ -6,10 +6,12 @@ const config: Config = {
   transform: {
     '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
   },
-  setupFilesAfterEnv: ['../../jest.setup.ts'],
-  globals: {
-    'import.meta': { url: 'file:///test' },
+  moduleNameMapper: {
+    // Redirect the create-worker module (which uses import.meta.url)
+    // to a mock that avoids the CJS parse error
+    '.*/workers/create-worker': '<rootDir>/__mocks__/create-worker.ts',
   },
+  setupFilesAfterEnv: ['../../jest.setup.ts'],
 };
 
 export default config;

@@ -11,11 +11,6 @@ let mockWorkerInstance: {
   terminate: jest.Mock;
 };
 
-// Mock the create-worker module to avoid import.meta.url parse error in CJS
-jest.mock('../src/workers/create-worker', () => ({
-  createFFmpegWorker: jest.fn(() => mockWorkerInstance),
-}));
-
 import { MKVPlayer, CancellationError, parseStreamInfo, canPlayNatively } from '../src/players/mkv-player';
 
 // ---------------------------------------------------------------------------
