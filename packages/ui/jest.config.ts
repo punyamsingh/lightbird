@@ -17,6 +17,7 @@ const config: Config = {
     '^ass-compiler$': '<rootDir>/__mocks__/ass-compiler.ts',
     '^@ffmpeg/ffmpeg$': '<rootDir>/__mocks__/@ffmpeg/ffmpeg.ts',
     '^@ffmpeg/util$': '<rootDir>/__mocks__/@ffmpeg/util.ts',
+    '^chardet$': '<rootDir>/__mocks__/chardet.ts',
   },
   setupFilesAfterEnv: ['../../jest.setup.ts'],
 };

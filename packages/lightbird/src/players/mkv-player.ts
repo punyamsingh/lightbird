@@ -154,13 +154,16 @@ export class MKVPlayer {
 
   private getWorker(): Worker {
     if (!this.worker) {
-      // Worker creation is in a separate module so tests can mock it
-      // without needing to parse import.meta.url
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { createFFmpegWorker } = require('../workers/create-worker') as { createFFmpegWorker: () => Worker };
-      const w: Worker = MKVPlayer._workerFactory
-        ? MKVPlayer._workerFactory()
-        : createFFmpegWorker();
+      let w: Worker;
+      if (MKVPlayer._workerFactory) {
+        w = MKVPlayer._workerFactory();
+      } else {
+        // Worker creation is in a separate module so tests can mock it
+        // without needing to parse import.meta.url
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { createFFmpegWorker } = require('../workers/create-worker') as { createFFmpegWorker: () => Worker };
+        w = createFFmpegWorker();
+      }
       w.onmessage = (event: MessageEvent) => {
         this._handleWorkerMessage(event.data);
       };
@@ -170,6 +173,10 @@ export class MKVPlayer {
           reject(error);
         }
         this.pendingOperations.clear();
+        if (this.worker === w) {
+          this.worker = null;
+        }
+        w.terminate();
       };
       this.worker = w;
     }
