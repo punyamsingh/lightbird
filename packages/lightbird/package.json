@@ -61,8 +61,7 @@
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
-    "ass-compiler": "^0.1.16",
-    "chardet": "^2.1.1"
+    "ass-compiler": "^0.1.16"
   },
   "optionalDependencies": {
     "@ffmpeg/core": "^0.12.6",

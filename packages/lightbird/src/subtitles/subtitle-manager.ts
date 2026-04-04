@@ -2,15 +2,29 @@ import type { Subtitle, SubtitleCue } from "../types";
 import { SubtitleConverter } from "./subtitle-converter";
 import { applyOffsetToVtt, createOffsetVttUrl } from "./subtitle-offset";
 
-// chardet runs fine in both Node and browser (via Buffer polyfill in Next.js)
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const chardet = require("chardet") as typeof import("chardet");
+/**
+ * Simple BOM / encoding detection for subtitle files.
+ * Checks for UTF-8 BOM, UTF-16 LE/BE BOMs, and falls back to UTF-8.
+ * This avoids depending on chardet (Node.js-only) in browser bundles.
+ */
+function detectEncoding(bytes: Uint8Array): string {
+  if (bytes.length >= 3 && bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) {
+    return "UTF-8";
+  }
+  if (bytes.length >= 2 && bytes[0] === 0xFF && bytes[1] === 0xFE) {
+    return "UTF-16LE";
+  }
+  if (bytes.length >= 2 && bytes[0] === 0xFE && bytes[1] === 0xFF) {
+    return "UTF-16BE";
+  }
+  return "UTF-8";
+}
 
 /** Reads a File, auto-detecting its text encoding, and returns the decoded string. */
 async function readSubtitleFile(file: File): Promise<string> {
   const buffer = await file.arrayBuffer();
   const bytes = new Uint8Array(buffer);
-  const detected = chardet.detect(Buffer.from(bytes)) ?? "UTF-8";
+  const detected = detectEncoding(bytes);
   const decoder = new TextDecoder(detected);
   return decoder.decode(buffer);
 }
