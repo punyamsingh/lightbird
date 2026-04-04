@@ -22,7 +22,7 @@ Extract all styled React components into `packages/ui/`, published as `@lightbir
 
 ### ShadCN UI primitives — DEFINITIVE LIST of what's used
 
-Audited by grepping every player component. Only these 11 are imported:
+Audited by grepping every player component. Only these 12 are imported:
 
 | Component file | Used by | Move to |
 |---------------|---------|---------|

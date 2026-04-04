@@ -220,15 +220,27 @@ Everything else (fonts, colors, animations, sidebar variants) stays as-is.
 
 ### `apps/web/scripts/copy-ffmpeg-wasm.js`
 
-Update paths to work from `apps/web/`:
+Updated for pnpm monorepo — checks both local and hoisted `node_modules`:
 
 ```js
-const root = join(__dirname, '..');  // apps/web/
-const src  = join(root, 'node_modules', '@ffmpeg', 'core', 'dist', 'umd');
-const dest = join(root, 'public', 'ffmpeg');
-```
+const { cpSync, mkdirSync, existsSync } = require('fs');
+const { join } = require('path');
 
-Note: pnpm hoists `@ffmpeg/core` to the workspace root `node_modules/`. The script may need to look at `../../node_modules/@ffmpeg/core/dist/umd` instead. **Test this during implementation** — if `node_modules/@ffmpeg/core` doesn't exist in `apps/web/`, update the path to `../../node_modules/@ffmpeg/core/dist/umd`.
+const root = join(__dirname, '..'); // apps/web/
+const localSrc = join(root, 'node_modules', '@ffmpeg', 'core', 'dist', 'umd');
+const hoistedSrc = join(root, '..', '..', 'node_modules', '@ffmpeg', 'core', 'dist', 'umd');
+const dest = join(root, 'public', 'ffmpeg');
+const src = existsSync(localSrc) ? localSrc : hoistedSrc;
+
+if (!existsSync(src)) {
+  console.warn('Warning: @ffmpeg/core not found. MKV playback will use CDN fallback.');
+  process.exit(0);
+}
+
+mkdirSync(dest, { recursive: true });
+cpSync(src, dest, { recursive: true });
+console.log('Copied @ffmpeg/core WASM files to public/ffmpeg/');
+```
 
 ### Delete old source directories
 
