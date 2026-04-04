@@ -6,10 +6,10 @@ Set up tsup to build both packages into publishable ESM + CJS bundles with TypeS
 
 ## Install tsup
 
-In each package:
+From repo root:
 ```bash
-cd packages/lightbird && pnpm add -D tsup typescript
-cd packages/ui && pnpm add -D tsup typescript tailwindcss postcss autoprefixer
+pnpm -C packages/lightbird add -D tsup typescript
+pnpm -C packages/ui add -D tsup typescript tailwindcss postcss autoprefixer tailwindcss-animate
 ```
 
 ## `packages/lightbird/tsup.config.ts`
@@ -57,11 +57,13 @@ export default defineConfig([
 packages/lightbird/dist/
 ├── index.js          (ESM)
 ├── index.cjs         (CJS)
-├── index.d.ts        (types)
+├── index.d.ts        (ESM types)
+├── index.d.cts       (CJS types)
 ├── react/
 │   ├── index.js      (ESM)
 │   ├── index.cjs     (CJS)
-│   └── index.d.ts    (types)
+│   ├── index.d.ts    (ESM types)
+│   └── index.d.cts   (CJS types)
 └── (chunks)
 ```
 
@@ -257,6 +259,7 @@ The `banner: { js: '"use client";' }` ensures every output chunk has the directi
     "autoprefixer": "^10.0.0",
     "postcss": "^8.0.0",
     "tailwindcss": "^3.4.0",
+    "tailwindcss-animate": "^1.0.7",
     "tsup": "^8.0.0",
     "typescript": "^5.0.0"
   }
