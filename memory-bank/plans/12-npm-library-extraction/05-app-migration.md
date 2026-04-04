@@ -263,7 +263,8 @@ After this phase:
 - `pnpm dev --filter web` starts on port 9002
 - The site looks and works exactly the same
 - No old directories remain at root level
+- `memory-bank/project-overview.md` updated with new monorepo architecture, file paths, and tech stack changes
 
 ## Rollback Safety
 
-Do the entire migration in a single branch. Don't delete old directories until everything is verified working. `git checkout main` restores the flat structure if needed.
+Do the entire migration in a single branch. Don't delete old directories until everything is verified working. `git checkout master` restores the flat structure if needed.

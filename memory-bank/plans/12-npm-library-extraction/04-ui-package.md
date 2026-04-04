@@ -69,7 +69,7 @@ These 14 files are NOT imported by any player component and should be deleted:
 ### 4.1 Exact Import Remapping — Every Component File
 
 **`lightbird-player.tsx`** (destination: `packages/ui/src/lightbird-player.tsx`)
-```
+```text
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";  (unchanged)
 
 OLD: import type { PlaylistItem, AudioTrack } from "@/types";
@@ -166,7 +166,7 @@ const subtitles = useSubtitles({
 ```
 
 **`player-controls.tsx`** (destination: `packages/ui/src/player-controls.tsx`)
-```
+```text
 import React, { useMemo, useState } from "react";  (unchanged)
 
 OLD: import type { Subtitle, VideoFilters, AudioTrack, Chapter } from "@/types";
@@ -197,7 +197,7 @@ NEW: import { cn } from "./utils/cn";
 ```
 
 **`playlist-panel.tsx`** (destination: `packages/ui/src/playlist-panel.tsx`)
-```
+```text
 import React, { useRef, useState } from "react";  (unchanged)
 
 OLD: import type { PlaylistItem } from "@/types";
@@ -232,19 +232,19 @@ NEW: import { exportPlaylist, parseM3U8 } from "lightbird";
 ```
 
 **`video-overlay.tsx`** (destination: `packages/ui/src/video-overlay.tsx`)
-```
+```ts
 import React from "react";
 ```
 No `@/` imports. No changes needed.
 
 **`subtitle-overlay.tsx`** (destination: `packages/ui/src/subtitle-overlay.tsx`)
-```
+```ts
 import { useState, useEffect, type RefObject } from "react";
 ```
 No `@/` imports. No changes needed.
 
 **`player-error-display.tsx`** (destination: `packages/ui/src/player-error-display.tsx`)
-```
+```text
 import { AlertCircle } from "lucide-react";  (unchanged)
 
 OLD: import { Button } from "@/components/ui/button";
@@ -255,13 +255,13 @@ NEW: import type { ParsedMediaError } from "lightbird";
 ```
 
 **`player-error-boundary.tsx`** (destination: `packages/ui/src/player-error-boundary.tsx`)
-```
+```ts
 import { Component, type ReactNode } from "react";
 ```
 No `@/` imports. No changes needed. (Note: this is a React class component, not a function component. Works fine with tsup bundling.)
 
 **`video-info-panel.tsx`** (destination: `packages/ui/src/video-info-panel.tsx`)
-```
+```text
 import React from "react";  (unchanged)
 
 OLD: import type { VideoMetadata } from "@/types";
@@ -271,7 +271,7 @@ import { X } from "lucide-react";  (unchanged)
 ```
 
 **`shortcut-settings-dialog.tsx`** (destination: `packages/ui/src/shortcut-settings-dialog.tsx`)
-```
+```text
 import React, { useState, useEffect } from "react";  (unchanged)
 
 OLD: import { DEFAULT_SHORTCUTS, saveShortcuts, formatShortcutKey, matchesShortcut } from "@/lib/keyboard-shortcuts";
@@ -299,14 +299,14 @@ Each ShadCN primitive file (button.tsx, slider.tsx, etc.) imports from:
 - `lucide-react` — unchanged (external dep)
 
 For every file in `packages/ui/src/primitives/`:
-```
+```text
 OLD: import { cn } from "@/lib/utils"
 NEW: import { cn } from "../utils/cn"
 ```
 
 ### 4.3 `use-toast.ts` import update
 
-```
+```text
 OLD: import type { ToastActionElement, ToastProps } from "@/components/ui/toast"
 NEW: import type { ToastActionElement, ToastProps } from "../primitives/toast"
 ```
