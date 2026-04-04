@@ -2,7 +2,7 @@
 
 ## Goal
 
-Extract all styled React components into `packages/ui/`, published as `@lightbird/ui`. This is the "drop it in and it works" package for React developers who want the full LightBird experience.
+Extract all styled React components into `packages/ui/`, published as `@lightbird/ui`. Drop-in player for React developers.
 
 ## What Moves
 
@@ -20,84 +20,309 @@ Extract all styled React components into `packages/ui/`, published as `@lightbir
 | `src/components/video-info-panel.tsx` | `packages/ui/src/video-info-panel.tsx` |
 | `src/components/shortcut-settings-dialog.tsx` | `packages/ui/src/shortcut-settings-dialog.tsx` |
 
-### ShadCN UI primitives (only the ones actually used)
+### ShadCN UI primitives — DEFINITIVE LIST of what's used
 
-| Source | Destination | Used by |
-|--------|-------------|---------|
-| `src/components/ui/button.tsx` | `packages/ui/src/primitives/button.tsx` | PlayerControls, PlaylistPanel |
-| `src/components/ui/slider.tsx` | `packages/ui/src/primitives/slider.tsx` | PlayerControls (volume, seek) |
-| `src/components/ui/popover.tsx` | `packages/ui/src/primitives/popover.tsx` | PlayerControls (chapters, audio) |
-| `src/components/ui/dialog.tsx` | `packages/ui/src/primitives/dialog.tsx` | ShortcutSettingsDialog |
-| `src/components/ui/tooltip.tsx` | `packages/ui/src/primitives/tooltip.tsx` | PlayerControls |
-| `src/components/ui/scroll-area.tsx` | `packages/ui/src/primitives/scroll-area.tsx` | PlaylistPanel |
-| `src/components/ui/select.tsx` | `packages/ui/src/primitives/select.tsx` | PlayerControls (speed, audio track) |
-| `src/components/ui/badge.tsx` | `packages/ui/src/primitives/badge.tsx` | PlaylistPanel (duration) |
-| `src/components/ui/toast.tsx` | `packages/ui/src/primitives/toast.tsx` | Toaster |
-| `src/components/ui/toaster.tsx` | `packages/ui/src/primitives/toaster.tsx` | LightBirdPlayer |
-| `src/components/ui/progress.tsx` | `packages/ui/src/primitives/progress.tsx` | VideoOverlay |
-| `src/components/ui/separator.tsx` | `packages/ui/src/primitives/separator.tsx` | If used |
+Audited by grepping every player component. Only these 11 are imported:
+
+| Component file | Used by | Move to |
+|---------------|---------|---------|
+| `ui/button.tsx` | player-controls, playlist-panel, player-error-display, shortcut-settings-dialog | `packages/ui/src/primitives/button.tsx` |
+| `ui/slider.tsx` | player-controls | `packages/ui/src/primitives/slider.tsx` |
+| `ui/popover.tsx` | player-controls | `packages/ui/src/primitives/popover.tsx` |
+| `ui/tooltip.tsx` | player-controls, playlist-panel | `packages/ui/src/primitives/tooltip.tsx` |
+| `ui/label.tsx` | player-controls | `packages/ui/src/primitives/label.tsx` |
+| `ui/radio-group.tsx` | player-controls | `packages/ui/src/primitives/radio-group.tsx` |
+| `ui/scroll-area.tsx` | playlist-panel | `packages/ui/src/primitives/scroll-area.tsx` |
+| `ui/input.tsx` | playlist-panel | `packages/ui/src/primitives/input.tsx` |
+| `ui/select.tsx` | playlist-panel | `packages/ui/src/primitives/select.tsx` |
+| `ui/dialog.tsx` | shortcut-settings-dialog | `packages/ui/src/primitives/dialog.tsx` |
+| `ui/toaster.tsx` | layout.tsx (app root) | `packages/ui/src/primitives/toaster.tsx` |
+| `ui/toast.tsx` | imported by toaster.tsx and use-toast.ts | `packages/ui/src/primitives/toast.tsx` |
+
+### ShadCN UI primitives — DELETE (unused by any player component)
+
+These 14 files are NOT imported by any player component and should be deleted:
+- `ui/alert.tsx`
+- `ui/badge.tsx`
+- `ui/card.tsx`
+- `ui/checkbox.tsx`
+- `ui/collapsible.tsx`
+- `ui/form.tsx`
+- `ui/progress.tsx`
+- `ui/separator.tsx`
+- `ui/sheet.tsx`
+- `ui/sidebar.tsx`
+- `ui/skeleton.tsx`
+- `ui/switch.tsx`
+- `ui/table.tsx`
+- `ui/textarea.tsx`
 
 ### UI-specific hooks and utils
 
 | Source | Destination |
 |--------|-------------|
 | `src/hooks/use-toast.ts` | `packages/ui/src/hooks/use-toast.ts` |
-| `src/lib/utils.ts` (the `cn()` function) | `packages/ui/src/utils/cn.ts` |
+| `src/lib/utils.ts` | `packages/ui/src/utils/cn.ts` |
 
 ## Code Changes Required
 
-### 4.1 Update imports to use `lightbird` and `lightbird/react`
+### 4.1 Exact Import Remapping — Every Component File
 
-This is the biggest change. All component files currently import from `@/lib/*` and `@/hooks/*`. These become external package imports:
+**`lightbird-player.tsx`** (destination: `packages/ui/src/lightbird-player.tsx`)
+```
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";  (unchanged)
 
-**Core imports:**
+OLD: import type { PlaylistItem, AudioTrack } from "@/types";
+NEW: import type { PlaylistItem, AudioTrack } from "lightbird";
 
-| Old | New |
-|-----|-----|
-| `from '@/lib/video-processor'` | `from 'lightbird'` |
-| `from '@/lib/players/mkv-player'` | `from 'lightbird'` |
-| `from '@/lib/media-error'` | `from 'lightbird'` |
-| `from '@/lib/keyboard-shortcuts'` | `from 'lightbird'` |
-| `from '@/lib/video-thumbnail'` | `from 'lightbird'` |
-| `from '@/lib/progress-estimator'` | `from 'lightbird'` |
-| `from '@/types'` | `from 'lightbird'` |
+OLD: import { cn } from "@/lib/utils";
+NEW: import { cn } from "./utils/cn";
 
-**Hook imports:**
+OLD: import PlayerControls from "@/components/player-controls";
+NEW: import PlayerControls from "./player-controls";
 
-| Old | New |
-|-----|-----|
-| `from '@/hooks/use-video-playback'` | `from 'lightbird/react'` |
-| `from '@/hooks/use-subtitles'` | `from 'lightbird/react'` |
-| `from '@/hooks/use-playlist'` | `from 'lightbird/react'` |
-| `from '@/hooks/use-video-filters'` | `from 'lightbird/react'` |
-| `from '@/hooks/use-fullscreen'` | `from 'lightbird/react'` |
-| `from '@/hooks/use-picture-in-picture'` | `from 'lightbird/react'` |
-| `from '@/hooks/use-keyboard-shortcuts'` | `from 'lightbird/react'` |
-| `from '@/hooks/use-progress-persistence'` | `from 'lightbird/react'` |
-| `from '@/hooks/use-video-info'` | `from 'lightbird/react'` |
-| `from '@/hooks/use-media-session'` | `from 'lightbird/react'` |
-| `from '@/hooks/use-chapters'` | `from 'lightbird/react'` |
+OLD: import PlaylistPanel, { type PlaylistSize } from "@/components/playlist-panel";
+NEW: import PlaylistPanel, { type PlaylistSize } from "./playlist-panel";
 
-**Internal imports (within the ui package):**
+OLD: import { VideoOverlay } from "@/components/video-overlay";
+NEW: import { VideoOverlay } from "./video-overlay";
 
-| Old | New |
-|-----|-----|
-| `from '@/components/player-controls'` | `from './player-controls'` |
-| `from '@/components/playlist-panel'` | `from './playlist-panel'` |
-| `from '@/components/ui/button'` | `from './primitives/button'` |
-| `from '@/lib/utils'` | `from './utils/cn'` |
-| `from '@/hooks/use-toast'` | `from './hooks/use-toast'` |
+OLD: import { PlayerErrorDisplay } from "@/components/player-error-display";
+NEW: import { PlayerErrorDisplay } from "./player-error-display";
 
-### 4.2 Keep `"use client"` in entry point
+OLD: import { VideoInfoPanel } from "@/components/video-info-panel";
+NEW: import { VideoInfoPanel } from "./video-info-panel";
 
-The main `index.ts` needs a `"use client"` banner so Next.js consumers don't have to wrap every import. tsup supports this via the `banner` option:
+OLD: import { ShortcutSettingsDialog } from "@/components/shortcut-settings-dialog";
+NEW: import { ShortcutSettingsDialog } from "./shortcut-settings-dialog";
+
+OLD: import { useToast } from "@/hooks/use-toast";
+NEW: import { useToast } from "./hooks/use-toast";
+
+OLD: import { createVideoPlayer, type VideoPlayer } from "@/lib/video-processor";
+NEW: import { createVideoPlayer, type VideoPlayer } from "lightbird";
+
+OLD: import { CancellationError } from "@/lib/players/mkv-player";
+NEW: import { CancellationError } from "lightbird";
+
+OLD: import { useVideoPlayback } from "@/hooks/use-video-playback";
+NEW: import { useVideoPlayback } from "lightbird/react";
+
+OLD: import { useVideoFilters } from "@/hooks/use-video-filters";
+NEW: import { useVideoFilters } from "lightbird/react";
+
+OLD: import { useSubtitles } from "@/hooks/use-subtitles";
+NEW: import { useSubtitles } from "lightbird/react";
+
+OLD: import { usePlaylist } from "@/hooks/use-playlist";
+NEW: import { usePlaylist } from "lightbird/react";
+
+OLD: import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+NEW: import { useKeyboardShortcuts } from "lightbird/react";
+
+OLD: import { useFullscreen } from "@/hooks/use-fullscreen";
+NEW: import { useFullscreen } from "lightbird/react";
+
+OLD: import { usePictureInPicture } from "@/hooks/use-picture-in-picture";
+NEW: import { usePictureInPicture } from "lightbird/react";
+
+OLD: import { useProgressPersistence } from "@/hooks/use-progress-persistence";
+NEW: import { useProgressPersistence } from "lightbird/react";
+
+OLD: import { useVideoInfo } from "@/hooks/use-video-info";
+NEW: import { useVideoInfo } from "lightbird/react";
+
+OLD: import { useMediaSession } from "@/hooks/use-media-session";
+NEW: import { useMediaSession } from "lightbird/react";
+
+OLD: import { useChapters } from "@/hooks/use-chapters";
+NEW: import { useChapters } from "lightbird/react";
+
+OLD: import { captureVideoThumbnail } from "@/lib/video-thumbnail";
+NEW: import { captureVideoThumbnail } from "lightbird";
+
+OLD: import { parseMediaError, validateFile, type ParsedMediaError } from "@/lib/media-error";
+NEW: import { parseMediaError, validateFile, type ParsedMediaError } from "lightbird";
+
+OLD: import { loadShortcuts } from "@/lib/keyboard-shortcuts";
+NEW: import { loadShortcuts } from "lightbird";
+
+OLD: import type { ShortcutBinding } from "@/lib/keyboard-shortcuts";
+NEW: import type { ShortcutBinding } from "lightbird";
+
+OLD: import { ProgressEstimator } from "@/lib/progress-estimator";
+NEW: import { ProgressEstimator } from "lightbird";
+
+OLD: import { SubtitleOverlay } from "@/components/subtitle-overlay";
+NEW: import { SubtitleOverlay } from "./subtitle-overlay";
+```
+
+Also update the `useSubtitles` call to pass `onError` callback (see Phase 3):
+```ts
+const { toast } = useToast();
+const subtitles = useSubtitles({
+  onError: (msg) => toast({ title: msg, variant: "destructive" }),
+});
+```
+
+**`player-controls.tsx`** (destination: `packages/ui/src/player-controls.tsx`)
+```
+import React, { useMemo, useState } from "react";  (unchanged)
+
+OLD: import type { Subtitle, VideoFilters, AudioTrack, Chapter } from "@/types";
+NEW: import type { Subtitle, VideoFilters, AudioTrack, Chapter } from "lightbird";
+
+OLD: import { Slider } from "@/components/ui/slider";
+NEW: import { Slider } from "./primitives/slider";
+
+OLD: import { Button } from "@/components/ui/button";
+NEW: import { Button } from "./primitives/button";
+
+OLD: import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+NEW: import { Popover, PopoverContent, PopoverTrigger } from "./primitives/popover";
+
+OLD: import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+NEW: import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./primitives/tooltip";
+
+OLD: import { Label } from "@/components/ui/label";
+NEW: import { Label } from "./primitives/label";
+
+import { ... } from "lucide-react";  (unchanged — external dep)
+
+OLD: import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
+NEW: import { RadioGroup, RadioGroupItem } from "./primitives/radio-group";
+
+OLD: import { cn } from "@/lib/utils";
+NEW: import { cn } from "./utils/cn";
+```
+
+**`playlist-panel.tsx`** (destination: `packages/ui/src/playlist-panel.tsx`)
+```
+import React, { useRef, useState } from "react";  (unchanged)
+
+OLD: import type { PlaylistItem } from "@/types";
+NEW: import type { PlaylistItem } from "lightbird";
+
+import { DndContext, ... } from "@dnd-kit/core";  (unchanged)
+import { SortableContext, ... } from "@dnd-kit/sortable";  (unchanged)
+import { CSS } from "@dnd-kit/utilities";  (unchanged)
+
+OLD: import { ScrollArea } from "@/components/ui/scroll-area";
+NEW: import { ScrollArea } from "./primitives/scroll-area";
+
+OLD: import { Button } from "@/components/ui/button";
+NEW: import { Button } from "./primitives/button";
+
+OLD: import { Input } from "@/components/ui/input";
+NEW: import { Input } from "./primitives/input";
+
+OLD: import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+NEW: import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./primitives/select";
+
+OLD: import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+NEW: import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./primitives/tooltip";
+
+OLD: import { cn } from "@/lib/utils";
+NEW: import { cn } from "./utils/cn";
+
+import { ... } from "lucide-react";  (unchanged)
+
+OLD: import { exportPlaylist, parseM3U8 } from "@/lib/m3u-parser";
+NEW: import { exportPlaylist, parseM3U8 } from "lightbird";
+```
+
+**`video-overlay.tsx`** (destination: `packages/ui/src/video-overlay.tsx`)
+```
+import React from "react";
+```
+No `@/` imports. No changes needed.
+
+**`subtitle-overlay.tsx`** (destination: `packages/ui/src/subtitle-overlay.tsx`)
+```
+import { useState, useEffect, type RefObject } from "react";
+```
+No `@/` imports. No changes needed.
+
+**`player-error-display.tsx`** (destination: `packages/ui/src/player-error-display.tsx`)
+```
+import { AlertCircle } from "lucide-react";  (unchanged)
+
+OLD: import { Button } from "@/components/ui/button";
+NEW: import { Button } from "./primitives/button";
+
+OLD: import type { ParsedMediaError } from "@/lib/media-error";
+NEW: import type { ParsedMediaError } from "lightbird";
+```
+
+**`player-error-boundary.tsx`** (destination: `packages/ui/src/player-error-boundary.tsx`)
+```
+import { Component, type ReactNode } from "react";
+```
+No `@/` imports. No changes needed. (Note: this is a React class component, not a function component. Works fine with tsup bundling.)
+
+**`video-info-panel.tsx`** (destination: `packages/ui/src/video-info-panel.tsx`)
+```
+import React from "react";  (unchanged)
+
+OLD: import type { VideoMetadata } from "@/types";
+NEW: import type { VideoMetadata } from "lightbird";
+
+import { X } from "lucide-react";  (unchanged)
+```
+
+**`shortcut-settings-dialog.tsx`** (destination: `packages/ui/src/shortcut-settings-dialog.tsx`)
+```
+import React, { useState, useEffect } from "react";  (unchanged)
+
+OLD: import { DEFAULT_SHORTCUTS, saveShortcuts, formatShortcutKey, matchesShortcut } from "@/lib/keyboard-shortcuts";
+NEW: import { DEFAULT_SHORTCUTS, saveShortcuts, formatShortcutKey, matchesShortcut } from "lightbird";
+
+OLD: import type { ShortcutBinding, ShortcutAction } from "@/lib/keyboard-shortcuts";
+NEW: import type { ShortcutBinding, ShortcutAction } from "lightbird";
+
+OLD: import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+NEW: import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./primitives/dialog";
+
+OLD: import { Button } from "@/components/ui/button";
+NEW: import { Button } from "./primitives/button";
+
+OLD: import { useToast } from "@/hooks/use-toast";
+NEW: import { useToast } from "./hooks/use-toast";
+```
+
+### 4.2 ShadCN Primitive Import Updates
+
+Each ShadCN primitive file (button.tsx, slider.tsx, etc.) imports from:
+- `@radix-ui/*` — unchanged (external deps)
+- `@/lib/utils` (the `cn` function) — change to `../utils/cn`
+- `class-variance-authority` — unchanged (external dep)
+- `lucide-react` — unchanged (external dep)
+
+For every file in `packages/ui/src/primitives/`:
+```
+OLD: import { cn } from "@/lib/utils"
+NEW: import { cn } from "../utils/cn"
+```
+
+### 4.3 `use-toast.ts` import update
+
+```
+OLD: import type { ToastActionElement, ToastProps } from "@/components/ui/toast"
+NEW: import type { ToastActionElement, ToastProps } from "../primitives/toast"
+```
+
+### 4.4 `"use client"` handling
+
+Remove `"use client"` from all source files. Instead, tsup adds it as a banner to all output chunks:
 
 ```ts
 // tsup.config.ts
 banner: { js: '"use client";' }
 ```
 
-### 4.3 Entry point
+This way every chunk has the directive and Next.js consumers never need to wrap imports.
+
+### 4.5 Entry point
 
 **`packages/ui/src/index.ts`:**
 
@@ -107,9 +332,7 @@ export { default as LightBirdPlayer } from './lightbird-player'
 
 // Individual components (for custom layouts)
 export { default as PlayerControls } from './player-controls'
-export type { PlayerControlsProps } from './player-controls'
 export { default as PlaylistPanel } from './playlist-panel'
-export type { PlaylistPanelProps } from './playlist-panel'
 export { VideoOverlay } from './video-overlay'
 export { SubtitleOverlay } from './subtitle-overlay'
 export { PlayerErrorDisplay } from './player-error-display'
@@ -117,102 +340,33 @@ export { PlayerErrorBoundary } from './player-error-boundary'
 export { VideoInfoPanel } from './video-info-panel'
 export { ShortcutSettingsDialog } from './shortcut-settings-dialog'
 
-// Toaster (needed at app root for toast notifications)
+// Toaster (user adds to app root for toast notifications)
 export { Toaster } from './primitives/toaster'
 ```
-
-### 4.4 Audit which ShadCN components are actually used
-
-Before moving, grep every `src/components/ui/*.tsx` to confirm which ones are imported by player components. Any that are only used in unused pages (if any) get left behind or deleted.
-
-Likely unused (carried over from initial ShadCN setup):
-- `alert.tsx` — check if used
-- `card.tsx` — check if used
-- `checkbox.tsx` — check if used
-- `collapsible.tsx` — check if used
-- `form.tsx` — check if used
-- `input.tsx` — check if used (maybe in stream URL input?)
-- `label.tsx` — check if used
-- `radio-group.tsx` — check if used
-- `sheet.tsx` — check if used
-- `sidebar.tsx` — check if used
-- `skeleton.tsx` — check if used
-- `switch.tsx` — check if used
-- `table.tsx` — check if used
-- `textarea.tsx` — check if used
-
-Only move what's actually imported.
 
 ## CSS Strategy
 
 ### Option A: Tailwind content path (recommended)
 
 User adds to their `tailwind.config.ts`:
-
 ```ts
 content: [
   './src/**/*.{ts,tsx}',
-  './node_modules/@lightbird/ui/dist/**/*.js',  // add this
+  './node_modules/@lightbird/ui/dist/**/*.js',
 ]
 ```
 
-LightBird components pick up the user's Tailwind theme (colors, fonts, etc.). Looks native to their app.
-
 ### Option B: Pre-compiled CSS
 
-We generate `packages/ui/dist/styles.css` during the build — a CSS file with all Tailwind classes used by our components pre-compiled with a default dark theme.
+Import `@lightbird/ui/styles.css` for zero-config dark theme.
 
-User imports it:
-```tsx
-import '@lightbird/ui/styles.css'
-import { LightBirdPlayer } from '@lightbird/ui'
-```
-
-Zero config but fixed styling.
-
-### Build both options
-
-tsup + Tailwind CLI can generate the CSS file. Document both approaches in the README.
-
-## Package Dependencies
-
-```json
-{
-  "dependencies": {
-    "@dnd-kit/core": "^6.3.1",
-    "@dnd-kit/sortable": "^10.0.0",
-    "@dnd-kit/utilities": "^3.2.2",
-    "@radix-ui/react-dialog": "^1.1.6",
-    "@radix-ui/react-popover": "^1.1.6",
-    "@radix-ui/react-progress": "^1.1.2",
-    "@radix-ui/react-scroll-area": "^1.2.3",
-    "@radix-ui/react-select": "^2.1.6",
-    "@radix-ui/react-separator": "^1.1.2",
-    "@radix-ui/react-slider": "^1.2.3",
-    "@radix-ui/react-slot": "^1.2.3",
-    "@radix-ui/react-toast": "^1.2.6",
-    "@radix-ui/react-tooltip": "^1.1.8",
-    "@tanstack/react-virtual": "^3.13.21",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "lucide-react": "^0.475.0",
-    "tailwind-merge": "^3.0.1"
-  },
-  "peerDependencies": {
-    "lightbird": "^0.1.0",
-    "react": "^18.0.0 || ^19.0.0",
-    "react-dom": "^18.0.0 || ^19.0.0"
-  }
-}
-```
-
-Note: Tailwind is NOT a runtime dependency. It's a build-time tool. Users configure it in their project. We provide the pre-compiled CSS as an alternative.
+### Build both — see `06-build-config.md` for details.
 
 ## Verification
 
 After this phase:
-- `packages/ui/src/` contains all player components + used ShadCN primitives
+- `packages/ui/src/` contains 9 player components + 12 ShadCN primitives + use-toast + cn
 - All imports point to `lightbird`, `lightbird/react`, or relative paths
-- `packages/ui/src/index.ts` exports the public API
+- No `@/` aliases remain
+- 14 unused ShadCN component files deleted
 - `tsc --noEmit` passes
-- No unused ShadCN components remain

@@ -4,9 +4,153 @@
 
 Migrate all 28 test suites to their respective packages. Each package gets its own jest config. Turborepo runs them all with `turbo test`.
 
+## Critical Decision: `next/jest` vs `ts-jest`
+
+Current setup uses `next/jest` (SWC transform). The packages are NOT Next.js apps, so they can't use `next/jest`.
+
+**Decision: Use `ts-jest` for packages, keep `next/jest` for `apps/web/`.**
+
+This means:
+- `packages/lightbird/` and `packages/ui/` use `ts-jest`
+- `apps/web/` continues using `next/jest` (if it has app-level tests)
+- Both produce identical results — they just use different TypeScript transpilers
+
+Install per package:
+```bash
+cd packages/lightbird && pnpm add -D jest ts-jest @types/jest jest-environment-jsdom @testing-library/jest-dom @testing-library/react @testing-library/user-event
+cd packages/ui && pnpm add -D jest ts-jest @types/jest jest-environment-jsdom @testing-library/jest-dom @testing-library/react @testing-library/user-event identity-obj-proxy
+```
+
+## The `jest.setup.ts` Problem
+
+The current `jest.setup.ts` (110 lines) contains critical polyfills for jsdom:
+- `TextEncoder` / `TextDecoder` polyfills
+- `URL.createObjectURL` / `revokeObjectURL` mocks
+- `ResizeObserver` mock (needed by Radix UI)
+- `IntersectionObserver` mock
+- `Blob.text()` / `Blob.arrayBuffer()` polyfills
+- `HTMLTrackElement.track` mock (needed by subtitle tests)
+- `MediaMetadata` mock (Media Session API)
+- `window.matchMedia` mock
+- `@testing-library/jest-dom` import
+
+**Solution:** Create a shared setup file at the workspace root:
+
+**`jest.setup.ts`** (workspace root — shared by all packages):
+```ts
+import '@testing-library/jest-dom';
+
+// TextEncoder/TextDecoder polyfills
+import { TextEncoder, TextDecoder } from 'util';
+if (typeof global.TextDecoder === 'undefined') {
+  (global as any).TextDecoder = TextDecoder;
+}
+if (typeof global.TextEncoder === 'undefined') {
+  (global as any).TextEncoder = TextEncoder;
+}
+
+// URL methods
+Object.defineProperty(global.URL, 'createObjectURL', {
+  value: jest.fn(() => `blob:mock-${Math.random()}`),
+  writable: true,
+});
+Object.defineProperty(global.URL, 'revokeObjectURL', {
+  value: jest.fn(),
+  writable: true,
+});
+
+// ResizeObserver (used by Radix UI)
+global.ResizeObserver = class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+
+// IntersectionObserver
+(global as any).IntersectionObserver = class IntersectionObserver {
+  root = null;
+  rootMargin = '';
+  thresholds: number[] = [];
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() { return []; }
+};
+
+// Blob.text() polyfill
+if (typeof Blob !== 'undefined' && !Blob.prototype.text) {
+  Blob.prototype.text = function (): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsText(this);
+    });
+  };
+}
+
+// Blob.arrayBuffer() polyfill
+if (typeof Blob !== 'undefined' && !Blob.prototype.arrayBuffer) {
+  Blob.prototype.arrayBuffer = function (): Promise<ArrayBuffer> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as ArrayBuffer);
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(this);
+    });
+  };
+}
+
+// HTMLTrackElement.prototype.track (needed by subtitle tests)
+if (typeof HTMLTrackElement !== 'undefined') {
+  Object.defineProperty(HTMLTrackElement.prototype, 'track', {
+    get() {
+      if (!this._mockTextTrack) {
+        this._mockTextTrack = { mode: 'disabled' };
+      }
+      return this._mockTextTrack;
+    },
+    configurable: true,
+  });
+}
+
+// MediaMetadata (Media Session API)
+if (typeof global.MediaMetadata === 'undefined') {
+  (global as any).MediaMetadata = class MediaMetadata {
+    title: string;
+    artist: string;
+    album: string;
+    artwork: MediaImage[];
+    constructor(init: MediaMetadataInit = {}) {
+      this.title = init.title ?? '';
+      this.artist = init.artist ?? '';
+      this.album = init.album ?? '';
+      this.artwork = init.artwork ? [...init.artwork] : [];
+    }
+  };
+}
+
+// window.matchMedia
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: jest.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: jest.fn(),
+    removeListener: jest.fn(),
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+    dispatchEvent: jest.fn(),
+  })),
+});
+```
+
+Each package references this shared file.
+
 ## Test Migration Map
 
-### `packages/lightbird/__tests__/` (library + hooks)
+### `packages/lightbird/__tests__/` (library tests)
 
 | Source | Destination |
 |--------|-------------|
@@ -24,6 +168,11 @@ Migrate all 28 test suites to their respective packages. Each package gets its o
 | `src/lib/__tests__/video-thumbnail.test.ts` | `packages/lightbird/__tests__/video-thumbnail.test.ts` |
 | `src/lib/__tests__/video-info.test.ts` | `packages/lightbird/__tests__/video-info.test.ts` |
 | `src/lib/__tests__/progress-estimator.test.ts` | `packages/lightbird/__tests__/progress-estimator.test.ts` |
+
+### `packages/lightbird/__tests__/react/` (hook tests)
+
+| Source | Destination |
+|--------|-------------|
 | `src/hooks/__tests__/use-video-playback.test.ts` | `packages/lightbird/__tests__/react/use-video-playback.test.ts` |
 | `src/hooks/__tests__/use-subtitles.test.ts` | `packages/lightbird/__tests__/react/use-subtitles.test.ts` |
 | `src/hooks/__tests__/use-playlist.test.ts` | `packages/lightbird/__tests__/react/use-playlist.test.ts` |
@@ -35,7 +184,7 @@ Migrate all 28 test suites to their respective packages. Each package gets its o
 | `src/hooks/__tests__/use-media-session.test.ts` | `packages/lightbird/__tests__/react/use-media-session.test.ts` |
 | `src/hooks/__tests__/use-chapters.test.ts` | `packages/lightbird/__tests__/react/use-chapters.test.ts` |
 
-### `packages/ui/__tests__/` (components)
+### `packages/ui/__tests__/` (component tests)
 
 | Source | Destination |
 |--------|-------------|
@@ -49,140 +198,101 @@ Migrate all 28 test suites to their respective packages. Each package gets its o
 ### `packages/lightbird/jest.config.ts`
 
 ```ts
-import type { Config } from 'jest'
+import type { Config } from 'jest';
 
 const config: Config = {
   testEnvironment: 'jsdom',
   roots: ['<rootDir>/__tests__'],
   transform: {
-    '^.+\\.tsx?$': ['ts-jest', {
-      tsconfig: 'tsconfig.json',
-    }],
+    '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
   },
   moduleNameMapper: {
-    // Map package self-references if any tests import from 'lightbird'
-    '^lightbird$': '<rootDir>/src/index.ts',
-    '^lightbird/react$': '<rootDir>/src/react/index.ts',
+    // No @/ aliases in packages — all imports are relative
   },
-  setupFilesAfterSetup: ['./jest.setup.ts'],
-}
+  setupFilesAfterSetup: ['../../jest.setup.ts'],
+};
 
-export default config
-```
-
-**Note:** We switch from `next/jest` (SWC) to `ts-jest` for the packages, since they're not Next.js apps. The app (`apps/web/`) can continue using `next/jest`.
-
-### `packages/lightbird/jest.setup.ts`
-
-```ts
-import '@testing-library/jest-dom'
+export default config;
 ```
 
 ### `packages/ui/jest.config.ts`
 
 ```ts
-import type { Config } from 'jest'
+import type { Config } from 'jest';
 
 const config: Config = {
   testEnvironment: 'jsdom',
   roots: ['<rootDir>/__tests__'],
   transform: {
-    '^.+\\.tsx?$': ['ts-jest', {
-      tsconfig: 'tsconfig.json',
-    }],
+    '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
   },
   moduleNameMapper: {
+    // Resolve workspace packages to source for tests
     '^lightbird$': '<rootDir>/../lightbird/src/index.ts',
     '^lightbird/react$': '<rootDir>/../lightbird/src/react/index.ts',
-    '^@lightbird/ui$': '<rootDir>/src/index.ts',
     '\\.css$': 'identity-obj-proxy',
   },
-  setupFilesAfterSetup: ['./jest.setup.ts'],
-}
+  setupFilesAfterSetup: ['../../jest.setup.ts'],
+};
 
-export default config
-```
-
-### `apps/web/jest.config.ts`
-
-```ts
-import type { Config } from 'jest'
-import nextJest from 'next/jest'
-
-const createJestConfig = nextJest({ dir: './' })
-
-const config: Config = {
-  testEnvironment: 'jsdom',
-  // App-level tests only (if any exist beyond package tests)
-  roots: ['<rootDir>/src'],
-  setupFilesAfterSetup: ['./jest.setup.ts'],
-}
-
-export default createJestConfig(config)
+export default config;
 ```
 
 ## Test Import Updates
 
-All test files need their imports updated to match the new source locations.
+Each test file needs its source imports updated to match the new directory structure.
 
-### Library tests (`packages/lightbird/__tests__/`)
+### Library test pattern (packages/lightbird/__tests__/)
 
-| Old import pattern | New import pattern |
-|-------------------|-------------------|
-| `from '../../lib/subtitle-converter'` | `from '../src/subtitles/subtitle-converter'` |
-| `from '../../lib/video-processor'` | `from '../src/video-processor'` |
-| `from '../../lib/players/mkv-player'` | `from '../src/players/mkv-player'` |
-| `from '../../types'` | `from '../src/types'` |
-| (etc. — match new directory structure) | |
-
-### Hook tests (`packages/lightbird/__tests__/react/`)
-
-| Old import pattern | New import pattern |
-|-------------------|-------------------|
-| `from '../../hooks/use-video-playback'` | `from '../../src/react/use-video-playback'` |
-| `from '../../lib/subtitle-manager'` | `from '../../src/subtitles/subtitle-manager'` |
-| (etc.) | |
-
-### Component tests (`packages/ui/__tests__/`)
-
-| Old import pattern | New import pattern |
-|-------------------|-------------------|
-| `from '../../components/player-controls'` | `from '../src/player-controls'` |
-| `from '../../components/playlist-panel'` | `from '../src/playlist-panel'` |
-| (etc.) | |
-
-## Dev Dependencies per Package
-
-Each package needs its own test deps:
-
-```bash
-# packages/lightbird
-pnpm add -D jest @types/jest ts-jest jest-environment-jsdom @testing-library/jest-dom @testing-library/react @testing-library/user-event
-
-# packages/ui
-pnpm add -D jest @types/jest ts-jest jest-environment-jsdom @testing-library/jest-dom @testing-library/react @testing-library/user-event identity-obj-proxy
 ```
+OLD: import { SubtitleConverter } from '../../lib/subtitle-converter';
+NEW: import { SubtitleConverter } from '../src/subtitles/subtitle-converter';
+
+OLD: import { createVideoPlayer } from '../../lib/video-processor';
+NEW: import { createVideoPlayer } from '../src/video-processor';
+
+OLD: import { MKVPlayer, parseStreamInfo } from '../../lib/players/mkv-player';
+NEW: import { MKVPlayer, parseStreamInfo } from '../src/players/mkv-player';
+
+OLD: import type { ... } from '../../types';
+NEW: import type { ... } from '../src/types';
+```
+
+### Hook test pattern (packages/lightbird/__tests__/react/)
+
+```
+OLD: import { useVideoPlayback } from '../../hooks/use-video-playback';
+NEW: import { useVideoPlayback } from '../../src/react/use-video-playback';
+
+OLD: import { UniversalSubtitleManager } from '../../lib/subtitle-manager';
+NEW: import { UniversalSubtitleManager } from '../../src/subtitles/subtitle-manager';
+```
+
+### Component test pattern (packages/ui/__tests__/)
+
+```
+OLD: import PlayerControls from '../../components/player-controls';
+NEW: import PlayerControls from '../src/player-controls';
+
+OLD: import { PlayerErrorDisplay } from '../../components/player-error-display';
+NEW: import { PlayerErrorDisplay } from '../src/player-error-display';
+```
+
+**Note on `use-subtitles.test.ts`:** This test may mock `useToast`. After Phase 3's refactor (replacing toast with `onError` callback), update the test to pass an `onError` mock instead.
 
 ## Running Tests
 
 ```bash
-# Run all tests across all packages
-pnpm turbo test
-
-# Run only core package tests
-pnpm test --filter lightbird
-
-# Run only UI package tests
-pnpm test --filter @lightbird/ui
-
-# Watch mode (for development)
-cd packages/lightbird && pnpm jest --watch
+pnpm turbo test                          # all packages
+pnpm test --filter lightbird             # core only
+pnpm test --filter @lightbird/ui         # UI only
+cd packages/lightbird && pnpm jest --watch  # dev mode
 ```
 
 ## Verification
 
-After this phase:
-- `pnpm turbo test` runs all 28 test suites and they all pass
-- Each package can run tests independently
-- No test imports reference `@/` aliases
+- `pnpm turbo test` runs all 28 suites and they all pass
+- Each package runs tests independently
+- No `@/` aliases in any test file
 - Coverage target maintained (>70% on core library code)
+- `use-subtitles.test.ts` updated for `onError` callback pattern
