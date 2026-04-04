@@ -1,0 +1,91 @@
+{
+  "name": "lightbird",
+  "version": "0.1.0",
+  "description": "Client-side video player engine. Plays MKV, MP4, WebM with full subtitle, audio track, and chapter support. No server required.",
+  "license": "MIT",
+  "author": "Punyam Singh",
+  "homepage": "https://lightbird.vercel.app/docs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/punyamsingh/lightbird",
+    "directory": "packages/lightbird"
+  },
+  "keywords": [
+    "video",
+    "player",
+    "mkv",
+    "ffmpeg",
+    "subtitles",
+    "webm",
+    "browser",
+    "client-side",
+    "wasm"
+  ],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./react": {
+      "import": {
+        "types": "./dist/react/index.d.ts",
+        "default": "./dist/react/index.js"
+      },
+      "require": {
+        "types": "./dist/react/index.d.cts",
+        "default": "./dist/react/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "jest",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm build"
+  },
+  "dependencies": {
+    "ass-compiler": "^0.1.16",
+    "chardet": "^2.1.1"
+  },
+  "optionalDependencies": {
+    "@ffmpeg/core": "^0.12.6",
+    "@ffmpeg/ffmpeg": "^0.12.10",
+    "@ffmpeg/util": "^0.12.1"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/jest": "^30.0.0",
+    "jest": "^30.3.0",
+    "jest-environment-jsdom": "^30.3.0",
+    "ts-jest": "^29.4.9",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  }
+}

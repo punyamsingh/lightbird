@@ -1,0 +1,32 @@
+{
+  "name": "web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "copy:ffmpeg": "node scripts/copy-ffmpeg-wasm.js",
+    "predev": "npm run copy:ffmpeg",
+    "dev": "next dev -p 9002",
+    "prebuild": "npm run copy:ffmpeg",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "jest"
+  },
+  "dependencies": {
+    "lightbird": "workspace:*",
+    "@lightbird/ui": "workspace:*",
+    "next": "15.5.9",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1",
+    "tailwindcss-animate": "^1.0.7",
+    "typescript": "^5"
+  }
+}
