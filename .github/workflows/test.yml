@@ -23,7 +23,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Build packages
-        run: pnpm turbo build --filter=lightbird --filter=@lightbird/ui
+        run: pnpm turbo build --filter=@lightbird/core --filter=@lightbird/ui
 
       - name: Typecheck
         run: pnpm turbo typecheck
