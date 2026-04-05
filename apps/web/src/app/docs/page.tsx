@@ -42,7 +42,7 @@ export default function DocsPage() {
           A video player that plays everything. Entirely client-side.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <CodeBlock>npm install lightbird</CodeBlock>
+          <CodeBlock>npm install @lightbird/core</CodeBlock>
           <a
             href="/"
             className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-opacity"
@@ -77,7 +77,7 @@ export default function DocsPage() {
       <SectionTitle id="install">Installation</SectionTitle>
 
       <h3 className="text-lg font-semibold mt-8 mb-3">Full UI (React)</h3>
-      <CodeBlock>{`npm install lightbird @lightbird/ui`}</CodeBlock>
+      <CodeBlock>{`npm install @lightbird/core @lightbird/ui`}</CodeBlock>
       <div className="mt-4">
         <CodeBlock>{`"use client"
 import { LightBirdPlayer } from '@lightbird/ui'
@@ -92,12 +92,12 @@ export default function VideoPage() {
       </p>
 
       <h3 className="text-lg font-semibold mt-8 mb-3">Headless React</h3>
-      <CodeBlock>{`npm install lightbird`}</CodeBlock>
+      <CodeBlock>{`npm install @lightbird/core`}</CodeBlock>
       <div className="mt-4">
         <CodeBlock>{`"use client"
 import { useRef } from 'react'
-import { useVideoPlayback, useSubtitles } from 'lightbird/react'
-import { createVideoPlayer } from 'lightbird'
+import { useVideoPlayback, useSubtitles } from '@lightbird/core/react'
+import { createVideoPlayer } from '@lightbird/core'
 
 export default function MyPlayer() {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -120,9 +120,9 @@ export default function MyPlayer() {
       </div>
 
       <h3 className="text-lg font-semibold mt-8 mb-3">Any Framework (Vanilla JS)</h3>
-      <CodeBlock>{`npm install lightbird`}</CodeBlock>
+      <CodeBlock>{`npm install @lightbird/core`}</CodeBlock>
       <div className="mt-4">
-        <CodeBlock>{`import { createVideoPlayer } from 'lightbird'
+        <CodeBlock>{`import { createVideoPlayer } from '@lightbird/core'
 
 const input = document.querySelector('input[type="file"]')
 const video = document.querySelector('video')
@@ -164,7 +164,7 @@ input.addEventListener('change', async (e) => {
       {/* API Reference */}
       <SectionTitle id="api">API Reference</SectionTitle>
 
-      <h3 className="text-lg font-semibold mt-8 mb-3">Core (<code>lightbird</code>)</h3>
+      <h3 className="text-lg font-semibold mt-8 mb-3">Core (<code>@lightbird/core</code>)</h3>
       <CodeBlock>{`// Player factory
 createVideoPlayer(file: File, subtitleFiles?: File[], onProgress?: (n: number) => void): VideoPlayer
 
@@ -185,7 +185,7 @@ validateFile(file: File): { valid: boolean; reason?: string }
 parseMediaError(error: MediaError): ParsedMediaError
 configureLightBird({ ffmpegCDN: string }): void`}</CodeBlock>
 
-      <h3 className="text-lg font-semibold mt-8 mb-3">React Hooks (<code>lightbird/react</code>)</h3>
+      <h3 className="text-lg font-semibold mt-8 mb-3">React Hooks (<code>@lightbird/core/react</code>)</h3>
       <div className="overflow-x-auto">
         <table className="w-full text-sm border border-border rounded-lg">
           <thead>
@@ -255,7 +255,7 @@ configureLightBird({ ffmpegCDN: string }): void`}</CodeBlock>
       <footer className="mt-20 pt-8 border-t border-border text-center text-sm text-muted-foreground">
         <div className="flex justify-center gap-6 mb-4">
           <a href="https://github.com/punyamsingh/lightbird" className="hover:text-foreground transition-colors">GitHub</a>
-          <a href="https://www.npmjs.com/package/lightbird" className="hover:text-foreground transition-colors">npm</a>
+          <a href="https://www.npmjs.com/package/@lightbird/core" className="hover:text-foreground transition-colors">npm</a>
           <span>MIT License</span>
         </div>
         <p>Built by Punyam Singh</p>

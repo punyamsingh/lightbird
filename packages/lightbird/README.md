@@ -1,4 +1,4 @@
-# lightbird
+# @lightbird/core
 
 Client-side video player engine for the browser. Plays MKV, MP4, WebM, AVI, and more — with full subtitle, audio track, and chapter support. No server required.
 
@@ -7,13 +7,13 @@ Client-side video player engine for the browser. Plays MKV, MP4, WebM, AVI, and 
 ## Install
 
 ```bash
-npm install lightbird
+npm install @lightbird/core
 ```
 
 ## Quick Start
 
 ```ts
-import { createVideoPlayer } from 'lightbird'
+import { createVideoPlayer } from '@lightbird/core'
 
 const player = createVideoPlayer(file)
 await player.initialize(videoElement)
@@ -22,7 +22,7 @@ await player.initialize(videoElement)
 ### React Hooks
 
 ```tsx
-import { useVideoPlayback, useSubtitles } from 'lightbird/react'
+import { useVideoPlayback, useSubtitles } from '@lightbird/core/react'
 
 const { isPlaying, togglePlay, seek } = useVideoPlayback(videoRef)
 ```
@@ -30,7 +30,7 @@ const { isPlaying, togglePlay, seek } = useVideoPlayback(videoRef)
 ### Full UI Component
 
 ```bash
-npm install lightbird @lightbird/ui
+npm install @lightbird/core @lightbird/ui
 ```
 
 ```tsx

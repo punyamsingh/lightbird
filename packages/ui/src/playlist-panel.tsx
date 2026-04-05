@@ -1,6 +1,6 @@
 "use client";
 import React, { useRef, useState } from "react";
-import type { PlaylistItem } from "lightbird";
+import type { PlaylistItem } from "@lightbird/core";
 import {
   DndContext,
   closestCenter,
@@ -47,7 +47,7 @@ import {
   Download,
   Upload,
 } from "lucide-react";
-import { exportPlaylist, parseM3U8 } from "lightbird";
+import { exportPlaylist, parseM3U8 } from "@lightbird/core";
 
 export type PlaylistSize = "sm" | "md" | "lg";
 

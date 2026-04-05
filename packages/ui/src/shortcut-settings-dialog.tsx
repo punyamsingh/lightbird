@@ -5,8 +5,8 @@ import {
   saveShortcuts,
   formatShortcutKey,
   matchesShortcut,
-} from "lightbird";
-import type { ShortcutBinding, ShortcutAction } from "lightbird";
+} from "@lightbird/core";
+import type { ShortcutBinding, ShortcutAction } from "@lightbird/core";
 import {
   Dialog,
   DialogContent,

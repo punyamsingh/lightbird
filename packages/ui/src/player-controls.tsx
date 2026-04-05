@@ -1,6 +1,6 @@
 "use client";
 import React, { useMemo, useState } from "react";
-import type { Subtitle, VideoFilters, AudioTrack, Chapter } from "lightbird";
+import type { Subtitle, VideoFilters, AudioTrack, Chapter } from "@lightbird/core";
 import { Slider } from "./primitives/slider";
 import { Button } from "./primitives/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./primitives/popover";

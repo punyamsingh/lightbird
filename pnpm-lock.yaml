@@ -31,12 +31,12 @@ importers:
       '@ffmpeg/util':
         specifier: ^0.12.1
         version: 0.12.2
+      '@lightbird/core':
+        specifier: workspace:*
+        version: link:../../packages/lightbird
       '@lightbird/ui':
         specifier: workspace:*
         version: link:../../packages/ui
-      lightbird:
-        specifier: workspace:*
-        version: link:../../packages/lightbird
       next:
         specifier: 15.5.9
         version: 15.5.9(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -139,6 +139,9 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@18.3.1)
+      '@lightbird/core':
+        specifier: workspace:*
+        version: link:../lightbird
       '@radix-ui/react-dialog':
         specifier: ^1.1.6
         version: 1.1.15(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -178,9 +181,6 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
-      lightbird:
-        specifier: workspace:*
-        version: link:../lightbird
       lucide-react:
         specifier: ^0.475.0
         version: 0.475.0(react@18.3.1)

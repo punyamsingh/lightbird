@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import PlayerControls from '../src/player-controls';
-import type { VideoFilters, Chapter } from 'lightbird';
+import type { VideoFilters, Chapter } from '@lightbird/core';
 
 const defaultFilters: VideoFilters = {
   brightness: 100,
