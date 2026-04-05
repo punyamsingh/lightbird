@@ -1,5 +1,5 @@
 import React from "react";
-import type { VideoMetadata } from "lightbird";
+import type { VideoMetadata } from "@lightbird/core";
 import { X } from "lucide-react";
 
 interface VideoInfoPanelProps {

@@ -1,6 +1,6 @@
 import { AlertCircle } from "lucide-react";
 import { Button } from "./primitives/button";
-import type { ParsedMediaError } from "lightbird";
+import type { ParsedMediaError } from "@lightbird/core";
 
 interface Props {
   error: ParsedMediaError;

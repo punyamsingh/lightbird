@@ -2,7 +2,7 @@ import type { NextConfig } from 'next';
 import path from 'path';
 
 const nextConfig: NextConfig = {
-  transpilePackages: ['lightbird', '@lightbird/ui', 'lucide-react'],
+  transpilePackages: ['@lightbird/core', '@lightbird/ui', 'lucide-react'],
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'placehold.co', port: '', pathname: '/**' },
@@ -29,8 +29,8 @@ const nextConfig: NextConfig = {
     // Worker bundling (new URL(..., import.meta.url)) and "use client" directives
     config.resolve.alias = {
       ...config.resolve.alias,
-      'lightbird/react': path.resolve(__dirname, '../../packages/lightbird/src/react/index.ts'),
-      'lightbird': path.resolve(__dirname, '../../packages/lightbird/src/index.ts'),
+      '@lightbird/core/react': path.resolve(__dirname, '../../packages/lightbird/src/react/index.ts'),
+      '@lightbird/core': path.resolve(__dirname, '../../packages/lightbird/src/index.ts'),
       '@lightbird/ui': path.resolve(__dirname, '../../packages/ui/src/index.ts'),
     };
 

@@ -2,13 +2,13 @@
 
 ## Project Summary
 
-LightBird is a modern, lightweight video player built as a **pnpm monorepo** with **Next.js 15** and **React 18**. It publishes two npm packages (`lightbird` and `@lightbird/ui`) while keeping the web app at lightbird.vercel.app fully functional.
+LightBird is a modern, lightweight video player built as a **pnpm monorepo** with **Next.js 15** and **React 18**. It publishes two npm packages (`@lightbird/core` and `@lightbird/ui`) while keeping the web app at lightbird.vercel.app fully functional.
 
 **Tech stack:** pnpm workspaces, Turborepo, tsup, Next.js 15, React 18, TypeScript, Tailwind CSS, ShadCN UI (Radix UI), FFmpeg.wasm.
 
 **Monorepo structure:**
 - `packages/lightbird/` — Framework-agnostic core: players, parsers, subtitle pipeline, utilities, types
-- `packages/lightbird/src/react/` — React hooks (headless, no UI deps) — subpath export `lightbird/react`
+- `packages/lightbird/src/react/` — React hooks (headless, no UI deps) — subpath export `@lightbird/core/react`
 - `packages/ui/` — Drop-in styled React components (`@lightbird/ui`)
 - `apps/web/` — Next.js app (lightbird.vercel.app)
 
@@ -37,7 +37,7 @@ LightBird is a modern, lightweight video player built as a **pnpm monorepo** wit
 
 ```bash
 pnpm turbo test           # run all package tests
-pnpm test --filter lightbird   # core package only
+pnpm test --filter @lightbird/core   # core package only
 pnpm test --filter @lightbird/ui  # UI package only
 cd packages/lightbird && pnpm jest --watch  # dev mode
 ```

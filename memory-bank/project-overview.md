@@ -10,8 +10,8 @@
 LightBird is a modern, lightweight, browser-based video player built as a **pnpm + Turborepo monorepo**. It publishes two npm packages while keeping the web app at lightbird.vercel.app functional. Its core value proposition is playing a wide range of video formats directly in the browser without server-side transcoding, including MKV files via FFmpeg.wasm.
 
 **npm packages:**
-- `lightbird` — Framework-agnostic core engine (players, parsers, subtitle pipeline, utilities, types)
-- `lightbird/react` — React hooks (subpath export, same npm install)
+- `@lightbird/core` — Framework-agnostic core engine (players, parsers, subtitle pipeline, utilities, types)
+- `@lightbird/core/react` — React hooks (subpath export, same npm install)
 - `@lightbird/ui` — Drop-in styled React components (Tailwind + Radix + Lucide)
 
 ---
@@ -22,7 +22,7 @@ LightBird is a modern, lightweight, browser-based video player built as a **pnpm
 
 ```text
 apps/web/          — Next.js app (lightbird.vercel.app)
-packages/lightbird/ — Core library (npm: lightbird)
+packages/lightbird/ — Core library (npm: @lightbird/core)
 packages/ui/        — UI components (npm: @lightbird/ui)
 ```
 
@@ -48,7 +48,7 @@ apps/web/src/app/page.tsx
         └── PlayerErrorDisplay
 ```
 
-### React Hooks (lightbird/react)
+### React Hooks (@lightbird/core/react)
 
 | Hook | Responsibility |
 |---|---|
@@ -72,7 +72,7 @@ Tests are per-package using ts-jest. Run with:
 
 ```bash
 pnpm turbo test         # all tests
-pnpm test --filter lightbird  # core only
+pnpm test --filter @lightbird/core  # core only
 pnpm test --filter @lightbird/ui  # UI only
 ```
 
@@ -134,6 +134,6 @@ Shared setup: `jest.setup.ts` (root)
 4. **Client-side only** — all video processing in the browser
 5. **Blob URLs** — files loaded via `URL.createObjectURL`, cleaned up on `destroy()`
 6. **`"use client"` via tsup banner** — UI package adds directive automatically
-7. **useSubtitles onError callback** — decouples hook from toast UI (lightbird-player passes toast callback)
+7. **useSubtitles onError callback** — decouples hook from toast UI (LightBirdPlayer passes toast callback)
 8. **FFmpeg as optional dep** — not required if only HTML5 playback needed
-9. **React as optional peer dep** — only needed for `lightbird/react` subpath
+9. **React as optional peer dep** — only needed for `@lightbird/core/react` subpath

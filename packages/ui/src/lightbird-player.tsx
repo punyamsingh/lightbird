@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import type { PlaylistItem, AudioTrack } from "lightbird";
+import type { PlaylistItem, AudioTrack } from "@lightbird/core";
 import { cn } from "./utils/cn";
 import PlayerControls from "./player-controls";
 import PlaylistPanel, { type PlaylistSize } from "./playlist-panel";
@@ -9,7 +9,7 @@ import { PlayerErrorDisplay } from "./player-error-display";
 import { VideoInfoPanel } from "./video-info-panel";
 import { ShortcutSettingsDialog } from "./shortcut-settings-dialog";
 import { useToast } from "./hooks/use-toast";
-import { createVideoPlayer, type VideoPlayer, CancellationError } from "lightbird";
+import { createVideoPlayer, type VideoPlayer, CancellationError } from "@lightbird/core";
 import {
   useVideoPlayback,
   useVideoFilters,
@@ -22,8 +22,8 @@ import {
   useVideoInfo,
   useMediaSession,
   useChapters,
-} from "lightbird/react";
-import { captureVideoThumbnail, parseMediaError, validateFile, type ParsedMediaError, loadShortcuts, type ShortcutBinding, ProgressEstimator } from "lightbird";
+} from "@lightbird/core/react";
+import { captureVideoThumbnail, parseMediaError, validateFile, type ParsedMediaError, loadShortcuts, type ShortcutBinding, ProgressEstimator } from "@lightbird/core";
 import { SubtitleOverlay } from "./subtitle-overlay";
 
 const MAX_RETRIES = 3;
@@ -616,7 +616,7 @@ const LightBirdPlayer = () => {
             >
               <h2 className="text-lg font-semibold mb-4">Keyboard Shortcuts</h2>
               <div className="space-y-1 max-h-80 overflow-y-auto">
-                {shortcuts.map((b: import("lightbird").ShortcutBinding) => {
+                {shortcuts.map((b: import("@lightbird/core").ShortcutBinding) => {
                   const mods: string[] = [];
                   if (b.modifiers?.ctrl) mods.push("Ctrl");
                   if (b.modifiers?.shift) mods.push("Shift");

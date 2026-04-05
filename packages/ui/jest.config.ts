@@ -17,8 +17,8 @@ const config: Config = {
   },
   moduleNameMapper: {
     // Resolve workspace packages to built dist (CI builds before testing)
-    '^lightbird$': '<rootDir>/../lightbird/dist/index.cjs',
-    '^lightbird/react$': '<rootDir>/../lightbird/dist/react/index.cjs',
+    '^@lightbird/core$': '<rootDir>/../lightbird/dist/index.cjs',
+    '^@lightbird/core/react$': '<rootDir>/../lightbird/dist/react/index.cjs',
     '\\.css$': 'identity-obj-proxy',
     '^lucide-react$': '<rootDir>/__mocks__/lucide-react.ts',
     // Mock ESM-only packages that the CJS dist externals can't resolve

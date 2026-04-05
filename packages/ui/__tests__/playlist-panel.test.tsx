@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import PlaylistPanel from '../src/playlist-panel';
-import type { PlaylistItem } from 'lightbird';
+import type { PlaylistItem } from '@lightbird/core';
 
 // Mock @dnd-kit to avoid needing pointer events in jsdom
 jest.mock('@dnd-kit/core', () => ({
@@ -31,8 +31,8 @@ jest.mock('@dnd-kit/utilities', () => ({
 }));
 
 // Mock m3u-parser to avoid DOM side effects in export tests
-jest.mock('lightbird', () => ({
-  ...jest.requireActual('lightbird'),
+jest.mock('@lightbird/core', () => ({
+  ...jest.requireActual('@lightbird/core'),
   exportPlaylist: jest.fn(),
   parseM3U8: jest.fn().mockReturnValue([]),
 }));
