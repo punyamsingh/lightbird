@@ -1,0 +1,115 @@
+import { SimplePlayer, type SimplePlayerFile } from './players/simple-player';
+import { MKVPlayer, type MKVPlayerFile } from './players/mkv-player';
+import type { AudioTrack, Subtitle, Chapter } from "./types";
+
+export type ProcessedFile = SimplePlayerFile | MKVPlayerFile;
+
+export interface VideoPlayer {
+  initialize(videoElement: HTMLVideoElement): Promise<ProcessedFile>;
+  getAudioTracks(): AudioTrack[];
+  getSubtitles(): Subtitle[];
+  getChapters?(): Chapter[];
+  switchAudioTrack(trackId: string): Promise<void>;
+  switchSubtitle(trackId: string): Promise<void>;
+  destroy(): void;
+  cancel?(): void;
+  /**
+   * Resolves when track metadata is fully populated. Only meaningful for
+   * MKVPlayer on the native path (where the probe runs after initialize()).
+   * For all other players/paths this is already resolved when initialize() returns.
+   */
+  tracksReady?: Promise<void>;
+}
+
+class SimplePlayerAdapter implements VideoPlayer {
+  private player: SimplePlayer;
+
+  constructor(file: File, externalSubtitles: File[] = []) {
+    this.player = new SimplePlayer(file, externalSubtitles);
+  }
+
+  async initialize(videoElement: HTMLVideoElement): Promise<ProcessedFile> {
+    return await this.player.initialize(videoElement);
+  }
+
+  getAudioTracks(): AudioTrack[] {
+    return this.player.getAudioTracks();
+  }
+
+  getSubtitles(): Subtitle[] {
+    return this.player.getSubtitles();
+  }
+
+  async switchAudioTrack(trackId: string): Promise<void> {
+    return await this.player.switchAudioTrack(trackId);
+  }
+
+  async switchSubtitle(trackId: string): Promise<void> {
+    return await this.player.switchSubtitle(trackId);
+  }
+
+  destroy(): void {
+    this.player.destroy();
+  }
+}
+
+class MKVPlayerAdapter implements VideoPlayer {
+  private player: MKVPlayer;
+
+  constructor(file: File, onProgress?: (progress: number) => void) {
+    this.player = new MKVPlayer(file, onProgress);
+  }
+
+  async initialize(videoElement: HTMLVideoElement): Promise<ProcessedFile> {
+    return await this.player.initialize(videoElement);
+  }
+
+  getAudioTracks(): AudioTrack[] {
+    return this.player.getAudioTracks();
+  }
+
+  getSubtitles(): Subtitle[] {
+    return this.player.getSubtitles();
+  }
+
+  getChapters(): Chapter[] {
+    return this.player.getChapters();
+  }
+
+  async switchAudioTrack(trackId: string): Promise<void> {
+    return await this.player.switchAudioTrack(trackId);
+  }
+
+  async switchSubtitle(trackId: string): Promise<void> {
+    return await this.player.switchSubtitle(trackId);
+  }
+
+  destroy(): void {
+    this.player.destroy();
+  }
+
+  cancel(): void {
+    this.player.cancel();
+  }
+
+  get tracksReady(): Promise<void> {
+    return this.player.tracksReady;
+  }
+}
+
+export function createVideoPlayer(
+  file: File,
+  externalSubtitles: File[] = [],
+  onProgress?: (progress: number) => void,
+): VideoPlayer {
+  // Smart format detection
+  if (MKVPlayer.isCompatible(file)) {
+    return new MKVPlayerAdapter(file, onProgress);
+  } else if (SimplePlayer.isCompatible(file)) {
+    return new SimplePlayerAdapter(file, externalSubtitles);
+  } else {
+    // Fallback to simple player for unknown formats
+    return new SimplePlayerAdapter(file, externalSubtitles);
+  }
+}
+

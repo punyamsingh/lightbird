@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom';
 
-// Make Node's TextEncoder/TextDecoder available in the jsdom test environment
+// TextEncoder/TextDecoder polyfills
 import { TextEncoder, TextDecoder } from 'util';
 if (typeof global.TextDecoder === 'undefined') {
   (global as any).TextDecoder = TextDecoder;
@@ -9,7 +9,7 @@ if (typeof global.TextEncoder === 'undefined') {
   (global as any).TextEncoder = TextEncoder;
 }
 
-// Mock URL methods unavailable in jsdom
+// URL methods
 Object.defineProperty(global.URL, 'createObjectURL', {
   value: jest.fn(() => `blob:mock-${Math.random()}`),
   writable: true,
@@ -20,14 +20,14 @@ Object.defineProperty(global.URL, 'revokeObjectURL', {
   writable: true,
 });
 
-// Mock ResizeObserver (used by Radix UI)
+// ResizeObserver (used by Radix UI)
 global.ResizeObserver = class ResizeObserver {
   observe() {}
   unobserve() {}
   disconnect() {}
 };
 
-// Mock IntersectionObserver
+// IntersectionObserver
 (global as any).IntersectionObserver = class IntersectionObserver {
   root = null;
   rootMargin = '';
@@ -40,7 +40,7 @@ global.ResizeObserver = class ResizeObserver {
   }
 };
 
-// Polyfill File.text() — jsdom 26 does not implement Blob/File.text()
+// Blob.text() polyfill
 if (typeof Blob !== 'undefined' && !Blob.prototype.text) {
   Blob.prototype.text = function (): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -52,7 +52,7 @@ if (typeof Blob !== 'undefined' && !Blob.prototype.text) {
   };
 }
 
-// Polyfill Blob.arrayBuffer() — jsdom 26 does not implement it
+// Blob.arrayBuffer() polyfill
 if (typeof Blob !== 'undefined' && !Blob.prototype.arrayBuffer) {
   Blob.prototype.arrayBuffer = function (): Promise<ArrayBuffer> {
     return new Promise((resolve, reject) => {
@@ -64,7 +64,7 @@ if (typeof Blob !== 'undefined' && !Blob.prototype.arrayBuffer) {
   };
 }
 
-// Mock HTMLTrackElement.prototype.track — jsdom does not implement TextTrack
+// HTMLTrackElement.prototype.track
 if (typeof HTMLTrackElement !== 'undefined') {
   Object.defineProperty(HTMLTrackElement.prototype, 'track', {
     get() {
@@ -77,7 +77,7 @@ if (typeof HTMLTrackElement !== 'undefined') {
   });
 }
 
-// Mock MediaMetadata (Media Session API — not available in jsdom)
+// MediaMetadata (Media Session API)
 if (typeof global.MediaMetadata === 'undefined') {
   (global as any).MediaMetadata = class MediaMetadata {
     title: string;
@@ -93,7 +93,7 @@ if (typeof global.MediaMetadata === 'undefined') {
   };
 }
 
-// Mock window.matchMedia
+// window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: jest.fn().mockImplementation((query: string) => ({

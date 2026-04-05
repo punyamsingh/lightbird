@@ -1,0 +1,17 @@
+diff --git a/dist/esm/classes.js b/dist/esm/classes.js
+index fae47533aa26ba897030686e25b08527f2688a6b..c9bfbdf88eaad981be009ca1f0cdfc9298ae56f4 100644
+--- a/dist/esm/classes.js
++++ b/dist/esm/classes.js
+@@ -102,7 +102,11 @@ export class FFmpeg {
+     load = ({ classWorkerURL, ...config } = {}, { signal } = {}) => {
+         if (!this.#worker) {
+             this.#worker = classWorkerURL ?
+-                new Worker(new URL(classWorkerURL, import.meta.url), {
++                new Worker(new URL(classWorkerURL, (typeof document !== 'undefined' ? document.baseURI : 'http://localhost')
++                    .split('/')
++                    .slice(0, -1)
++                    .join('/') +
++                    '/'), {
+                     type: "module",
+                 }) :
+                 // We need to duplicated the code here to enable webpack

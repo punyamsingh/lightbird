@@ -1,122 +1,87 @@
 # LightBird — Project Overview
 
-> **Last updated:** 2026-03-13
-> **Branch context:** Plans 01–06 implemented; Plans 08 (Keyboard Shortcut Customisation), 09 (Video Info Panel), and 10 (Codebase Cleanup) now also implemented. Media Session API plan (MS-01, MS-02) implemented. Picture-in-Picture plan (PIP-01, PIP-02) implemented. Chapters plan (CH-01–CH-04) implemented.
+> **Last updated:** 2026-04-04
+> **Branch context:** Plans 01–12 implemented. Project is now a pnpm monorepo publishing two npm packages: `lightbird` (core) and `@lightbird/ui` (React components).
 
 ---
 
 ## What is LightBird?
 
-LightBird is a modern, lightweight, browser-based video player built with Next.js 15 and React 18. Its core value proposition is playing a wide range of video formats directly in the browser without server-side transcoding, including MKV files (planned via FFmpeg.wasm).
+LightBird is a modern, lightweight, browser-based video player built as a **pnpm + Turborepo monorepo**. It publishes two npm packages while keeping the web app at lightbird.vercel.app functional. Its core value proposition is playing a wide range of video formats directly in the browser without server-side transcoding, including MKV files via FFmpeg.wasm.
+
+**npm packages:**
+- `lightbird` — Framework-agnostic core engine (players, parsers, subtitle pipeline, utilities, types)
+- `lightbird/react` — React hooks (subpath export, same npm install)
+- `@lightbird/ui` — Drop-in styled React components (Tailwind + Radix + Lucide)
 
 ---
 
 ## Architecture
+
+### Monorepo Structure
+
+```text
+apps/web/          — Next.js app (lightbird.vercel.app)
+packages/lightbird/ — Core library (npm: lightbird)
+packages/ui/        — UI components (npm: @lightbird/ui)
+```
 
 ### Dual-Player System
 
 | Player | Handles | Implementation |
 |---|---|---|
 | `SimplePlayer` | MP4, WebM, AVI, MOV, WMV, FLV, OGV | Native HTML5 `<video>` element |
-| `MKVPlayer` | MKV | FFmpeg.wasm running in a **Web Worker** — probes streams, remuxes to fragmented MP4, extracts embedded subtitles; `destroy()` calls `worker.terminate()`; falls back to native on failure |
+| `MKVPlayer` | MKV | FFmpeg.wasm in Web Worker — probes, remuxes to MP4, extracts subtitles |
 
-The factory function `createVideoPlayer(file)` in `src/lib/video-processor.ts` selects the right player based on file extension.
+The factory function `createVideoPlayer(file)` in `packages/lightbird/src/video-processor.ts` selects the right player.
 
 ### Component Hierarchy
 
-```
-src/app/page.tsx
-└── src/components/player-error-boundary.tsx  (React error boundary, Plan 05)
-    └── src/components/lightbird-player.tsx   (thin coordinator)
-        ├── src/components/player-controls.tsx
-        ├── src/components/playlist-panel.tsx
-        ├── src/components/video-overlay.tsx  (loading spinner overlay)
-        └── src/components/player-error-display.tsx  (error overlay, Plan 05)
+```text
+apps/web/src/app/page.tsx
+└── @lightbird/ui: PlayerErrorBoundary
+    └── @lightbird/ui: LightBirdPlayer (coordinator)
+        ├── PlayerControls
+        ├── PlaylistPanel
+        ├── VideoOverlay
+        ├── SubtitleOverlay
+        └── PlayerErrorDisplay
 ```
 
-### Custom Hooks (added in Plan 03)
+### React Hooks (lightbird/react)
 
 | Hook | Responsibility |
 |---|---|
-| `src/hooks/use-video-playback.ts` | Play/pause/seek/volume/rate state + video event listeners |
-| `src/hooks/use-video-filters.ts` | Brightness/contrast/saturation/hue/zoom state + CSS application |
-| `src/hooks/use-subtitles.ts` | Subtitle list, UniversalSubtitleManager lifecycle, add/remove/switch |
-| `src/hooks/use-playlist.ts` | Playlist array, current index, file parsing, removeItem, reorderItems, addFiles, localStorage persistence |
-| `src/hooks/use-keyboard-shortcuts.ts` | Keyboard event registration (Space/Arrows/M/F) |
-| `src/hooks/use-fullscreen.ts` | Fullscreen enter/exit/detect |
-| `src/hooks/use-progress-persistence.ts` | localStorage save (debounced 5s) and restore |
-| `src/hooks/use-media-session.ts` | MediaSession API: metadata (title + artwork), hardware key handlers (play/pause/next/prev/seek) |
-| `src/hooks/use-picture-in-picture.ts` | PiP enter/exit/toggle/detect (`requestPictureInPicture` + events) |
-
-### Supporting Libraries
-
-| File | Purpose |
-|---|---|
-| `src/lib/subtitle-converter.ts` | Converts SRT → VTT for browser playback |
-| `src/lib/subtitle-manager.ts` | Manages `<track>` elements on the video element |
-| `src/lib/players/simple-player.ts` | HTML5 player wrapper with subtitle support |
-| `src/lib/players/mkv-player.ts` | MKV player — probes with FFmpeg, remuxes to MP4, extracts embedded subtitles |
-| `src/lib/ffmpeg-singleton.ts` | Lazy-loaded shared FFmpeg.wasm instance (CDN fetch on first MKV load) |
-| `src/types/index.ts` | Shared TypeScript interfaces (`id`, `duration` added to `PlaylistItem`) |
-| `src/components/video-overlay.tsx` | Loading/processing overlay component |
-| `src/lib/media-error.ts` | `parseMediaError` + `validateFile` (Plan 05) |
-| `src/components/player-error-display.tsx` | Error overlay with Retry/Skip/Dismiss (Plan 05) |
-| `src/components/player-error-boundary.tsx` | React class Error Boundary (Plan 05) |
-| `src/lib/m3u-parser.ts` | M3U8 export and import parsing (Plan 06) |
-| `src/lib/video-thumbnail.ts` | Captures a JPEG thumbnail frame from a video element (seek-and-draw) for MediaSession artwork |
+| `use-video-playback.ts` | Play/pause/seek/volume/rate/loop + video events |
+| `use-video-filters.ts` | Brightness/contrast/saturation/hue/zoom + rAF-batched CSS |
+| `use-subtitles.ts` | Subtitle management with onError/onSuccess callbacks |
+| `use-playlist.ts` | Playlist state, file parsing, reorder, localStorage persistence |
+| `use-keyboard-shortcuts.ts` | Keyboard event binding |
+| `use-fullscreen.ts` | Fullscreen enter/exit/detect |
+| `use-progress-persistence.ts` | localStorage save (debounced 5s) and restore |
+| `use-media-session.ts` | MediaSession API: metadata, hardware key handlers |
+| `use-picture-in-picture.ts` | PiP enter/exit/toggle/detect |
+| `use-video-info.ts` | Video metadata extraction |
+| `use-chapters.ts` | Chapter navigation from MKV metadata |
 
 ---
 
-## Current State
+## Test Suite
 
-### What works
-- MP4, WebM, and other HTML5-native formats play correctly.
-- SRT subtitles are converted to VTT and loaded as `<track>` elements.
-- External subtitle uploads (SRT/VTT) work via `UniversalSubtitleManager`.
-- Playlist management (local files + stream URLs).
-- Playback controls: play/pause, seek, volume, speed, fullscreen, screenshot, loop.
-- Video filters: brightness, contrast, saturation, hue, zoom.
-- Progress persistence via `localStorage`.
-- Keyboard shortcuts for common actions.
-
-### Known limitations / not yet implemented
-- **MKV FFmpeg.wasm** — implemented (Plan 02); FFmpeg core loaded from unpkg CDN (~31 MB); for production, copy assets to `/public/ffmpeg/` to avoid CDN dependency.
-- **Error handling implemented** — Plan 05 done; see `src/lib/media-error.ts`, `PlayerErrorDisplay`, `PlayerErrorBoundary`.
-- **Playlist management implemented** — Plan 06 done; drag-and-drop reordering, M3U8 import/export, folder opening, and sorting.
-- **No playlist persistence** — playlist is not persisted after page refresh (persist to localStorage if needed).
-- **No advanced subtitle formats** — ASS/SSA not supported; no sync offset (Plan 07).
-- **Keyboard shortcuts customisable** — registry in `src/lib/keyboard-shortcuts.ts`, persisted to localStorage, configurable via ShortcutSettingsDialog.
-- **Video info panel added** — shows filename, size, duration, resolution, codec from native API (Plan 09 DONE).
-- **Unused dependencies removed** — Firebase, Genkit, ReCharts uninstalled; `src/ai/` deleted (Plan 10 DONE).
-- **Build errors re-enabled** — `next.config.ts` no longer suppresses TypeScript/ESLint errors (Plan 10 DONE).
-
----
-
-## Test Suite (Plan 01 — DONE)
-
-Tests were added as part of Plan 01. Run them with:
+Tests are per-package using ts-jest. Run with:
 
 ```bash
-npm test              # all tests
-npm run test:coverage # with coverage report
+pnpm turbo test         # all tests
+pnpm test --filter lightbird  # core only
+pnpm test --filter @lightbird/ui  # UI only
 ```
 
-### Test files
+Test locations:
+- `packages/lightbird/__tests__/` — library tests (14 files)
+- `packages/lightbird/__tests__/react/` — hook tests (10 files)
+- `packages/ui/__tests__/` — component tests (4 files)
 
-| File | What it covers |
-|---|---|
-| `src/lib/__tests__/subtitle-converter.test.ts` | SRT→VTT conversion, edge cases |
-| `src/lib/__tests__/video-processor.test.ts` | Player factory routing, VideoPlayer interface |
-| `src/lib/__tests__/subtitle-manager.test.ts` | Add/remove/clear subtitles, DOM track elements |
-| `src/lib/__tests__/ffmpeg-singleton.test.ts` | Singleton lifecycle, lazy loading, reset |
-| `src/lib/__tests__/mkv-player.test.ts` | parseStreamInfo, MKVPlayer fallback, progress, embedded subs |
-| `src/lib/__tests__/media-error.test.ts` | parseMediaError all codes, validateFile extension/size checks |
-| `src/components/__tests__/player-controls.test.tsx` | Control buttons, speed selector, callbacks, PiP button |
-| `src/components/__tests__/playlist-panel.test.tsx` | Empty state, item rendering, selection, stream URL |
-| `src/components/__tests__/player-error-display.test.tsx` | Error display rendering, button callbacks |
-| `src/components/__tests__/player-error-boundary.test.tsx` | Error boundary fallback UI, reset |
-
-CI runs on every push and PR via `.github/workflows/test.yml`.
+Shared setup: `jest.setup.ts` (root)
 
 ---
 
@@ -130,16 +95,15 @@ CI runs on every push and PR via `.github/workflows/test.yml`.
 | 04 | Performance Optimisation | **DONE** |
 | 05 | Error Handling & Recovery | **DONE** |
 | 06 | Playlist Management (DnD, M3U8) | **DONE** |
-| 07 | Advanced Subtitle Support (ASS/SSA, offset) | Pending |
+| 07 | Advanced Subtitle Support | Pending |
 | 08 | Keyboard Customisation | **DONE** |
 | 09 | Video Info Panel | **DONE** |
 | 10 | Codebase Cleanup | **DONE** |
 | 11 | MKV Loading UX Improvements | **DONE** |
+| 12 | npm Library Extraction | **DONE** |
 | MS | Media Session API | **DONE** |
 | PIP | Picture-in-Picture | **DONE** |
-| CH | Chapters & Cue Points (CH-01–CH-04) | **DONE** |
-
-Full plan details: `memory-bank/plans/01-test-suite.md` … `10-codebase-cleanup.md`, `memory-bank/plans/11-mkv-loading-ux/`, `memory-bank/plans/media-session/`
+| CH | Chapters & Cue Points | **DONE** |
 
 ---
 
@@ -147,35 +111,29 @@ Full plan details: `memory-bank/plans/01-test-suite.md` … `10-codebase-cleanup
 
 | Layer | Technology | Version |
 |---|---|---|
-| Framework | Next.js (App Router) | 15.5.9 |
-| List virtualisation | @tanstack/react-virtual | ^3.x |
+| Monorepo | pnpm workspaces + Turborepo | pnpm 9, turbo 2 |
+| Bundler (packages) | tsup | 8.x |
+| Framework (app) | Next.js (App Router) | 15.5.9 |
 | UI library | React | 18.3.1 |
 | Language | TypeScript | 5.x |
 | Styling | Tailwind CSS + ShadCN UI | 3.4.1 |
 | Component primitives | Radix UI | various |
-| Video processing | FFmpeg.wasm (`@ffmpeg/ffmpeg`) | 0.12.10 |
+| Video processing | FFmpeg.wasm | 0.12.10 |
 | Icons | Lucide React | 0.475.0 |
-| Drag-and-drop | @dnd-kit/core + @dnd-kit/sortable + @dnd-kit/utilities | — |
-| Testing | Jest + React Testing Library | Jest 30, RTL 16 |
-| Forms | React Hook Form + Zod | — |
-| Hosting | Firebase App Hosting | — |
+| Drag-and-drop | @dnd-kit | 6.x/10.x |
+| List virtualisation | @tanstack/react-virtual | 3.x |
+| Testing | Jest + ts-jest + RTL | Jest 30, RTL 16 |
 
 ---
 
 ## Key Architectural Decisions
 
-1. **No Redux/Zustand** — state is managed via focused custom hooks (Plan 03). Each domain (playback, filters, subtitles, playlist, fullscreen) has its own hook; `lightbird-player.tsx` is a thin coordinator.
-
-2. **Client-side only** — all video processing and playback happens in the browser. No server-side video handling.
-
-3. **SWC transform** — tests use `next/jest` with Next.js's built-in SWC transform (not `ts-jest`).
-
-4. **`"use client"` directives** — all components and lib files are client-side. Server components are not used in the player layer.
-
-5. **Blob URLs** — video files are loaded via `URL.createObjectURL`. These are cleaned up on `destroy()`.
-
-6. **Playlist virtualisation** (Plan 04) — `PlaylistPanel` uses `@tanstack/react-virtual` (`useVirtualizer`) so only the ~10 visible items are in the DOM regardless of playlist size. `ScrollArea` (Radix) replaced with a plain `<div>` as the scroll container. Item heights are measured at runtime via `virtualizer.measureElement`.
-
-7. **Component memoisation** (Plan 04) — `PlayerControls` and `PlaylistPanel` are wrapped in `React.memo`. All callback props passed to them (`handleNext`, `handlePrevious`, `loadVideo`, `processFile`, `handleSelectVideo`, etc.) are memoised with `useCallback` so referential stability is preserved and `React.memo` is effective during the ~4 `timeupdate` ticks per second.
-
-8. **rAF-batched filter writes** (Plan 04) — `use-video-filters.ts` schedules `style.filter` / `style.transform` DOM writes inside `requestAnimationFrame`, capping updates at 60 fps during rapid slider input and avoiding layout thrashing.
+1. **Monorepo with pnpm + Turborepo** — strict dependency isolation, task caching, correct build ordering
+2. **tsup for packages** — ESM + CJS dual output with TypeScript declarations
+3. **No Redux/Zustand** — custom hooks for domain-specific state
+4. **Client-side only** — all video processing in the browser
+5. **Blob URLs** — files loaded via `URL.createObjectURL`, cleaned up on `destroy()`
+6. **`"use client"` via tsup banner** — UI package adds directive automatically
+7. **useSubtitles onError callback** — decouples hook from toast UI (lightbird-player passes toast callback)
+8. **FFmpeg as optional dep** — not required if only HTML5 playback needed
+9. **React as optional peer dep** — only needed for `lightbird/react` subpath
