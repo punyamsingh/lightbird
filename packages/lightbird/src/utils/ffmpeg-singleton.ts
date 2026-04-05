@@ -5,7 +5,7 @@ import { getConfig } from '../config';
 let instance: FFmpeg | null = null;
 let loading: Promise<FFmpeg> | null = null;
 
-const defaultCDN = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+const defaultCDN = 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd';
 
 export async function getFFmpeg(): Promise<FFmpeg> {
   if (instance) return instance;
