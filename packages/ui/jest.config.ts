@@ -4,7 +4,16 @@ const config: Config = {
   testEnvironment: 'jsdom',
   roots: ['<rootDir>/__tests__'],
   transform: {
-    '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
+    '^.+\\.tsx?$': ['ts-jest', {
+      tsconfig: 'tsconfig.json',
+      diagnostics: { ignoreDiagnostics: [1343] },
+      astTransformers: {
+        before: [{
+          path: 'ts-jest-mock-import-meta',
+          options: { metaObjectReplacement: { url: 'file:///test' } },
+        }],
+      },
+    }],
   },
   moduleNameMapper: {
     // Resolve workspace packages to built dist (CI builds before testing)

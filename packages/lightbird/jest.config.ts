@@ -4,12 +4,16 @@ const config: Config = {
   testEnvironment: 'jsdom',
   roots: ['<rootDir>/__tests__'],
   transform: {
-    '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
-  },
-  moduleNameMapper: {
-    // Redirect the create-worker module (which uses import.meta.url)
-    // to a mock that avoids the CJS parse error
-    '.*/workers/create-worker': '<rootDir>/__mocks__/create-worker.ts',
+    '^.+\\.tsx?$': ['ts-jest', {
+      tsconfig: 'tsconfig.json',
+      diagnostics: { ignoreDiagnostics: [1343] },
+      astTransformers: {
+        before: [{
+          path: 'ts-jest-mock-import-meta',
+          options: { metaObjectReplacement: { url: 'file:///test' } },
+        }],
+      },
+    }],
   },
   setupFilesAfterEnv: ['../../jest.setup.ts'],
 };

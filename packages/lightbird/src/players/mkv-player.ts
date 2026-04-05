@@ -158,11 +158,8 @@ export class MKVPlayer {
       if (MKVPlayer._workerFactory) {
         w = MKVPlayer._workerFactory();
       } else {
-        // Worker creation is in a separate module so tests can mock it
-        // without needing to parse import.meta.url
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { createFFmpegWorker } = require('../workers/create-worker') as { createFFmpegWorker: () => Worker };
-        w = createFFmpegWorker();
+        // Next.js/webpack requires this exact inline pattern for Worker bundling
+        w = new Worker(new URL('../workers/ffmpeg-worker.ts', import.meta.url));
       }
       w.onmessage = (event: MessageEvent) => {
         this._handleWorkerMessage(event.data);
