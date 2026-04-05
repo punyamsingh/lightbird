@@ -45,7 +45,8 @@
     "**/*.css"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && pnpm run build:css",
+    "build:css": "tailwindcss -i ./src/styles/input.css -o ./dist/styles.css --minify",
     "dev": "tsup --watch",
     "test": "jest",
     "typecheck": "tsc --noEmit",
