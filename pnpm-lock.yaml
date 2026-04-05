@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@ffmpeg/ffmpeg':
+    hash: uu3uj3yc4rby6vuthniwggrcw4
+    path: patches/@ffmpeg__ffmpeg.patch
+
 importers:
 
   .:
@@ -22,7 +27,7 @@ importers:
         version: 0.12.10
       '@ffmpeg/ffmpeg':
         specifier: ^0.12.10
-        version: 0.12.15
+        version: 0.12.15(patch_hash=uu3uj3yc4rby6vuthniwggrcw4)
       '@ffmpeg/util':
         specifier: ^0.12.1
         version: 0.12.2
@@ -78,7 +83,7 @@ importers:
         version: 0.12.10
       '@ffmpeg/ffmpeg':
         specifier: ^0.12.10
-        version: 0.12.15
+        version: 0.12.15(patch_hash=uu3uj3yc4rby6vuthniwggrcw4)
       '@ffmpeg/util':
         specifier: ^0.12.1
         version: 0.12.2
@@ -3724,7 +3729,7 @@ snapshots:
 
   '@ffmpeg/core@0.12.10': {}
 
-  '@ffmpeg/ffmpeg@0.12.15':
+  '@ffmpeg/ffmpeg@0.12.15(patch_hash=uu3uj3yc4rby6vuthniwggrcw4)':
     dependencies:
       '@ffmpeg/types': 0.12.4
 

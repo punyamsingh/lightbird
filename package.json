@@ -12,5 +12,10 @@
     "@testing-library/jest-dom": "^6.9.1",
     "turbo": "^2.0.0"
   },
-  "packageManager": "pnpm@9.15.9"
+  "packageManager": "pnpm@9.15.9",
+  "pnpm": {
+    "patchedDependencies": {
+      "@ffmpeg/ffmpeg": "patches/@ffmpeg__ffmpeg.patch"
+    }
+  }
 }
