@@ -17,6 +17,15 @@ importers:
 
   apps/web:
     dependencies:
+      '@ffmpeg/core':
+        specifier: ^0.12.6
+        version: 0.12.10
+      '@ffmpeg/ffmpeg':
+        specifier: ^0.12.10
+        version: 0.12.15
+      '@ffmpeg/util':
+        specifier: ^0.12.1
+        version: 0.12.2
       '@lightbird/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -3713,19 +3722,15 @@ snapshots:
   '@esbuild/win32-x64@0.27.7':
     optional: true
 
-  '@ffmpeg/core@0.12.10':
-    optional: true
+  '@ffmpeg/core@0.12.10': {}
 
   '@ffmpeg/ffmpeg@0.12.15':
     dependencies:
       '@ffmpeg/types': 0.12.4
-    optional: true
 
-  '@ffmpeg/types@0.12.4':
-    optional: true
+  '@ffmpeg/types@0.12.4': {}
 
-  '@ffmpeg/util@0.12.2':
-    optional: true
+  '@ffmpeg/util@0.12.2': {}
 
   '@floating-ui/core@1.7.5':
     dependencies:
