@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import path from 'path';
 
 const nextConfig: NextConfig = {
   transpilePackages: ['lightbird', '@lightbird/ui', 'lucide-react'],
@@ -23,6 +24,16 @@ const nextConfig: NextConfig = {
     if (!isServer) {
       config.output.globalObject = 'self';
     }
+
+    // Resolve workspace packages to source code so webpack can handle
+    // Worker bundling (new URL(..., import.meta.url)) and "use client" directives
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      'lightbird/react': path.resolve(__dirname, '../../packages/lightbird/src/react/index.ts'),
+      'lightbird': path.resolve(__dirname, '../../packages/lightbird/src/index.ts'),
+      '@lightbird/ui': path.resolve(__dirname, '../../packages/ui/src/index.ts'),
+    };
+
     return config;
   },
 };
