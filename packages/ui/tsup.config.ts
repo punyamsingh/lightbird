@@ -13,8 +13,8 @@ export default defineConfig({
   external: [
     'react',
     'react-dom',
-    'lightbird',
-    'lightbird/react',
+    '@lightbird/core',
+    '@lightbird/core/react',
   ],
   onSuccess: async () => {
     // Prepend "use client" directive to output files

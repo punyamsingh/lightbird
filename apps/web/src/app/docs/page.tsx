@@ -303,7 +303,7 @@ export default function DocsPage() {
               ))}
             </div>
             <div className="flex flex-col sm:flex-row gap-4 items-start">
-              <CodeBlock className="flex-1 max-w-sm">npm install lightbird</CodeBlock>
+              <CodeBlock className="flex-1 max-w-sm">npm install @lightbird/core</CodeBlock>
               <a
                 href="/"
                 className="inline-flex items-center gap-2 px-6 py-3 bg-[hsl(207,100%,45%)] text-white rounded-xl font-medium text-sm hover:bg-[hsl(207,100%,50%)] transition-colors"
@@ -352,14 +352,14 @@ export default function DocsPage() {
 
             <div id="api-core" className="scroll-mt-24 mb-12">
               <SectionHeading id="api-core-heading" sub>
-                Core &mdash; <code className="text-sm font-normal font-code text-muted-foreground">lightbird</code>
+                Core &mdash; <code className="text-sm font-normal font-code text-muted-foreground">@lightbird/core</code>
               </SectionHeading>
               <CodeBlock>{CORE_API}</CodeBlock>
             </div>
 
             <div id="api-hooks" className="scroll-mt-24 mb-12">
               <SectionHeading id="api-hooks-heading" sub>
-                React Hooks &mdash; <code className="text-sm font-normal font-code text-muted-foreground">lightbird/react</code>
+                React Hooks &mdash; <code className="text-sm font-normal font-code text-muted-foreground">@lightbird/core/react</code>
               </SectionHeading>
               <ApiTable headers={["Hook", "Purpose"]} rows={HOOKS_DATA} />
             </div>
@@ -426,7 +426,7 @@ export default function DocsPage() {
               GitHub
             </a>
             <a
-              href="https://www.npmjs.com/package/lightbird"
+              href="https://www.npmjs.com/package/@lightbird/core"
               className="hover:text-foreground transition-colors"
               target="_blank"
               rel="noopener noreferrer"

@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "lightbird": "workspace:*",
+    "@lightbird/core": "workspace:*",
     "@lightbird/ui": "workspace:*",
     "@ffmpeg/core": "^0.12.6",
     "@ffmpeg/ffmpeg": "^0.12.10",

@@ -1,7 +1,7 @@
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { PlayerErrorDisplay } from "../src/player-error-display";
-import type { ParsedMediaError } from "lightbird";
+import type { ParsedMediaError } from "@lightbird/core";
 
 const networkError: ParsedMediaError = {
   type: "network",

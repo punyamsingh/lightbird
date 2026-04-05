@@ -14,8 +14,8 @@ export default function VideoPage() {
 
 const HEADLESS_CODE = `"use client"
 import { useRef } from 'react'
-import { useVideoPlayback } from 'lightbird/react'
-import { createVideoPlayer } from 'lightbird'
+import { useVideoPlayback } from '@lightbird/core/react'
+import { createVideoPlayer } from '@lightbird/core'
 
 export default function MyPlayer() {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -36,7 +36,7 @@ export default function MyPlayer() {
   )
 }`;
 
-const VANILLA_CODE = `import { createVideoPlayer } from 'lightbird'
+const VANILLA_CODE = `import { createVideoPlayer } from '@lightbird/core'
 
 const input = document.querySelector('input[type="file"]')
 const video = document.querySelector('video')
@@ -51,9 +51,9 @@ input.addEventListener('change', async (e) => {
 })`;
 
 const INSTALL_COMMANDS: Record<string, string> = {
-  "React UI": "npm install lightbird @lightbird/ui",
-  "Headless React": "npm install lightbird",
-  "Vanilla JS": "npm install lightbird",
+  "React UI": "npm install @lightbird/core @lightbird/ui",
+  "Headless React": "npm install @lightbird/core",
+  "Vanilla JS": "npm install @lightbird/core",
 };
 
 const INSTALL_CODE: Record<string, string> = {
