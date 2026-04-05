@@ -30,8 +30,8 @@ jobs:
       - name: Test
         run: pnpm turbo test
 
-      - name: Publish lightbird
-        run: pnpm --filter lightbird publish --access public --no-git-checks
+      - name: Publish @lightbird/core
+        run: pnpm --filter @lightbird/core publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 

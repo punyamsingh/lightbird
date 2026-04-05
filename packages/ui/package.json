@@ -69,7 +69,7 @@
     "@tanstack/react-virtual": "^3.13.21",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "lightbird": "workspace:*",
+    "@lightbird/core": "workspace:*",
     "lucide-react": "^0.475.0",
     "tailwind-merge": "^3.0.1"
   },

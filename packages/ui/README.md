@@ -1,13 +1,13 @@
 # @lightbird/ui
 
-Drop-in React video player component powered by [LightBird](https://www.npmjs.com/package/lightbird). Full controls, playlist, subtitles, chapters — one import.
+Drop-in React video player component powered by [@lightbird/core](https://www.npmjs.com/package/@lightbird/core). Full controls, playlist, subtitles, chapters — one import.
 
 **[Documentation](https://lightbird.vercel.app/docs)** | **[Live Demo](https://lightbird.vercel.app)** | **[GitHub](https://github.com/punyamsingh/lightbird)**
 
 ## Install
 
 ```bash
-npm install lightbird @lightbird/ui
+npm install @lightbird/core @lightbird/ui
 ```
 
 ## Usage
@@ -48,7 +48,7 @@ import '@lightbird/ui/styles.css'
 
 ## Requires
 
-- `lightbird` (included as dependency)
+- `@lightbird/core` (included as dependency)
 - `react` ^18.0.0 || ^19.0.0
 - `react-dom` ^18.0.0 || ^19.0.0
 
