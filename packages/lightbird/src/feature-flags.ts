@@ -11,7 +11,8 @@ export const FLAG_MAGNET_LINK = "magnet-link-enabled";
 /**
  * Initialise the OpenFeature SDK with the Unleash Frontend API provider.
  * Returns a promise that resolves once Unleash has fetched the initial flag
- * state. Flags fall back to `false` while the provider is loading.
+ * state. Each `useBooleanFlagValue` call supplies its own default, used while
+ * the provider is loading or when no provider is configured.
  *
  * Requires the following environment variables (set in .env.local or Vercel):
  *   NEXT_PUBLIC_UNLEASH_URL        — Frontend API URL
@@ -28,7 +29,7 @@ export function initFeatureFlags(): Promise<void> {
     console.warn(
       "[feature-flags] NEXT_PUBLIC_UNLEASH_URL and/or " +
         "NEXT_PUBLIC_UNLEASH_CLIENT_KEY are not set — feature flags will use " +
-        "their default values (magnet link disabled).",
+        "their default values (magnet link enabled by default).",
     );
     return Promise.resolve();
   }
