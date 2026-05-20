@@ -2,12 +2,16 @@ name: Auto Release
 
 on:
   pull_request:
-    types: [closed]
-    branches: [master]
+    types:
+      - closed
+    branches:
+      - master
 
 jobs:
   release:
-    if: github.event.pull_request.merged && startsWith(github.event.pull_request.title, 'chore: bump to v')
+    if: >-
+      github.event.pull_request.merged &&
+      startsWith(github.event.pull_request.title, 'chore: bump to v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -18,7 +22,8 @@ jobs:
       - name: Extract version from PR title
         id: version
         run: |
-          VERSION=$(echo "${{ github.event.pull_request.title }}" | grep -oP 'v\d+\.\d+\.\d+')
+          TITLE="${{ github.event.pull_request.title }}"
+          VERSION=$(echo "$TITLE" | grep -oP 'v\d+\.\d+\.\d+')
           echo "tag=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Extracted version: $VERSION"
 
