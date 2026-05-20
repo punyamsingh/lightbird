@@ -1,39 +1,23 @@
 name: Release & Publish
 
 on:
-  pull_request:
-    types:
-      - closed
+  push:
     branches:
       - master
 
 jobs:
-  release-and-publish:
-    if: >-
-      github.event.pull_request.merged &&
-      startsWith(github.event.pull_request.title, 'chore: bump to v')
+  release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      issues: write
+      pull-requests: write
       id-token: write
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Extract version from PR title
-        id: version
-        run: |
-          TITLE="${{ github.event.pull_request.title }}"
-          VERSION=$(echo "$TITLE" | grep -oP 'v\d+\.\d+\.\d+')
-          echo "tag=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Releasing version: $VERSION"
-
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: ${{ steps.version.outputs.tag }}
-          generate_release_notes: true
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
 
@@ -44,18 +28,15 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build
-        run: pnpm turbo build
+      - name: Build packages
+        run: pnpm turbo build --filter=@lightbird/core --filter=@lightbird/ui
 
       - name: Test
         run: pnpm turbo test
 
-      - name: Publish @lightbird/core
-        run: pnpm --filter @lightbird/core publish --access public --no-git-checks --provenance
+      - name: Release
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish @lightbird/ui
-        run: pnpm --filter @lightbird/ui publish --access public --no-git-checks --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npx semantic-release
