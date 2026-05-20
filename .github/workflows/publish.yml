@@ -31,11 +31,11 @@ jobs:
         run: pnpm turbo test
 
       - name: Publish @lightbird/core
-        run: pnpm --filter @lightbird/core publish --access public --no-git-checks
+        run: pnpm --filter @lightbird/core publish --access public --no-git-checks --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @lightbird/ui
-        run: pnpm --filter @lightbird/ui publish --access public --no-git-checks
+        run: pnpm --filter @lightbird/ui publish --access public --no-git-checks --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
