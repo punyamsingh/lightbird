@@ -86,7 +86,58 @@ The memory bank lives in `memory-bank/`. It is the single source of truth for th
 3. **Implement** the changes.
 4. **Run `pnpm turbo test`** and ensure all tests pass.
 5. **Update `memory-bank/project-overview.md`** with what changed.
-6. **Commit** with a descriptive message.
+6. **Commit** with a conventional commit message (see below).
+
+---
+
+## Mandatory: Commit Message Format (Conventional Commits)
+
+> **This project uses [Conventional Commits](https://www.conventionalcommits.org/). Every commit and PR title MUST follow this format. Semantic-release reads these to determine version bumps and generate changelogs automatically.**
+
+### Format
+
+```
+<type>: <short description>
+```
+
+### Types and what they do
+
+| Type | What it does | Example |
+|------|-------------|---------|
+| `feat:` | **Minor version bump** (0.1.6 → 0.2.0) + npm publish | `feat: add HLS streaming support` |
+| `fix:` | **Patch version bump** (0.1.6 → 0.1.7) + npm publish | `fix: subtitle sync offset not applied` |
+| `feat!:` | **Major version bump** (0.1.6 → 1.0.0) + npm publish | `feat!: redesign VideoPlayer API` |
+| `docs:` | No release, no publish | `docs: update API reference in /docs` |
+| `chore:` | No release, no publish | `chore: update dependencies` |
+| `ci:` | No release, no publish | `ci: fix test workflow` |
+| `refactor:` | No release, no publish | `refactor: extract subtitle parser` |
+| `test:` | No release, no publish | `test: add MKV player edge cases` |
+| `style:` | No release, no publish | `style: fix button alignment` |
+| `perf:` | No release, no publish | `perf: lazy-load FFmpeg worker` |
+
+### Rules
+
+1. **PR titles matter most.** When a PR is squash-merged, the PR title becomes the commit message. Use the correct type prefix.
+2. **`feat:` and `fix:` trigger npm releases.** Only use these when the change affects the published packages (`@lightbird/core` or `@lightbird/ui`). UI changes to the web app only (e.g., docs page redesign) should use `docs:` or `chore:`.
+3. **Breaking changes** use `!` after the type: `feat!:` or `fix!:`. This triggers a major version bump.
+4. **Keep descriptions concise.** One line, lowercase start, no period at end.
+5. **Scope is optional** but useful: `feat(subtitles): add SSA format support`, `fix(player): handle missing audio track`.
+
+### What happens on merge to master
+
+```
+PR merged with "feat: ..." → semantic-release bumps minor → creates GitHub release → publishes to npm
+PR merged with "fix: ..."  → semantic-release bumps patch → creates GitHub release → publishes to npm
+PR merged with "docs: ..." → semantic-release skips → no release, no publish
+PR merged with "chore: ..." → semantic-release skips → no release, no publish
+```
+
+### Common mistakes to avoid
+
+- `Update subtitle converter` — missing type prefix, semantic-release can't parse it
+- `feat: updated stuff` — too vague, write what the feature actually is
+- `feat: fix typo in README` — this is not a feature, use `docs:` (otherwise it triggers a release)
+- `fix: refactor player controls` — refactoring is not a bug fix, use `refactor:`
 
 ---
 
