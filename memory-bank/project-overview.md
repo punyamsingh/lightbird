@@ -1,7 +1,7 @@
 # LightBird — Project Overview
 
-> **Last updated:** 2026-04-04
-> **Branch context:** Plans 01–12 implemented. Project is now a pnpm monorepo publishing two npm packages: `lightbird` (core) and `@lightbird/ui` (React components).
+> **Last updated:** 2026-05-20
+> **Branch context:** Plans 01–12 implemented. Project is now a pnpm monorepo publishing two npm packages: `lightbird` (core) and `@lightbird/ui` (React components). Docs page refactored into a server component with client islands (issue #35).
 
 ---
 
@@ -137,3 +137,4 @@ Shared setup: `jest.setup.ts` (root)
 7. **useSubtitles onError callback** — decouples hook from toast UI (lightbird-player passes toast callback)
 8. **FFmpeg as optional dep** — not required if only HTML5 playback needed
 9. **React as optional peer dep** — only needed for `lightbird/react` subpath
+10. **Docs page server/client islands** — `apps/web/src/app/docs/page.tsx` is a server component holding all static content (prose, tables, API reference, page structure). Only four interactive pieces hydrate as client islands: `DocsNav` (sidebar + mobile nav + scroll spy), `CodeBlock` (copy-to-clipboard), `InstallTabs` (tabbed install UI), and `FadeSection` (scroll-triggered fade-in)
