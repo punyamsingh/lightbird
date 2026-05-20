@@ -1,0 +1,16 @@
+{
+  "branches": ["master"],
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    ["@semantic-release/exec", {
+      "prepareCmd": "bash scripts/update-versions.sh ${nextRelease.version}",
+      "publishCmd": "bash scripts/publish-packages.sh"
+    }],
+    ["@semantic-release/git", {
+      "assets": ["packages/lightbird/package.json", "packages/ui/package.json"],
+      "message": "chore(release): v${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+    }],
+    "@semantic-release/github"
+  ]
+}
