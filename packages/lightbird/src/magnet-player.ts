@@ -72,6 +72,7 @@ export function acceptDisclaimer(): void {
 // ─── WebTorrent Client Singleton ──────────────────────────────────────────────
 
 let wtClient: InstanceType<typeof WebTorrent> | null = null;
+let wtClientPromise: Promise<InstanceType<typeof WebTorrent>> | null = null;
 let swPromise: Promise<ServiceWorkerRegistration> | null = null;
 
 /**
@@ -125,22 +126,28 @@ async function ensureServiceWorker(): Promise<ServiceWorkerRegistration> {
  */
 export async function getWebTorrentClient(): Promise<InstanceType<typeof WebTorrent>> {
   if (wtClient && !wtClient.destroyed) return wtClient;
+  // Cache the in-flight creation so concurrent callers share one client.
+  if (wtClientPromise) return wtClientPromise;
 
-  const { default: WebTorrentClass } = await import("webtorrent");
-  const client = new WebTorrentClass();
-  wtClient = client;
+  wtClientPromise = (async () => {
+    const { default: WebTorrentClass } = await import("webtorrent");
+    const client = new WebTorrentClass();
+    wtClient = client;
 
-  try {
-    const registration = await ensureServiceWorker();
-    if (!client._server) {
-      client.createServer({ controller: registration });
+    try {
+      const registration = await ensureServiceWorker();
+      if (!client._server) {
+        client.createServer({ controller: registration });
+      }
+    } catch (err) {
+      // Non-fatal: streaming URL will be unavailable but torrent downloading still works.
+      console.warn("[magnet-player] Service worker setup failed:", err);
     }
-  } catch (err) {
-    // Non-fatal: streaming URL will be unavailable but torrent downloading still works.
-    console.warn("[magnet-player] Service worker setup failed:", err);
-  }
 
-  return client;
+    return client;
+  })();
+
+  return wtClientPromise;
 }
 
 /**
@@ -151,5 +158,6 @@ export function destroyWebTorrentClient(): void {
     wtClient.destroy();
   }
   wtClient = null;
+  wtClientPromise = null;
   // Keep swPromise so the SW stays registered for the session.
 }

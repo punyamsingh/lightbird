@@ -58,6 +58,13 @@ export function useMagnet(): UseMagnetReturn {
       throw new Error("Not a valid magnet link");
     }
 
+    // Tear down any previous torrent first so rapid successive calls don't
+    // leave orphaned torrents downloading in the background.
+    if (activeTorrentRef.current && !activeTorrentRef.current.destroyed) {
+      activeTorrentRef.current.destroy();
+    }
+    activeTorrentRef.current = null;
+
     setTorrentStatus({
       ...INITIAL_STATUS,
       status: "loading-metadata",
@@ -87,6 +94,7 @@ export function useMagnet(): UseMagnetReturn {
       const timeout = setTimeout(() => {
         settle(() => {
           torrent?.destroy?.();
+          activeTorrentRef.current = null;
           const msg = "Could not connect to peers. Check the link and try again.";
           setTorrentStatus((s) => ({ ...s, status: "error", error: msg }));
           reject(new Error(msg));
@@ -109,6 +117,8 @@ export function useMagnet(): UseMagnetReturn {
       torrent.on("error", (err: Error) => {
         settle(() => {
           clearTimeout(timeout);
+          torrent?.destroy?.();
+          activeTorrentRef.current = null;
           const msg = err?.message ?? "Torrent error";
           setTorrentStatus((s) => ({ ...s, status: "error", error: msg }));
           reject(new Error(msg));
@@ -119,12 +129,19 @@ export function useMagnet(): UseMagnetReturn {
         clearTimeout(timeout);
 
         const videoFiles = getVideoFiles(torrent);
+        // Only files with a service-worker-backed stream URL can actually
+        // play; an empty URL would fail silently in the <video> element.
+        const streamable = videoFiles.filter(
+          (file) => Boolean((file as { streamURL?: string }).streamURL),
+        );
 
-        if (videoFiles.length === 0) {
+        if (streamable.length === 0) {
           settle(() => {
             torrent.destroy();
             activeTorrentRef.current = null;
-            const msg = "No video files found in this torrent";
+            const msg = videoFiles.length === 0
+              ? "No video files found in this torrent"
+              : "Video files in this torrent could not be made streamable";
             setTorrentStatus((s) => ({ ...s, status: "error", error: msg }));
             reject(new Error(msg));
           });
@@ -140,10 +157,11 @@ export function useMagnet(): UseMagnetReturn {
           }));
 
           // Build playlist items using the SW-backed stream URL for each file
-          const items: PlaylistItem[] = videoFiles.map((file) => ({
+          // (guaranteed present — `streamable` was filtered on it above).
+          const items: PlaylistItem[] = streamable.map((file) => ({
             id: crypto.randomUUID(),
             name: file.name,
-            url: (file as { streamURL?: string }).streamURL ?? "",
+            url: (file as { streamURL?: string }).streamURL!,
             type: "stream" as const,
             source: "torrent" as const,
             duration: undefined,
