@@ -4,9 +4,11 @@
   "private": true,
   "scripts": {
     "copy:ffmpeg": "node scripts/copy-ffmpeg-wasm.js",
-    "predev": "pnpm run copy:ffmpeg",
+    "copy:webtorrent": "node scripts/copy-webtorrent-sw.js",
+    "copy:assets": "pnpm run copy:ffmpeg && pnpm run copy:webtorrent",
+    "predev": "pnpm run copy:assets",
     "dev": "next dev -p 9002",
-    "prebuild": "pnpm run copy:ffmpeg",
+    "prebuild": "pnpm run copy:assets",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

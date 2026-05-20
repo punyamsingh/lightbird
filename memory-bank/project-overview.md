@@ -63,6 +63,32 @@ apps/web/src/app/page.tsx
 | `use-picture-in-picture.ts` | PiP enter/exit/toggle/detect |
 | `use-video-info.ts` | Video metadata extraction |
 | `use-chapters.ts` | Chapter navigation from MKV metadata |
+| `use-magnet.ts` | Magnet link → torrent metadata → playlist items |
+
+---
+
+### Magnet Link Player (WebTorrent)
+
+Magnet links are streamed in-browser via BitTorrent — no server required:
+
+- `magnet-player.ts` — `WebTorrent` client singleton + a service worker
+  (`apps/web/public/webtorrent-sw.js`, copied from `node_modules/webtorrent`
+  by `apps/web/scripts/copy-webtorrent-sw.js` on `prebuild`/`predev`). The SW
+  intercepts fetches and streams torrent pieces progressively into `<video>`.
+- `use-magnet.ts` — adds a torrent, waits for metadata, returns one
+  `PlaylistItem` per streamable video file (`type: 'stream'`, `source:
+  'torrent'`). Torrent items reuse the existing stream-loading path.
+- Gated behind the `magnet-link-enabled` OpenFeature flag (see below); a
+  one-time legal disclaimer is shown before first use.
+
+### Feature Flags (OpenFeature)
+
+- `feature-flags.ts` — initialises OpenFeature with the Unleash Web provider
+  (`NEXT_PUBLIC_UNLEASH_URL` / `NEXT_PUBLIC_UNLEASH_CLIENT_KEY`). Missing
+  credentials warn and fall back to flag defaults.
+- `feature-flags-provider.tsx` (`@lightbird/ui`) — wraps the app so
+  `useBooleanFlagValue` hooks resolve. The magnet UI is hidden when the flag
+  is off.
 
 ---
 
