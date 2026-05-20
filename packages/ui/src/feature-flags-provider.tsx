@@ -1,17 +1,26 @@
 "use client";
 
-import React, { Suspense } from "react";
+import React, { useEffect } from "react";
 import { OpenFeatureProvider } from "@openfeature/react-sdk";
 import { initFeatureFlags } from "@lightbird/core";
 
-// Kick off Unleash initialisation as early as possible.
-// Flags return their default values until the first fetch completes.
-initFeatureFlags().catch(console.error);
+let started = false;
 
 export function FeatureFlagsProvider({ children }: { children: React.ReactNode }) {
+  // Initialise on the client only. Running during SSR makes the server and
+  // client provider states diverge, which breaks hydration (React error #418).
+  useEffect(() => {
+    if (started) return;
+    started = true;
+    initFeatureFlags().catch(console.error);
+  }, []);
+
+  // Never suspend: flags resolve to the default passed to each
+  // useBooleanFlagValue call until the provider is ready, so SSR and the first
+  // client render stay identical.
   return (
-    <Suspense fallback={null}>
-      <OpenFeatureProvider>{children}</OpenFeatureProvider>
-    </Suspense>
+    <OpenFeatureProvider suspendUntilReady={false} suspendWhileReconciling={false}>
+      {children}
+    </OpenFeatureProvider>
   );
 }
