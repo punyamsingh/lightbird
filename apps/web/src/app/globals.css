@@ -110,13 +110,24 @@
   position: relative;
 }
 
-.docs-code-block:hover .docs-copy-btn {
-  opacity: 1;
-}
-
 .docs-copy-btn {
   opacity: 0;
+  pointer-events: none;
   transition: opacity 0.2s;
+}
+
+.docs-code-block:hover .docs-copy-btn,
+.docs-code-block:focus-within .docs-copy-btn,
+.docs-copy-btn:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (hover: none) {
+  .docs-copy-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 /* Sidebar active indicator */
@@ -156,4 +167,19 @@
   height: 2px;
   background: hsl(207 100% 50%);
   border-radius: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .docs-fade-in,
+  .docs-section-hidden,
+  .docs-section-visible {
+    animation: none;
+    transition: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .docs-hero-glow {
+    animation: none;
+  }
 }

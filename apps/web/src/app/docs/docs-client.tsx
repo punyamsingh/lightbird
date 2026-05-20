@@ -59,11 +59,14 @@ function useScrollSpy(ids: string[]) {
 
 function useFadeIn() {
   const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(true);
+  const [animated, setAnimated] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    setVisible(false);
+    setAnimated(true);
     const obs = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -77,6 +80,7 @@ function useFadeIn() {
     return () => obs.disconnect();
   }, []);
 
+  if (!animated) return { ref, className: "" };
   return { ref, className: visible ? "docs-section-visible" : "docs-section-hidden" };
 }
 
@@ -292,16 +296,40 @@ const INSTALL_CODE: Record<string, string> = {
   "Vanilla JS": VANILLA_CODE,
 };
 
+function tabId(t: string) {
+  return `install-tab-${t.replace(/\s+/g, "-").toLowerCase()}`;
+}
+function panelId(t: string) {
+  return `install-panel-${t.replace(/\s+/g, "-").toLowerCase()}`;
+}
+
 function InstallTabs() {
   const [tab, setTab] = useState<string>(INSTALL_TABS[0]);
 
   return (
     <div>
-      <div className="flex gap-1 border-b border-white/[0.06] mb-6">
+      <div role="tablist" className="flex gap-1 border-b border-white/[0.06] mb-6">
         {INSTALL_TABS.map((t) => (
           <button
             key={t}
+            role="tab"
+            id={tabId(t)}
+            aria-selected={tab === t}
+            aria-controls={panelId(t)}
+            tabIndex={tab === t ? 0 : -1}
             onClick={() => setTab(t)}
+            onKeyDown={(e) => {
+              const idx = INSTALL_TABS.indexOf(t as typeof INSTALL_TABS[number]);
+              if (e.key === "ArrowRight") {
+                const next = INSTALL_TABS[(idx + 1) % INSTALL_TABS.length];
+                setTab(next);
+                document.getElementById(tabId(next))?.focus();
+              } else if (e.key === "ArrowLeft") {
+                const prev = INSTALL_TABS[(idx - 1 + INSTALL_TABS.length) % INSTALL_TABS.length];
+                setTab(prev);
+                document.getElementById(tabId(prev))?.focus();
+              }
+            }}
             className={`docs-tab px-4 py-2.5 text-sm font-medium transition-colors ${
               tab === t
                 ? "docs-tab-active text-[hsl(207,100%,60%)]"
@@ -313,7 +341,12 @@ function InstallTabs() {
         ))}
       </div>
 
-      <div className="space-y-4">
+      <div
+        role="tabpanel"
+        id={panelId(tab)}
+        aria-labelledby={tabId(tab)}
+        className="space-y-4"
+      >
         <CodeBlock>{INSTALL_COMMANDS[tab]}</CodeBlock>
         <CodeBlock>{INSTALL_CODE[tab]}</CodeBlock>
         {tab === "React UI" && (
