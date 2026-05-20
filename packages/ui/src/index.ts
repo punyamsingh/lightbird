@@ -15,3 +15,6 @@ export { ShortcutSettingsDialog } from './shortcut-settings-dialog'
 
 // Toaster (user adds to app root for toast notifications)
 export { Toaster } from './primitives/toaster'
+
+// Feature flag provider (wrap app root to enable OpenFeature flags)
+export { FeatureFlagsProvider } from './feature-flags-provider'

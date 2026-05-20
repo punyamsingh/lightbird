@@ -21,7 +21,7 @@ export function initFeatureFlags(): Promise<void> {
   const url = process.env.NEXT_PUBLIC_UNLEASH_URL ?? "";
   const clientKey = process.env.NEXT_PUBLIC_UNLEASH_CLIENT_KEY ?? "";
 
-  return OpenFeature.setProvider(
+  return OpenFeature.setProviderAndWait(
     new UnleashWebProvider({ url, clientKey, appName: "lightbird" }),
   );
 }

@@ -7,8 +7,8 @@ import {
   getWebTorrentClient,
   destroyWebTorrentClient,
   DEFAULT_TRACKERS,
-} from "@/lib/magnet-player";
-import type { PlaylistItem, TorrentStatus } from "@/types";
+} from "../magnet-player";
+import type { PlaylistItem, TorrentStatus } from "../types";
 
 const METADATA_TIMEOUT_MS = 30_000;
 

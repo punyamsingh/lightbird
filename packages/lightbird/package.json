@@ -61,7 +61,10 @@
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
-    "ass-compiler": "^0.1.16"
+    "@openfeature/unleash-web-provider": "^0.1.1",
+    "@openfeature/web-sdk": "^1.6.0",
+    "ass-compiler": "^0.1.16",
+    "webtorrent": "^2.8.5"
   },
   "optionalDependencies": {
     "@ffmpeg/core": "^0.12.6",

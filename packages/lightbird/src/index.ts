@@ -22,6 +22,23 @@ export { ASSRenderer } from './subtitles/ass-renderer'
 export { parseChaptersFromFFmpegLog, parseChaptersFromVtt } from './parsers/chapter-parser'
 export { exportPlaylist, parseM3U8 } from './parsers/m3u-parser'
 
+// Magnet link player (WebTorrent)
+export {
+  isMagnetUri,
+  isVideoFile,
+  getVideoFiles,
+  hasAcceptedDisclaimer,
+  acceptDisclaimer,
+  getWebTorrentClient,
+  destroyWebTorrentClient,
+  VIDEO_EXTENSIONS,
+  DEFAULT_TRACKERS,
+  DISCLAIMER_KEY,
+} from './magnet-player'
+
+// Feature flags (OpenFeature)
+export { FLAG_MAGNET_LINK, initFeatureFlags } from './feature-flags'
+
 // Utilities
 export { parseMediaError, validateFile } from './utils/media-error'
 export type { ParsedMediaError, MediaErrorType } from './utils/media-error'
@@ -46,4 +63,5 @@ export type {
   VideoMetadata,
   AudioTrackMeta,
   SubtitleTrackMeta,
+  TorrentStatus,
 } from './types'
