@@ -66,7 +66,8 @@ const LightBirdPlayer = () => {
   const { metadata: videoMetadata } = useVideoInfo(videoRef, playlist.currentItem?.file ?? null);
   useProgressPersistence(videoRef, playlist.currentItem?.name ?? null);
   const { chapters, currentChapter, goToChapter } = useChapters(videoRef, playerRef);
-  const magnetLinkEnabled = useBooleanFlagValue(FLAG_MAGNET_LINK, false);
+  // Default to enabled: the feature shows unless Unleash explicitly turns it off.
+  const magnetLinkEnabled = useBooleanFlagValue(FLAG_MAGNET_LINK, true);
   const magnet = useMagnet();
   const [disclaimerPendingUri, setDisclaimerPendingUri] = useState<string | null>(null);
 
