@@ -2,12 +2,16 @@ name: Auto Release
 
 on:
   pull_request:
-    types: [closed]
-    branches: [master]
+    types:
+      - closed
+    branches:
+      - master
 
 jobs:
   release:
-    if: github.event.pull_request.merged && startsWith(github.event.pull_request.title, 'chore: bump to v')
+    if: |
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.title, 'chore: bump to v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
