@@ -1,19 +1,39 @@
-name: Publish to npm
+name: Release & Publish
 
 on:
-  release:
+  pull_request:
     types:
-      - published
+      - closed
+    branches:
+      - master
 
 jobs:
-  publish:
+  release-and-publish:
+    if: >-
+      github.event.pull_request.merged &&
+      startsWith(github.event.pull_request.title, 'chore: bump to v')
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       id-token: write
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Extract version from PR title
+        id: version
+        run: |
+          TITLE="${{ github.event.pull_request.title }}"
+          VERSION=$(echo "$TITLE" | grep -oP 'v\d+\.\d+\.\d+')
+          echo "tag=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Releasing version: $VERSION"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          generate_release_notes: true
 
       - uses: pnpm/action-setup@v4
 
