@@ -6,7 +6,7 @@ import {
   acceptDisclaimer,
   DISCLAIMER_KEY,
   VIDEO_EXTENSIONS,
-} from "../magnet-player";
+} from "../src/magnet-player";
 
 // ─── isMagnetUri ──────────────────────────────────────────────────────────────
 
