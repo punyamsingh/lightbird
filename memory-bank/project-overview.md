@@ -1,6 +1,6 @@
 # LightBird — Project Overview
 
-> **Last updated:** 2026-05-20
+> **Last updated:** 2026-05-21
 > **Branch context:** Plans 01–12 implemented. Project is now a pnpm monorepo publishing two npm packages: `lightbird` (core) and `@lightbird/ui` (React components). Docs page refactored into a server component with client islands (issue #35).
 
 ---
@@ -121,7 +121,7 @@ Shared setup: `jest.setup.ts` (root)
 | 04 | Performance Optimisation | **DONE** |
 | 05 | Error Handling & Recovery | **DONE** |
 | 06 | Playlist Management (DnD, M3U8) | **DONE** |
-| 07 | Advanced Subtitle Support | Pending |
+| 07 | Advanced Subtitle Support | **DONE** |
 | 08 | Keyboard Customisation | **DONE** |
 | 09 | Video Info Panel | **DONE** |
 | 10 | Codebase Cleanup | **DONE** |
@@ -131,6 +131,7 @@ Shared setup: `jest.setup.ts` (root)
 | MS | Media Session API | **DONE** |
 | PIP | Picture-in-Picture | **DONE** |
 | CH | Chapters & Cue Points | **DONE** |
+| HLS | HLS/DASH Adaptive Streaming | Planned ([#48](https://github.com/punyamsingh/lightbird/issues/48)) |
 
 ---
 
