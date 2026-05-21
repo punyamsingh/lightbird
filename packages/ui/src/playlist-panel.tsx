@@ -92,11 +92,12 @@ interface SortableItemProps {
   item: PlaylistItem;
   index: number;
   isActive: boolean;
+  downloadReady: boolean;
   onSelect: (index: number) => void;
   onRemove: (index: number) => void;
 }
 
-function SortablePlaylistItem({ item, index, isActive, onSelect, onRemove }: SortableItemProps) {
+function SortablePlaylistItem({ item, index, isActive, downloadReady, onSelect, onRemove }: SortableItemProps) {
   const {
     attributes,
     listeners,
@@ -153,6 +154,20 @@ function SortablePlaylistItem({ item, index, isActive, onSelect, onRemove }: Sor
           </span>
         )}
       </button>
+
+      {/* Download link (torrent items only, once fully buffered) */}
+      {item.source === "torrent" && downloadReady && (
+        <a
+          href={item.url}
+          download={item.name}
+          onClick={(e) => e.stopPropagation()}
+          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
+          aria-label={`Download ${item.name}`}
+          title="Download"
+        >
+          <Download className="w-3 h-3 text-emerald-500 hover:text-emerald-400" />
+        </a>
+      )}
 
       {/* Remove button */}
       <button
@@ -542,20 +557,27 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
               </form>
             )}
 
-            {/* Torrent download progress bar */}
-            {showMagnet && torrentStatus.status === "ready" && torrentStatus.progress < 1 && (
-              <div className="space-y-1">
-                <div className="w-full bg-muted rounded-full h-1 overflow-hidden">
-                  <div
-                    className="bg-emerald-500 h-1 rounded-full transition-all duration-500"
-                    style={{ width: `${Math.round(torrentStatus.progress * 100)}%` }}
-                  />
-                </div>
-                <p className="text-[10px] text-muted-foreground flex items-center justify-between">
-                  <span>↓ {formatBytes(torrentStatus.downloadSpeed)}/s · {torrentStatus.numPeers} peer{torrentStatus.numPeers !== 1 ? "s" : ""}</span>
-                  <span>{Math.round(torrentStatus.progress * 100)}%</span>
+            {/* Torrent progress / download-ready banner */}
+            {showMagnet && torrentStatus.status === "ready" && (
+              torrentStatus.progress >= 1 ? (
+                <p className="text-[10px] text-emerald-500 flex items-center gap-1">
+                  <Download className="h-3 w-3 shrink-0" />
+                  Download ready — hover a file to save it
                 </p>
-              </div>
+              ) : (
+                <div className="space-y-1">
+                  <div className="w-full bg-muted rounded-full h-1 overflow-hidden">
+                    <div
+                      className="bg-emerald-500 h-1 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.round(torrentStatus.progress * 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground flex items-center justify-between">
+                    <span>↓ {formatBytes(torrentStatus.downloadSpeed)}/s · {torrentStatus.numPeers} peer{torrentStatus.numPeers !== 1 ? "s" : ""}</span>
+                    <span>{Math.round(torrentStatus.progress * 100)}%</span>
+                  </p>
+                </div>
+              )
             )}
 
             {playlist.length > 1 && (
@@ -593,6 +615,7 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
                         item={item}
                         index={index}
                         isActive={index === currentVideoIndex}
+                        downloadReady={item.source === "torrent" && torrentStatus.progress >= 1}
                         onSelect={onSelectVideo}
                         onRemove={onRemoveItem}
                       />
