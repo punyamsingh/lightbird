@@ -257,6 +257,63 @@ function ApiTable({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Bundle size                                                         */
+/* ------------------------------------------------------------------ */
+
+// Gzipped transfer sizes, measured from the latest `tsup` build of the
+// published packages. See scripts/check-core-bundle.js for the CI budget.
+const BUNDLE_SIZES = [
+  [
+    "@lightbird/core",
+    "~12 KB",
+    "Base entry: players, parsers, subtitle pipeline, utilities. Contains no FFmpeg.wasm code.",
+  ],
+  [
+    "@lightbird/core/react",
+    "~9 KB",
+    "Optional subpath: 11 headless React hooks.",
+  ],
+  [
+    "@lightbird/ui",
+    "~21 KB + 6 KB CSS",
+    "Optional: styled drop-in components.",
+  ],
+  [
+    "FFmpeg.wasm (deferred)",
+    "~10 MB",
+    "Fetched only when an MKV actually needs remuxing — never loaded for MP4/WebM playback.",
+  ],
+];
+
+function BundleSizeTable() {
+  return (
+    <div className="overflow-x-auto rounded-xl border border-white/[0.06]">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-white/[0.06] bg-[hsl(0,0%,10%)]">
+            <th className="text-left p-4 font-semibold text-foreground">Package</th>
+            <th className="text-left p-4 font-semibold text-foreground w-40">Gzipped</th>
+            <th className="text-left p-4 font-semibold text-foreground">When it loads</th>
+          </tr>
+        </thead>
+        <tbody className="text-muted-foreground">
+          {BUNDLE_SIZES.map(([pkg, size, when], i) => (
+            <tr
+              key={pkg}
+              className={i < BUNDLE_SIZES.length - 1 ? "border-b border-white/[0.04]" : ""}
+            >
+              <td className="p-4 font-mono text-xs text-foreground whitespace-nowrap">{pkg}</td>
+              <td className="p-4 font-medium text-foreground">{size}</td>
+              <td className="p-4">{when}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Browser support                                                    */
 /* ------------------------------------------------------------------ */
 
@@ -370,6 +427,29 @@ export default function DocsPage() {
               </SectionHeading>
               <ApiTable headers={["Component", "Description"]} rows={UI_DATA} />
             </div>
+          </section>
+        </FadeSection>
+
+        {/* ---- Bundle Size ---- */}
+        <FadeSection>
+          <section id="bundle-size" className="mb-20 scroll-mt-24">
+            <SectionHeading id="bundle-size-heading">Bundle Size</SectionHeading>
+            <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+              LightBird&apos;s &ldquo;lightweight&rdquo; promise is enforced, not assumed. The
+              base{" "}
+              <code className="text-foreground text-xs bg-white/5 px-1.5 py-0.5 rounded">
+                @lightbird/core
+              </code>{" "}
+              entry contains <strong className="text-foreground">zero FFmpeg.wasm code</strong> —
+              FFmpeg is reached only through a dynamic <code className="text-foreground text-xs bg-white/5 px-1.5 py-0.5 rounded">import()</code>
+              {" "}and a lazily-created Web Worker. An app that only plays MP4/WebM downloads none
+              of the multi-megabyte FFmpeg payload. A CI bundle-size budget fails the build if the
+              base entry grows past its threshold or regains a static FFmpeg import.
+            </p>
+            <BundleSizeTable />
+            <p className="text-sm text-muted-foreground mt-4">
+              Sizes are gzipped transfer sizes measured from the latest build.
+            </p>
           </section>
         </FadeSection>
 

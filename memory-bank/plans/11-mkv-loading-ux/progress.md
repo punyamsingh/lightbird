@@ -11,3 +11,14 @@ Sub-plan 1 moved all FFmpeg.wasm processing off the main thread into a dedicated
 | 03 | Cancellation | **DONE** | `claude/mkv-loading-ux-subplan-3-zhpkl` | `CancellationError` sentinel class exported from `mkv-player.ts`; `MKVPlayer.cancel()` terminates worker and rejects pending ops; `VideoPlayer` interface gets optional `cancel?()`; `MKVPlayerAdapter` delegates; `VideoOverlay` gets `onCancel` prop; `lightbird-player.tsx` gates cancel button via `cancellableProcessing` state; `CancellationError` suppresses error toast. All 247 tests pass. |
 | 04 | Audio track remux cache | **DONE** | `claude/mkv-loading-ux-subplan-4-mzSWv` | `remuxCache: Map<number, string>` on `MKVPlayer`; `_remux(n)` checks cache before calling worker; `initialize()` stores track 0 URL in cache; removed premature `URL.revokeObjectURL` call from `_remux()`; `destroy()` iterates `remuxCache` to revoke all entries then revokes `objectUrl` for native fallback URL. All 251 tests pass. |
 | 05 | Native fallback first | **DONE** | `claude/mkv-loading-ux-subplan-5-arKN5` | `canPlayNatively()` exported from `mkv-player.ts`; `MKVPlayer._canPlayNatively` static hook for testability; `initialize()` probes native playback first, keeps probeUrl on fast path, revokes it on slow path; `_cancelled` flag handles cancel-during-probe; 8 new tests (4 unit + 4 integration). All 255 tests pass. |
+
+## Follow-up — Issue #54 (zero-cost FFmpeg.wasm lazy loading)
+
+Plan 11 moved FFmpeg into a Web Worker and added a native-first probe. Issue #54
+**guarantees** the zero-cost path and prevents regressions:
+
+- `ffmpeg-singleton.ts` (`getFFmpeg`) now reaches `@ffmpeg/ffmpeg` and `@ffmpeg/util`
+  via dynamic `import()` instead of static top-level imports — the built base
+  `@lightbird/core` entry no longer has any static `@ffmpeg/*` import edge.
+- `scripts/check-core-bundle.js` + `bundle-budget.test.ts` enforce the guarantee
+  in CI and in `pnpm turbo test`. See `project-overview.md` for details.

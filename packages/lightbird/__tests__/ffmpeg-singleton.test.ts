@@ -52,4 +52,12 @@ describe('ffmpeg-singleton', () => {
     expect(a).toBe(b);
     expect(MockFFmpeg).toHaveBeenCalledTimes(1);
   });
+
+  it('does not construct FFmpeg until getFFmpeg() is called (lazy — issue #54)', async () => {
+    // @ffmpeg/* are pulled in via dynamic import() inside getFFmpeg(), so
+    // importing @lightbird/core must never touch FFmpeg.wasm on its own.
+    expect(MockFFmpeg).not.toHaveBeenCalled();
+    await getFFmpeg();
+    expect(MockFFmpeg).toHaveBeenCalledTimes(1);
+  });
 });
