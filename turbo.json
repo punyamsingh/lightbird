@@ -12,6 +12,9 @@
     "test": {
       "dependsOn": ["^build"]
     },
+    "@lightbird/core#test": {
+      "dependsOn": ["^build", "build"]
+    },
     "typecheck": {
       "dependsOn": ["^build"]
     },

@@ -1,7 +1,7 @@
 # LightBird — Project Overview
 
 > **Last updated:** 2026-05-21
-> **Branch context:** Plans 01–12 implemented. Project is now a pnpm monorepo publishing two npm packages: `lightbird` (core) and `@lightbird/ui` (React components). Docs page refactored into a server component with client islands (issue #35).
+> **Branch context:** Plans 01–12 implemented. Project is now a pnpm monorepo publishing two npm packages: `lightbird` (core) and `@lightbird/ui` (React components). Docs page refactored into a server component with client islands (issue #35). FFmpeg.wasm lazy loading is now guaranteed zero-cost for HTML5-native playback and protected by a CI bundle-size budget (issue #54).
 
 ---
 
@@ -103,11 +103,22 @@ pnpm test --filter @lightbird/ui  # UI only
 ```
 
 Test locations:
-- `packages/lightbird/__tests__/` — library tests (14 files)
-- `packages/lightbird/__tests__/react/` — hook tests (10 files)
+- `packages/lightbird/__tests__/` — library tests (18 files)
+- `packages/lightbird/__tests__/react/` — hook tests (11 files)
 - `packages/ui/__tests__/` — component tests (4 files)
 
 Shared setup: `jest.setup.ts` (root)
+
+### Bundle-size guarantee (issue #54)
+
+The base `@lightbird/core` entry must stay FFmpeg-free and lean:
+
+- `scripts/check-core-bundle.js` audits the built `dist/index.js` / `dist/index.cjs`
+  for static `@ffmpeg/*` imports and enforces a gzipped size budget. CI runs it
+  after the build step (`.github/workflows/test.yml`).
+- `packages/lightbird/__tests__/bundle-budget.test.ts` asserts the same guarantee
+  on the built artifacts as part of `pnpm turbo test` (turbo builds
+  `@lightbird/core` before testing it).
 
 ---
 
@@ -164,6 +175,6 @@ Shared setup: `jest.setup.ts` (root)
 5. **Blob URLs** — files loaded via `URL.createObjectURL`, cleaned up on `destroy()`
 6. **`"use client"` via tsup banner** — UI package adds directive automatically
 7. **useSubtitles onError callback** — decouples hook from toast UI (LightBirdPlayer passes toast callback)
-8. **FFmpeg as optional dep** — not required if only HTML5 playback needed
+8. **FFmpeg.wasm is zero-cost for native playback** — `@ffmpeg/*` is an optional dependency reached only through a dynamic `import()` (`getFFmpeg`) and the lazily-created Web Worker. The base `@lightbird/core` entry contains no FFmpeg code, so apps that only play MP4/WebM download zero FFmpeg bytes. Enforced by a CI bundle-size budget (`scripts/check-core-bundle.js`). A `@lightbird/core/lite` subpath was evaluated and rejected — the base entry is already FFmpeg-free, so a lite subpath would only shave the small `MKVPlayer` glue while fragmenting the API (issue #54).
 9. **React as optional peer dep** — only needed for `@lightbird/core/react` subpath
 10. **Docs page server/client islands** — `apps/web/src/app/docs/page.tsx` is a server component holding all static content (prose, tables, API reference, page structure). Only four interactive pieces hydrate as client islands: `DocsNav` (sidebar + mobile nav + scroll spy), `CodeBlock` (copy-to-clipboard), `InstallTabs` (tabbed install UI), and `FadeSection` (scroll-triggered fade-in)

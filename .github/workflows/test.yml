@@ -25,6 +25,9 @@ jobs:
       - name: Build packages
         run: pnpm turbo build --filter=@lightbird/core --filter=@lightbird/ui
 
+      - name: Bundle size budget
+        run: node scripts/check-core-bundle.js
+
       - name: Typecheck
         run: pnpm turbo typecheck
 
