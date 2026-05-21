@@ -19,10 +19,14 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, webpack }) => {
     config.experiments = { ...config.experiments, asyncWebAssembly: true, layers: true };
     if (!isServer) {
       config.output.globalObject = 'self';
+      // WebTorrent (and its Node.js deps) reference `global`; polyfill it for browsers.
+      config.plugins.push(
+        new webpack.DefinePlugin({ global: 'globalThis' }),
+      );
     }
 
     // Resolve workspace packages to source code so webpack can handle
