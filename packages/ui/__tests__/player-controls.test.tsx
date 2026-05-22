@@ -283,3 +283,72 @@ describe('PlayerControls — seek-hover preview', () => {
     expect(onSeekHover).not.toHaveBeenCalled();
   });
 });
+
+describe('PlayerControls — A-B loop', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('does not render the A-B loop button when onABLoopCycle is not provided', () => {
+    render(<PlayerControls {...defaultProps} />);
+    expect(screen.queryByTestId('ab-loop-button')).not.toBeInTheDocument();
+  });
+
+  it('renders the A-B loop button when onABLoopCycle is provided', () => {
+    render(<PlayerControls {...defaultProps} onABLoopCycle={jest.fn()} />);
+    expect(screen.getByTestId('ab-loop-button')).toBeInTheDocument();
+  });
+
+  it('calls onABLoopCycle when the A-B loop button is clicked', () => {
+    const onABLoopCycle = jest.fn();
+    render(<PlayerControls {...defaultProps} onABLoopCycle={onABLoopCycle} />);
+    fireEvent.click(screen.getByTestId('ab-loop-button'));
+    expect(onABLoopCycle).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders no A-B markers when no points are set', () => {
+    render(<PlayerControls {...defaultProps} duration={200} onABLoopCycle={jest.fn()} />);
+    expect(screen.queryByTestId('ab-marker-a')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ab-marker-b')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ab-loop-region')).not.toBeInTheDocument();
+  });
+
+  it('renders marker A positioned by ratio when point A is set', () => {
+    render(
+      <PlayerControls
+        {...defaultProps}
+        duration={200}
+        onABLoopCycle={jest.fn()}
+        abLoop={{ pointA: 50, pointB: null, isLooping: false }}
+      />,
+    );
+    expect(screen.getByTestId('ab-marker-a')).toHaveStyle({ left: '25%' });
+    expect(screen.queryByTestId('ab-marker-b')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ab-loop-region')).not.toBeInTheDocument();
+  });
+
+  it('renders both markers and the loop region when the loop is active', () => {
+    render(
+      <PlayerControls
+        {...defaultProps}
+        duration={200}
+        onABLoopCycle={jest.fn()}
+        abLoop={{ pointA: 50, pointB: 150, isLooping: true }}
+      />,
+    );
+    expect(screen.getByTestId('ab-marker-a')).toHaveStyle({ left: '25%' });
+    expect(screen.getByTestId('ab-marker-b')).toHaveStyle({ left: '75%' });
+    expect(screen.getByTestId('ab-loop-region')).toHaveStyle({ left: '25%', width: '50%' });
+  });
+
+  it('marks the A-B loop button active when the loop is running', () => {
+    render(
+      <PlayerControls
+        {...defaultProps}
+        onABLoopCycle={jest.fn()}
+        abLoop={{ pointA: 50, pointB: 150, isLooping: true }}
+      />,
+    );
+    expect(screen.getByTestId('ab-loop-button')).toHaveAttribute('data-active', 'true');
+  });
+});

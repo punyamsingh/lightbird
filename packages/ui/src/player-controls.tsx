@@ -57,6 +57,8 @@ interface PlayerControlsProps {
   pipSupported?: boolean;
   onSeekHover?: (timeSeconds: number | null) => void;
   seekPreviewThumbnail?: string | null;
+  abLoop?: { pointA: number | null; pointB: number | null; isLooping: boolean };
+  onABLoopCycle?: () => void;
 }
 
 const formatTime = (time: number) => {
@@ -77,6 +79,7 @@ export const PlayerControls = React.memo(function PlayerControls({
   onSubtitleUpload, onSubtitleRemove,
   onShowInfo, onOpenShortcuts, onGoToChapter, onTogglePiP, isPiP = false, pipSupported = false,
   onSeekHover, seekPreviewThumbnail = null,
+  abLoop = { pointA: null, pointB: null, isLooping: false }, onABLoopCycle,
 }: PlayerControlsProps) {
   const formattedProgress = useMemo(() => formatTime(progress), [progress]);
   const formattedDuration = useMemo(() => formatTime(duration), [duration]);
@@ -158,6 +161,31 @@ export const PlayerControls = React.memo(function PlayerControls({
               </TooltipContent>
             </Tooltip>
           ))}
+          {/* A-B loop region + markers */}
+          {duration > 0 && abLoop.pointA !== null && abLoop.pointB !== null && (
+            <div
+              data-testid="ab-loop-region"
+              className="pointer-events-none absolute top-0 h-full bg-primary/30"
+              style={{
+                left: `${(abLoop.pointA / duration) * 100}%`,
+                width: `${((abLoop.pointB - abLoop.pointA) / duration) * 100}%`,
+              }}
+            />
+          )}
+          {duration > 0 && abLoop.pointA !== null && (
+            <div
+              data-testid="ab-marker-a"
+              className="pointer-events-none absolute top-0 h-full w-0.5 -translate-x-1/2 bg-primary"
+              style={{ left: `${(abLoop.pointA / duration) * 100}%` }}
+            />
+          )}
+          {duration > 0 && abLoop.pointB !== null && (
+            <div
+              data-testid="ab-marker-b"
+              className="pointer-events-none absolute top-0 h-full w-0.5 -translate-x-1/2 bg-primary"
+              style={{ left: `${(abLoop.pointB / duration) * 100}%` }}
+            />
+          )}
         </div>
 
         {/* Current chapter name */}
@@ -372,6 +400,34 @@ export const PlayerControls = React.memo(function PlayerControls({
               <TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={onScreenshot}><Camera /></Button></TooltipTrigger>
               <TooltipContent><p>Screenshot</p></TooltipContent>
             </Tooltip>
+            {onABLoopCycle && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onABLoopCycle}
+                    aria-label="A-B loop"
+                    data-testid="ab-loop-button"
+                    data-active={abLoop.isLooping}
+                    className={cn("font-mono text-xs font-bold", abLoop.isLooping && "text-primary")}
+                  >
+                    <span className={cn(abLoop.pointA !== null && "text-primary")}>A</span>
+                    <span className="opacity-50">-</span>
+                    <span className={cn(abLoop.pointB !== null && "text-primary")}>B</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>
+                    {abLoop.pointA === null
+                      ? "Set loop start (A)"
+                      : abLoop.pointB === null
+                        ? "Set loop end (B)"
+                        : "Clear A-B loop"}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            )}
             <Tooltip>
               <TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={onLoopToggle} data-active={loop} className="data-[active=true]:text-primary"><RotateCcw /></Button></TooltipTrigger>
               <TooltipContent><p>Loop</p></TooltipContent>
