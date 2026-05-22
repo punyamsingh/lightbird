@@ -24,6 +24,7 @@ import {
   useChapters,
   useMagnet,
   useSeekPreview,
+  useABLoop,
 } from "@lightbird/core/react";
 import { captureVideoThumbnail, parseMediaError, validateFile, type ParsedMediaError, loadShortcuts, type ShortcutBinding, ProgressEstimator, hasAcceptedDisclaimer, acceptDisclaimer, FLAG_MAGNET_LINK } from "@lightbird/core";
 import { useBooleanFlagValue } from "@openfeature/react-sdk";
@@ -65,6 +66,7 @@ const LightBirdPlayer = () => {
   const fullscreen = useFullscreen(containerRef);
   const pip = usePictureInPicture(videoRef);
   const seekPreview = useSeekPreview(videoRef);
+  const abLoop = useABLoop(videoRef);
   const { metadata: videoMetadata } = useVideoInfo(videoRef, playlist.currentItem?.file ?? null);
   useProgressPersistence(videoRef, playlist.currentItem?.name ?? null);
   const { chapters, currentChapter, goToChapter } = useChapters(videoRef, playerRef);
@@ -563,6 +565,17 @@ const LightBirdPlayer = () => {
     toast({ title: "Screenshot Saved" });
   }, [toast]);
 
+  const handleABLoopCycle = useCallback(() => {
+    if (abLoop.pointA === null) abLoop.setPointA();
+    else if (abLoop.pointB === null) abLoop.setPointB();
+    else abLoop.clear();
+  }, [abLoop.pointA, abLoop.pointB, abLoop.setPointA, abLoop.setPointB, abLoop.clear]);
+
+  const abLoopState = useMemo(
+    () => ({ pointA: abLoop.pointA, pointB: abLoop.pointB, isLooping: abLoop.isLooping }),
+    [abLoop.pointA, abLoop.pointB, abLoop.isLooping]
+  );
+
   const handleNext = useCallback(() => {
     if (playlist.currentIndex !== null && playlist.playlist.length > 1) {
       loadVideo((playlist.currentIndex + 1) % playlist.playlist.length);
@@ -711,6 +724,8 @@ const LightBirdPlayer = () => {
             onSeek={playback.seek}
             onSeekHover={(t) => (t === null ? seekPreview.clearPreview() : seekPreview.requestPreview(t))}
             seekPreviewThumbnail={seekPreview.thumbnail}
+            abLoop={abLoopState}
+            onABLoopCycle={handleABLoopCycle}
             onVolumeChange={playback.setVolume}
             onMuteToggle={playback.toggleMute}
             onPlaybackRateChange={playback.setPlaybackRate}
