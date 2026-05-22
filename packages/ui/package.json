@@ -1,6 +1,6 @@
 {
   "name": "@lightbird/ui",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Drop-in React video player component powered by LightBird. Full controls, playlist, subtitles, chapters — one import.",
   "license": "MIT",
   "author": "Punyam Singh",
