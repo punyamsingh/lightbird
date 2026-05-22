@@ -35,6 +35,12 @@ describe('auditEntrySource', () => {
     ).not.toHaveLength(0);
   });
 
+  it('flags a multiline static ESM `import { ... } from "@ffmpeg/*"`', () => {
+    expect(
+      auditEntrySource('import {\n  FFmpeg,\n} from "@ffmpeg/ffmpeg";'),
+    ).not.toHaveLength(0);
+  });
+
   it('flags a static CJS `require("@ffmpeg/*")`', () => {
     expect(
       auditEntrySource(`var ff = require("@ffmpeg/util");`),

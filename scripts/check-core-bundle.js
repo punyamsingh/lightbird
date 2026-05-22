@@ -36,7 +36,9 @@ const MAX_GZIP_BYTES = 16 * 1024;
  */
 function auditEntrySource(source) {
   const violations = [];
-  const staticEsmFrom = /import\b[^;\n]*\bfrom\s*['"]@ffmpeg\/[^'"]+['"]/;
+  // `[^;]*?` (not `[^;\n]*`) so a line-broken `import { ... } \n from '@ffmpeg/*'`
+  // is still caught — it spans newlines but stays within one statement.
+  const staticEsmFrom = /import\b[^;]*?\bfrom\s*['"]@ffmpeg\/[^'"]+['"]/;
   const staticEsmBare = /import\s+['"]@ffmpeg\/[^'"]+['"]/;
   const staticCjs = /\brequire\(\s*['"]@ffmpeg\/[^'"]+['"]\s*\)/;
 
