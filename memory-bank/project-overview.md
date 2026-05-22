@@ -1,7 +1,7 @@
 # LightBird — Project Overview
 
 > **Last updated:** 2026-05-22
-> **Branch context:** Plans 01–12 implemented. Project is now a pnpm monorepo publishing two npm packages: `@lightbird/core` (core) and `@lightbird/ui` (React components). Docs page refactored into a server component with client islands (issue #35). FFmpeg.wasm lazy loading is now guaranteed zero-cost for HTML5-native playback and protected by a CI bundle-size budget (issue #54). Player UX polish added seek-hover thumbnail previews, A-B loop, and mobile touch gestures (issue #57).
+> **Branch context:** Plans 01–12 implemented. Project is now a pnpm monorepo publishing two npm packages: `@lightbird/core` (core) and `@lightbird/ui` (React components). Docs page refactored into a server component with client islands (issue #35). FFmpeg.wasm lazy loading is now guaranteed zero-cost for HTML5-native playback and protected by a CI bundle-size budget (issue #54). Player UX polish added seek-hover thumbnail previews, frame/screenshot export, A-B loop, and mobile touch gestures (issue #57).
 
 ---
 
