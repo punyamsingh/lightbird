@@ -5,6 +5,7 @@ import { cn } from "./utils/cn";
 import PlayerControls from "./player-controls";
 import PlaylistPanel, { type PlaylistSize } from "./playlist-panel";
 import { VideoOverlay } from "./video-overlay";
+import { GestureFeedback } from "./gesture-feedback";
 import { PlayerErrorDisplay } from "./player-error-display";
 import { VideoInfoPanel } from "./video-info-panel";
 import { ShortcutSettingsDialog } from "./shortcut-settings-dialog";
@@ -25,6 +26,7 @@ import {
   useMagnet,
   useSeekPreview,
   useABLoop,
+  useTouchGestures,
 } from "@lightbird/core/react";
 import { captureVideoThumbnail, parseMediaError, validateFile, type ParsedMediaError, loadShortcuts, type ShortcutBinding, ProgressEstimator, hasAcceptedDisclaimer, acceptDisclaimer, FLAG_MAGNET_LINK } from "@lightbird/core";
 import { useBooleanFlagValue } from "@openfeature/react-sdk";
@@ -67,6 +69,17 @@ const LightBirdPlayer = () => {
   const pip = usePictureInPicture(videoRef);
   const seekPreview = useSeekPreview(videoRef);
   const abLoop = useABLoop(videoRef);
+  const gestures = useTouchGestures(videoRef, {
+    seekBy: (seconds) => {
+      const el = videoRef.current;
+      if (el) playback.seek(el.currentTime + seconds);
+    },
+    getVolume: () => videoRef.current?.volume ?? 1,
+    setVolume: (v) => playback.setVolume(v),
+    getBrightness: () => filters.filters.brightness / 200,
+    setBrightness: (v) =>
+      filters.setFilters({ ...filters.filters, brightness: Math.round(v * 200) }),
+  });
   const { metadata: videoMetadata } = useVideoInfo(videoRef, playlist.currentItem?.file ?? null);
   useProgressPersistence(videoRef, playlist.currentItem?.name ?? null);
   const { chapters, currentChapter, goToChapter } = useChapters(videoRef, playerRef);
@@ -655,6 +668,8 @@ const LightBirdPlayer = () => {
           throughputMBs={processingThroughput}
           onCancel={cancellableProcessing ? handleCancelProcessing : undefined}
         />
+
+        <GestureFeedback feedback={gestures.feedback} />
 
         {playerError && (
           <PlayerErrorDisplay
