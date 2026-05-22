@@ -1,8 +1,9 @@
 import { SimplePlayer, type SimplePlayerFile } from './players/simple-player';
 import { MKVPlayer, type MKVPlayerFile } from './players/mkv-player';
-import type { AudioTrack, Subtitle, Chapter } from "./types";
+import { HLSPlayer, isHlsUrl } from './players/hls-player';
+import type { AudioTrack, Subtitle, Chapter, HLSPlayerFile } from "./types";
 
-export type ProcessedFile = SimplePlayerFile | MKVPlayerFile;
+export type ProcessedFile = SimplePlayerFile | MKVPlayerFile | HLSPlayerFile;
 
 export interface VideoPlayer {
   initialize(videoElement: HTMLVideoElement): Promise<ProcessedFile>;
@@ -98,18 +99,28 @@ class MKVPlayerAdapter implements VideoPlayer {
 }
 
 export function createVideoPlayer(
-  file: File,
+  source: File | string,
   externalSubtitles: File[] = [],
   onProgress?: (progress: number) => void,
 ): VideoPlayer {
-  // Smart format detection
-  if (MKVPlayer.isCompatible(file)) {
-    return new MKVPlayerAdapter(file, onProgress);
-  } else if (SimplePlayer.isCompatible(file)) {
-    return new SimplePlayerAdapter(file, externalSubtitles);
+  // String sources are remote URLs; only HLS streams have a dedicated player.
+  if (typeof source === 'string') {
+    if (isHlsUrl(source)) {
+      return new HLSPlayer(source);
+    }
+    throw new Error(
+      `createVideoPlayer: unsupported URL "${source}" — only HLS (.m3u8) stream URLs are supported; pass a File for other formats.`,
+    );
+  }
+
+  // Smart format detection for File sources
+  if (MKVPlayer.isCompatible(source)) {
+    return new MKVPlayerAdapter(source, onProgress);
+  } else if (SimplePlayer.isCompatible(source)) {
+    return new SimplePlayerAdapter(source, externalSubtitles);
   } else {
     // Fallback to simple player for unknown formats
-    return new SimplePlayerAdapter(file, externalSubtitles);
+    return new SimplePlayerAdapter(source, externalSubtitles);
   }
 }
 
