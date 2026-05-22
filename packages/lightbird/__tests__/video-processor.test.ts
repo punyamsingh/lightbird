@@ -20,6 +20,7 @@ jest.mock('@ffmpeg/util', () => ({
 
 import { createVideoPlayer } from '../src/video-processor';
 import { MKVPlayer } from '../src/players/mkv-player';
+import { HLSPlayer } from '../src/players/hls-player';
 
 beforeEach(() => {
   // Set up worker factory that immediately errors so MKV falls back to native
@@ -147,5 +148,26 @@ describe('tracksReady adapter surface', () => {
     // MKV: optional chain runs .then() — resolves to the mapped value
     const mkvResult = await mkvPlayer.tracksReady?.then(() => 'resolved');
     expect(mkvResult).toBe('resolved');
+  });
+});
+
+describe('createVideoPlayer — HLS URL routing', () => {
+  it('routes .m3u8 URL strings to HLSPlayer', () => {
+    const player = createVideoPlayer('https://example.com/stream.m3u8');
+    expect(player).toBeInstanceOf(HLSPlayer);
+  });
+
+  it('routes .m3u8 URLs with a query string to HLSPlayer', () => {
+    const player = createVideoPlayer('https://cdn.example.com/master.m3u8?token=xyz');
+    expect(player).toBeInstanceOf(HLSPlayer);
+  });
+
+  it('throws for non-HLS URL strings', () => {
+    expect(() => createVideoPlayer('https://example.com/video.mp4')).toThrow(/HLS/);
+  });
+
+  it('still routes File inputs through format detection (not HLS)', () => {
+    const player = createVideoPlayer(makeFile('video.mp4'));
+    expect(player).not.toBeInstanceOf(HLSPlayer);
   });
 });

@@ -85,3 +85,17 @@ export interface SubtitleTrackMeta {
   format: string | null;
   language: string | null;
 }
+
+/** A single HLS quality rendition (e.g. 1080p, 720p). */
+export interface QualityLevel {
+  index: number;
+  height: number;
+  bitrate: number;
+  name: string;
+}
+
+/** Result of initialising an HLS stream via `HLSPlayer`. */
+export interface HLSPlayerFile {
+  url: string;
+  qualityLevels: QualityLevel[];
+}

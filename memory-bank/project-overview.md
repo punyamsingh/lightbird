@@ -1,7 +1,7 @@
 # LightBird — Project Overview
 
-> **Last updated:** 2026-05-21
-> **Branch context:** Plans 01–12 implemented. Project is now a pnpm monorepo publishing two npm packages: `@lightbird/core` (core) and `@lightbird/ui` (React components). Docs page refactored into a server component with client islands (issue #35). FFmpeg.wasm lazy loading is now guaranteed zero-cost for HTML5-native playback and protected by a CI bundle-size budget (issue #54).
+> **Last updated:** 2026-05-22
+> **Branch context:** Plans 01–12 implemented. Project is now a pnpm monorepo publishing two npm packages: `lightbird` (core) and `@lightbird/ui` (React components). Docs page refactored into a server component with client islands (issue #35). HLS-01 (issue #49) adds an `HLSPlayer` for `.m3u8` adaptive streams.
 
 ---
 
@@ -26,14 +26,15 @@ packages/lightbird/ — Core library (npm: @lightbird/core)
 packages/ui/        — UI components (npm: @lightbird/ui)
 ```
 
-### Dual-Player System
+### Player System
 
 | Player | Handles | Implementation |
 |---|---|---|
 | `SimplePlayer` | MP4, WebM, AVI, MOV, WMV, FLV, OGV | Native HTML5 `<video>` element |
 | `MKVPlayer` | MKV | FFmpeg.wasm in Web Worker — probes, remuxes to MP4, extracts subtitles |
+| `HLSPlayer` | HLS `.m3u8` adaptive streams | `hls.js` (lazy dynamic import), or native HLS on Safari |
 
-The factory function `createVideoPlayer(file)` in `packages/lightbird/src/video-processor.ts` selects the right player.
+The factory function `createVideoPlayer(source)` in `packages/lightbird/src/video-processor.ts` selects the right player. It accepts a `File` (MP4/MKV/etc., routed by format detection) or an HLS `.m3u8` URL string (routed to `HLSPlayer`); other URL strings throw.
 
 ### Component Hierarchy
 
@@ -142,7 +143,7 @@ The base `@lightbird/core` entry must stay FFmpeg-free and lean:
 | MS | Media Session API | **DONE** |
 | PIP | Picture-in-Picture | **DONE** |
 | CH | Chapters & Cue Points | **DONE** |
-| HLS | HLS/DASH Adaptive Streaming | Planned ([#48](https://github.com/punyamsingh/lightbird/issues/48)) |
+| HLS | HLS/DASH Adaptive Streaming | In progress ([#48](https://github.com/punyamsingh/lightbird/issues/48)) — HLS-01 `HLSPlayer` **DONE**, HLS-02/03 pending |
 
 ---
 
