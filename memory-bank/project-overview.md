@@ -1,7 +1,7 @@
 # LightBird — Project Overview
 
 > **Last updated:** 2026-05-22
-> **Branch context:** Plans 01–12 implemented. Project is now a pnpm monorepo publishing two npm packages: `lightbird` (core) and `@lightbird/ui` (React components). Docs page refactored into a server component with client islands (issue #35). HLS-01 (issue #49) adds an `HLSPlayer` for `.m3u8` adaptive streams.
+> **Branch context:** Plans 01–12 implemented. Project is now a pnpm monorepo publishing two npm packages: `@lightbird/core` (core) and `@lightbird/ui` (React components). Docs page refactored into a server component with client islands (issue #35). FFmpeg.wasm lazy loading is now guaranteed zero-cost for HTML5-native playback and protected by a CI bundle-size budget (issue #54). Player UX polish added seek-hover thumbnail previews, A-B loop, and mobile touch gestures (issue #57).
 
 ---
 
@@ -46,6 +46,7 @@ apps/web/src/app/page.tsx
         ├── PlaylistPanel
         ├── VideoOverlay
         ├── SubtitleOverlay
+        ├── GestureFeedback
         └── PlayerErrorDisplay
 ```
 
@@ -65,6 +66,9 @@ apps/web/src/app/page.tsx
 | `use-video-info.ts` | Video metadata extraction |
 | `use-chapters.ts` | Chapter navigation from MKV metadata |
 | `use-magnet.ts` | Magnet link → torrent metadata → playlist items |
+| `use-seek-preview.ts` | Seek-bar hover thumbnail previews via an offscreen video |
+| `use-ab-loop.ts` | A-B loop: repeat playback between two user-set points |
+| `use-touch-gestures.ts` | Mobile touch gestures: double-tap seek, swipe volume/brightness |
 
 ---
 
@@ -105,8 +109,8 @@ pnpm test --filter @lightbird/ui  # UI only
 
 Test locations:
 - `packages/lightbird/__tests__/` — library tests (18 files)
-- `packages/lightbird/__tests__/react/` — hook tests (11 files)
-- `packages/ui/__tests__/` — component tests (4 files)
+- `packages/lightbird/__tests__/react/` — hook tests (14 files)
+- `packages/ui/__tests__/` — component tests (5 files)
 
 Shared setup: `jest.setup.ts` (root)
 
