@@ -200,3 +200,86 @@ describe('PlayerControls — chapters', () => {
     expect(onGoToChapter).toHaveBeenCalledWith(1);
   });
 });
+
+// jsdom returns a zero-sized rect by default; mock a 100px-wide seek bar.
+function mockSeekBarRect(el: HTMLElement) {
+  jest.spyOn(el, 'getBoundingClientRect').mockReturnValue({
+    left: 0,
+    width: 100,
+    top: 0,
+    height: 8,
+    right: 100,
+    bottom: 8,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  } as DOMRect);
+}
+
+describe('PlayerControls — seek-hover preview', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('calls onSeekHover with the hovered timestamp on mouse move over the seek bar', () => {
+    const onSeekHover = jest.fn();
+    render(<PlayerControls {...defaultProps} duration={200} onSeekHover={onSeekHover} />);
+    const seekBar = screen.getByTestId('seek-bar');
+    mockSeekBarRect(seekBar);
+
+    fireEvent.mouseMove(seekBar, { clientX: 50 });
+    // 50% of a 200s video
+    expect(onSeekHover).toHaveBeenCalledWith(100);
+  });
+
+  it('shows a preview tooltip with the formatted timestamp while hovering', () => {
+    render(<PlayerControls {...defaultProps} duration={200} />);
+    const seekBar = screen.getByTestId('seek-bar');
+    mockSeekBarRect(seekBar);
+
+    fireEvent.mouseMove(seekBar, { clientX: 50 });
+    expect(screen.getByTestId('seek-preview')).toBeInTheDocument();
+    expect(screen.getByText('01:40')).toBeInTheDocument();
+  });
+
+  it('renders the captured thumbnail image when seekPreviewThumbnail is provided', () => {
+    render(
+      <PlayerControls
+        {...defaultProps}
+        duration={200}
+        seekPreviewThumbnail="data:image/jpeg;base64,XYZ"
+      />,
+    );
+    const seekBar = screen.getByTestId('seek-bar');
+    mockSeekBarRect(seekBar);
+
+    fireEvent.mouseMove(seekBar, { clientX: 25 });
+    const img = screen.getByTestId('seek-preview').querySelector('img');
+    expect(img).not.toBeNull();
+    expect(img?.getAttribute('src')).toBe('data:image/jpeg;base64,XYZ');
+  });
+
+  it('hides the preview and calls onSeekHover(null) on mouse leave', () => {
+    const onSeekHover = jest.fn();
+    render(<PlayerControls {...defaultProps} duration={200} onSeekHover={onSeekHover} />);
+    const seekBar = screen.getByTestId('seek-bar');
+    mockSeekBarRect(seekBar);
+
+    fireEvent.mouseMove(seekBar, { clientX: 50 });
+    expect(screen.getByTestId('seek-preview')).toBeInTheDocument();
+
+    fireEvent.mouseLeave(seekBar);
+    expect(screen.queryByTestId('seek-preview')).not.toBeInTheDocument();
+    expect(onSeekHover).toHaveBeenLastCalledWith(null);
+  });
+
+  it('does not call onSeekHover when duration is zero', () => {
+    const onSeekHover = jest.fn();
+    render(<PlayerControls {...defaultProps} duration={0} onSeekHover={onSeekHover} />);
+    const seekBar = screen.getByTestId('seek-bar');
+    mockSeekBarRect(seekBar);
+
+    fireEvent.mouseMove(seekBar, { clientX: 50 });
+    expect(onSeekHover).not.toHaveBeenCalled();
+  });
+});
