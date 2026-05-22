@@ -23,6 +23,7 @@ import {
   useMediaSession,
   useChapters,
   useMagnet,
+  useSeekPreview,
 } from "@lightbird/core/react";
 import { captureVideoThumbnail, parseMediaError, validateFile, type ParsedMediaError, loadShortcuts, type ShortcutBinding, ProgressEstimator, hasAcceptedDisclaimer, acceptDisclaimer, FLAG_MAGNET_LINK } from "@lightbird/core";
 import { useBooleanFlagValue } from "@openfeature/react-sdk";
@@ -63,6 +64,7 @@ const LightBirdPlayer = () => {
   });
   const fullscreen = useFullscreen(containerRef);
   const pip = usePictureInPicture(videoRef);
+  const seekPreview = useSeekPreview(videoRef);
   const { metadata: videoMetadata } = useVideoInfo(videoRef, playlist.currentItem?.file ?? null);
   useProgressPersistence(videoRef, playlist.currentItem?.name ?? null);
   const { chapters, currentChapter, goToChapter } = useChapters(videoRef, playerRef);
@@ -707,6 +709,8 @@ const LightBirdPlayer = () => {
             tracksLoading={tracksLoading}
             onPlayPause={playback.togglePlay}
             onSeek={playback.seek}
+            onSeekHover={(t) => (t === null ? seekPreview.clearPreview() : seekPreview.requestPreview(t))}
+            seekPreviewThumbnail={seekPreview.thumbnail}
             onVolumeChange={playback.setVolume}
             onMuteToggle={playback.toggleMute}
             onPlaybackRateChange={playback.setPlaybackRate}

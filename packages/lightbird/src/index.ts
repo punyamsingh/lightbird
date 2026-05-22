@@ -44,7 +44,7 @@ export { FLAG_MAGNET_LINK, initFeatureFlags } from './feature-flags'
 export { parseMediaError, validateFile } from './utils/media-error'
 export type { ParsedMediaError, MediaErrorType } from './utils/media-error'
 export { extractNativeMetadata } from './utils/video-info'
-export { captureVideoThumbnail } from './utils/video-thumbnail'
+export { captureVideoThumbnail, captureFrameAt } from './utils/video-thumbnail'
 export {
   loadShortcuts, saveShortcuts, matchesShortcut, isInteractiveElement,
   formatShortcutKey, DEFAULT_SHORTCUTS

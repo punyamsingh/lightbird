@@ -55,6 +55,8 @@ interface PlayerControlsProps {
   onTogglePiP?: () => void;
   isPiP?: boolean;
   pipSupported?: boolean;
+  onSeekHover?: (timeSeconds: number | null) => void;
+  seekPreviewThumbnail?: string | null;
 }
 
 const formatTime = (time: number) => {
@@ -74,16 +76,58 @@ export const PlayerControls = React.memo(function PlayerControls({
   onZoomChange, onSubtitleChange, onAudioTrackChange, tracksLoading = false,
   onSubtitleUpload, onSubtitleRemove,
   onShowInfo, onOpenShortcuts, onGoToChapter, onTogglePiP, isPiP = false, pipSupported = false,
+  onSeekHover, seekPreviewThumbnail = null,
 }: PlayerControlsProps) {
   const formattedProgress = useMemo(() => formatTime(progress), [progress]);
   const formattedDuration = useMemo(() => formatTime(duration), [duration]);
   const [chaptersMenuOpen, setChaptersMenuOpen] = useState(false);
+  const [seekHover, setSeekHover] = useState<{ ratio: number; time: number } | null>(null);
+
+  const handleSeekHover = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (duration <= 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const time = ratio * duration;
+    setSeekHover({ ratio, time });
+    onSeekHover?.(time);
+  };
+
+  const handleSeekLeave = () => {
+    setSeekHover(null);
+    onSeekHover?.(null);
+  };
 
   return (
     <TooltipProvider>
       <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-in-out flex flex-col gap-2">
-        {/* Seek bar with chapter tick marks */}
-        <div className="relative w-full">
+        {/* Seek bar with chapter tick marks + hover preview */}
+        <div
+          className="relative w-full"
+          data-testid="seek-bar"
+          onMouseMove={handleSeekHover}
+          onMouseLeave={handleSeekLeave}
+        >
+          {seekHover && (
+            <div
+              data-testid="seek-preview"
+              className="absolute bottom-full mb-3 -translate-x-1/2 pointer-events-none flex flex-col items-center z-20"
+              style={{ left: `${seekHover.ratio * 100}%` }}
+            >
+              {seekPreviewThumbnail ? (
+                <img
+                  src={seekPreviewThumbnail}
+                  alt=""
+                  className="w-40 h-[90px] rounded border border-white/20 bg-black object-cover shadow-lg"
+                />
+              ) : (
+                <div className="w-40 h-[90px] rounded border border-white/20 bg-black/80 shadow-lg" />
+              )}
+              <span className="mt-1 rounded bg-black/80 px-1.5 py-0.5 font-mono text-xs text-white">
+                {formatTime(seekHover.time)}
+              </span>
+            </div>
+          )}
           <Slider
             value={[progress]}
             max={duration}
