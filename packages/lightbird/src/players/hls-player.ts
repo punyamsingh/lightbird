@@ -43,7 +43,7 @@ export class HLSPlayer implements VideoPlayer {
 
   getAudioTracks(): AudioTrack[] {
     if (!this.hls) return [];
-    return this.hls.audioTracks.map((track) => ({
+    return this.hls.audioTracks.map((track: any) => ({
       id: String(track.id),
       name: track.name,
       lang: track.lang || 'unknown',
@@ -70,7 +70,7 @@ export class HLSPlayer implements VideoPlayer {
   /** Quality renditions — not on `VideoPlayer`; read directly by the quality hook. */
   getQualityLevels(): QualityLevel[] {
     if (!this.hls) return [];
-    return this.hls.levels.map((level, index) => ({
+    return this.hls.levels.map((level: any, index: number) => ({
       index,
       height: level.height,
       bitrate: level.bitrate,
