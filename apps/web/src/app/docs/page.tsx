@@ -217,7 +217,9 @@ const HOOKS_DATA = [
 
 const UI_DATA = [
   ["<LightBirdPlayer />", "Full player — drop in and done"],
-  ["<PlayerControls />", "Standalone control bar"],
+  ["<MenuBar />", "VLC-style top menu bar"],
+  ["<PlayerControls />", "Slim transport row + seek bar"],
+  ["<SeekBar />", "Thin seek bar with rAF-smoothed thumb"],
   ["<PlaylistPanel />", "Standalone playlist sidebar"],
   ["<Toaster />", "Toast notification provider"],
 ];

@@ -70,7 +70,7 @@ export const SeekBar = React.memo(function SeekBar({
 
   return (
     <div
-      className="relative w-full py-2"
+      className="group/seek relative w-full py-1.5 cursor-pointer"
       data-testid="seek-bar"
       data-scrubbing={isScrubbing || undefined}
       data-hover={isHovering || undefined}
@@ -81,7 +81,7 @@ export const SeekBar = React.memo(function SeekBar({
       {seekHover && (
         <div
           data-testid="seek-preview"
-          className="absolute bottom-full mb-3 -translate-x-1/2 pointer-events-none flex flex-col items-center z-20"
+          className="absolute bottom-full mb-2 -translate-x-1/2 pointer-events-none flex flex-col items-center z-20"
           style={{ left: `${seekHover.ratio * 100}%` }}
         >
           {seekPreviewThumbnail ? (
@@ -107,10 +107,17 @@ export const SeekBar = React.memo(function SeekBar({
         onPointerUp={() => setIsScrubbing(false)}
         onLostPointerCapture={() => setIsScrubbing(false)}
         className="w-full"
-        trackClassName={cn(active ? "h-3" : "h-2")}
-        rangeClassName={cn(active && "shadow-[0_0_8px_hsl(var(--primary)/0.7)]")}
+        trackClassName={cn(
+          "rounded-none transition-all duration-150 ease-out",
+          active ? "h-1.5" : "h-[3px]"
+        )}
+        rangeClassName={cn(
+          "rounded-none",
+          active && "shadow-[0_0_6px_hsl(var(--primary)/0.6)]"
+        )}
         thumbClassName={cn(
-          active && "scale-110",
+          "h-3 w-3 border transition-[transform,opacity] duration-150",
+          active ? "scale-100 opacity-100" : "scale-0 opacity-0",
           isScrubbing && "scale-125"
         )}
       />
@@ -124,9 +131,9 @@ export const SeekBar = React.memo(function SeekBar({
                 left: `${(chapter.startTime / duration) * 100}%`,
                 top: '50%',
                 width: '2px',
-                height: active ? '14px' : '12px',
+                height: active ? '10px' : '6px',
                 background: 'white',
-                opacity: 0.6,
+                opacity: 0.55,
                 pointerEvents: 'none',
                 transform: 'translate(-1px, -50%)',
                 transition: 'height 150ms ease-out',
@@ -142,8 +149,8 @@ export const SeekBar = React.memo(function SeekBar({
         <div
           data-testid="ab-loop-region"
           className={cn(
-            "pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 bg-primary/30 transition-[height] duration-150",
-            active ? "h-3" : "h-2"
+            "pointer-events-none absolute top-1/2 -translate-y-1/2 bg-primary/40 transition-[height] duration-150",
+            active ? "h-1.5" : "h-[3px]"
           )}
           style={{
             left: `${(abLoop.pointA / duration) * 100}%`,
@@ -154,14 +161,14 @@ export const SeekBar = React.memo(function SeekBar({
       {duration > 0 && abLoop.pointA !== null && (
         <div
           data-testid="ab-marker-a"
-          className="pointer-events-none absolute top-1/2 -translate-y-1/2 h-4 w-0.5 -translate-x-1/2 bg-primary"
+          className="pointer-events-none absolute top-1/2 -translate-y-1/2 h-3 w-0.5 -translate-x-1/2 bg-primary"
           style={{ left: `${(abLoop.pointA / duration) * 100}%` }}
         />
       )}
       {duration > 0 && abLoop.pointB !== null && (
         <div
           data-testid="ab-marker-b"
-          className="pointer-events-none absolute top-1/2 -translate-y-1/2 h-4 w-0.5 -translate-x-1/2 bg-primary"
+          className="pointer-events-none absolute top-1/2 -translate-y-1/2 h-3 w-0.5 -translate-x-1/2 bg-primary"
           style={{ left: `${(abLoop.pointB / duration) * 100}%` }}
         />
       )}

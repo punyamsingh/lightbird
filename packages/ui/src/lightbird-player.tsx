@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import type { PlaylistItem, AudioTrack } from "@lightbird/core";
 import { cn } from "./utils/cn";
 import PlayerControls from "./player-controls";
+import MenuBar from "./menu-bar";
 import PlaylistPanel, { type PlaylistSize } from "./playlist-panel";
 import { VideoOverlay } from "./video-overlay";
 import { GestureFeedback } from "./gesture-feedback";
@@ -49,6 +50,7 @@ const LightBirdPlayer = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const subtitleInputRef = useRef<HTMLInputElement>(null);
+  const mediaInputRef = useRef<HTMLInputElement>(null);
   const playerRef = useRef<VideoPlayer | null>(null);
   // Companion map: preserves external subtitle files for re-loading playlist items
   const subtitleFilesMapRef = useRef<Map<string, File[]>>(new Map());
@@ -649,8 +651,65 @@ const LightBirdPlayer = () => {
     <div className="flex flex-1 w-full h-full">
       <div
         ref={containerRef}
-        className="flex-1 flex flex-col items-center justify-center bg-black relative group"
+        className="flex-1 flex flex-col bg-black relative"
       >
+        <MenuBar
+          isPlaying={playback.isPlaying}
+          isFullScreen={fullscreen.isFullscreen}
+          isMuted={playback.isMuted}
+          loop={playback.loop}
+          playbackRate={playback.playbackRate}
+          filters={filters.filters}
+          zoom={filters.zoom}
+          subtitles={subtitles.subtitles}
+          activeSubtitle={subtitles.activeSubtitle}
+          audioTracks={audioTracks}
+          activeAudioTrack={activeAudioTrack}
+          chapters={chapters}
+          currentChapter={currentChapter}
+          isPiP={pip.isPiP}
+          pipSupported={!!pip.isSupported}
+          playlistOpen={playlistOpen}
+          abLoop={abLoopState}
+          onPlayPause={playback.togglePlay}
+          onStop={() => {
+            const el = videoRef.current;
+            if (el) {
+              el.pause();
+              el.currentTime = 0;
+            }
+          }}
+          onNext={handleNext}
+          onPrevious={handlePrevious}
+          onSeekRelative={(delta) => {
+            const el = videoRef.current;
+            if (el) playback.seek(el.currentTime + delta);
+          }}
+          onFrameStep={playback.frameStep}
+          onPlaybackRateChange={playback.setPlaybackRate}
+          onLoopToggle={playback.toggleLoop}
+          onABLoopCycle={handleABLoopCycle}
+          onGoToChapter={goToChapter}
+          onMuteToggle={playback.toggleMute}
+          onVolumeStep={(delta) => {
+            const el = videoRef.current;
+            if (el) playback.setVolume(Math.max(0, Math.min(1, el.volume + delta)));
+          }}
+          onAudioTrackChange={handleAudioTrackChange}
+          onFullScreenToggle={fullscreen.toggle}
+          onTogglePiP={pip.toggle}
+          onScreenshot={captureScreenshot}
+          onFiltersChange={filters.setFilters}
+          onZoomChange={filters.setZoom}
+          onSubtitleChange={handleSubtitleChange}
+          onSubtitleUpload={handleSubtitleUpload}
+          onSubtitleRemove={subtitles.removeSubtitle}
+          onShowInfo={() => setShowInfo((v: boolean) => !v)}
+          onOpenShortcuts={() => setShowShortcutsDialog(true)}
+          onOpenFile={() => mediaInputRef.current?.click()}
+          onTogglePlaylist={handlePlaylistToggle}
+        />
+        <div className="relative flex-1 flex items-center justify-center min-h-0">
         <video
           ref={videoRef}
           className={cn("w-full h-full object-contain transition-all duration-300", isLoading && "invisible")}
@@ -718,6 +777,16 @@ const LightBirdPlayer = () => {
           </div>
         )}
 
+        {!playlist.currentItem && !isLoading && !loadingMessage && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center text-muted-foreground">
+              <p className="text-2xl font-semibold">LightBird Player</p>
+              <p>Add a local file or stream to begin.</p>
+            </div>
+          </div>
+        )}
+        </div>{/* /video region */}
+
         {playlist.currentItem && (
           <PlayerControls
             videoRef={videoRef}
@@ -726,17 +795,18 @@ const LightBirdPlayer = () => {
             duration={playback.duration}
             volume={playback.volume}
             isMuted={playback.isMuted}
-            playbackRate={playback.playbackRate}
             loop={playback.loop}
             isFullScreen={fullscreen.isFullscreen}
-            filters={filters.filters}
-            zoom={filters.zoom}
-            subtitles={subtitles.subtitles}
-            activeSubtitle={subtitles.activeSubtitle}
-            audioTracks={audioTracks}
-            activeAudioTrack={activeAudioTrack}
-            tracksLoading={tracksLoading}
+            chapters={chapters}
+            currentChapter={currentChapter}
             onPlayPause={playback.togglePlay}
+            onStop={() => {
+              const el = videoRef.current;
+              if (el) {
+                el.pause();
+                el.currentTime = 0;
+              }
+            }}
             onSeek={playback.seek}
             onSeekHover={(t) => (t === null ? seekPreview.clearPreview() : seekPreview.requestPreview(t))}
             seekPreviewThumbnail={seekPreview.thumbnail}
@@ -744,27 +814,12 @@ const LightBirdPlayer = () => {
             onABLoopCycle={handleABLoopCycle}
             onVolumeChange={playback.setVolume}
             onMuteToggle={playback.toggleMute}
-            onPlaybackRateChange={playback.setPlaybackRate}
             onLoopToggle={playback.toggleLoop}
             onFullScreenToggle={fullscreen.toggle}
-            onFrameStep={playback.frameStep}
-            onScreenshot={captureScreenshot}
             onNext={handleNext}
             onPrevious={handlePrevious}
-            onFiltersChange={filters.setFilters}
-            onZoomChange={filters.setZoom}
-            onSubtitleChange={handleSubtitleChange}
-            onAudioTrackChange={handleAudioTrackChange}
-            onSubtitleUpload={handleSubtitleUpload}
-            onSubtitleRemove={subtitles.removeSubtitle}
-            onShowInfo={() => setShowInfo((v: boolean) => !v)}
-            onOpenShortcuts={() => setShowShortcutsDialog(true)}
-            chapters={chapters}
-            currentChapter={currentChapter}
-            onGoToChapter={goToChapter}
-            onTogglePiP={pip.toggle}
-            isPiP={pip.isPiP}
-            pipSupported={!!pip.isSupported}
+            onTogglePlaylist={handlePlaylistToggle}
+            playlistOpen={playlistOpen}
           />
         )}
 
@@ -788,14 +843,18 @@ const LightBirdPlayer = () => {
           }}
         />
 
-        {!playlist.currentItem && !isLoading && !loadingMessage && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center text-muted-foreground">
-              <p className="text-2xl font-semibold">LightBird Player</p>
-              <p>Add a local file or stream to begin.</p>
-            </div>
-          </div>
-        )}
+        <input
+          type="file"
+          ref={mediaInputRef}
+          className="hidden"
+          accept="video/*,.mkv,.m3u8"
+          onChange={(e) => {
+            if (e.target.files && e.target.files.length > 0) {
+              handleFileChange(e.target.files);
+            }
+            e.target.value = "";
+          }}
+        />
       </div>
 
       <PlaylistPanel
