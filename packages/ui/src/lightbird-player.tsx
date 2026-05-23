@@ -720,6 +720,7 @@ const LightBirdPlayer = () => {
 
         {playlist.currentItem && (
           <PlayerControls
+            videoRef={videoRef}
             isPlaying={playback.isPlaying}
             progress={playback.progress}
             duration={playback.duration}

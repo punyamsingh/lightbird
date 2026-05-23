@@ -1,11 +1,12 @@
 "use client";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, type RefObject } from "react";
 import type { Subtitle, VideoFilters, AudioTrack, Chapter } from "@lightbird/core";
 import { Slider } from "./primitives/slider";
 import { Button } from "./primitives/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./primitives/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./primitives/tooltip";
 import { Label } from "./primitives/label";
+import { SeekBar } from "./seek-bar";
 import {
   Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward,
   FastForward, Rewind, RotateCcw, Settings2, Subtitles, Camera, AudioLines, Plus, X,
@@ -59,6 +60,7 @@ interface PlayerControlsProps {
   seekPreviewThumbnail?: string | null;
   abLoop?: { pointA: number | null; pointB: number | null; isLooping: boolean };
   onABLoopCycle?: () => void;
+  videoRef?: RefObject<HTMLVideoElement | null>;
 }
 
 const formatTime = (time: number) => {
@@ -80,113 +82,26 @@ export const PlayerControls = React.memo(function PlayerControls({
   onShowInfo, onOpenShortcuts, onGoToChapter, onTogglePiP, isPiP = false, pipSupported = false,
   onSeekHover, seekPreviewThumbnail = null,
   abLoop = { pointA: null, pointB: null, isLooping: false }, onABLoopCycle,
+  videoRef,
 }: PlayerControlsProps) {
   const formattedProgress = useMemo(() => formatTime(progress), [progress]);
   const formattedDuration = useMemo(() => formatTime(duration), [duration]);
   const [chaptersMenuOpen, setChaptersMenuOpen] = useState(false);
-  const [seekHover, setSeekHover] = useState<{ ratio: number; time: number } | null>(null);
-
-  const handleSeekHover = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (duration <= 0) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    if (rect.width <= 0) return;
-    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const time = ratio * duration;
-    setSeekHover({ ratio, time });
-    onSeekHover?.(time);
-  };
-
-  const handleSeekLeave = () => {
-    setSeekHover(null);
-    onSeekHover?.(null);
-  };
 
   return (
     <TooltipProvider>
       <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-in-out flex flex-col gap-2">
-        {/* Seek bar with chapter tick marks + hover preview */}
-        <div
-          className="relative w-full"
-          data-testid="seek-bar"
-          onMouseMove={handleSeekHover}
-          onMouseLeave={handleSeekLeave}
-        >
-          {seekHover && (
-            <div
-              data-testid="seek-preview"
-              className="absolute bottom-full mb-3 -translate-x-1/2 pointer-events-none flex flex-col items-center z-20"
-              style={{ left: `${seekHover.ratio * 100}%` }}
-            >
-              {seekPreviewThumbnail ? (
-                <img
-                  src={seekPreviewThumbnail}
-                  alt=""
-                  className="w-40 h-[90px] rounded border border-white/20 bg-black object-cover shadow-lg"
-                />
-              ) : (
-                <div className="w-40 h-[90px] rounded border border-white/20 bg-black/80 shadow-lg" />
-              )}
-              <span className="mt-1 rounded bg-black/80 px-1.5 py-0.5 font-mono text-xs text-white">
-                {formatTime(seekHover.time)}
-              </span>
-            </div>
-          )}
-          <Slider
-            value={[progress]}
-            max={duration}
-            step={1}
-            onValueChange={([val]) => onSeek(val)}
-            className="w-full h-2"
-          />
-          {chapters.length > 0 && duration > 0 && chapters.slice(1).map((chapter) => (
-            <Tooltip key={chapter.index}>
-              <TooltipTrigger asChild>
-                <div
-                  data-testid="chapter-tick"
-                  style={{
-                    position: 'absolute',
-                    left: `${(chapter.startTime / duration) * 100}%`,
-                    top: 0,
-                    width: '2px',
-                    height: '100%',
-                    background: 'white',
-                    opacity: 0.5,
-                    pointerEvents: 'none',
-                    transform: 'translateX(-1px)',
-                  }}
-                />
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{chapter.title} — {formatTime(chapter.startTime)}</p>
-              </TooltipContent>
-            </Tooltip>
-          ))}
-          {/* A-B loop region + markers */}
-          {duration > 0 && abLoop.pointA !== null && abLoop.pointB !== null && (
-            <div
-              data-testid="ab-loop-region"
-              className="pointer-events-none absolute top-0 h-full bg-primary/30"
-              style={{
-                left: `${(abLoop.pointA / duration) * 100}%`,
-                width: `${((abLoop.pointB - abLoop.pointA) / duration) * 100}%`,
-              }}
-            />
-          )}
-          {duration > 0 && abLoop.pointA !== null && (
-            <div
-              data-testid="ab-marker-a"
-              className="pointer-events-none absolute top-0 h-full w-0.5 -translate-x-1/2 bg-primary"
-              style={{ left: `${(abLoop.pointA / duration) * 100}%` }}
-            />
-          )}
-          {duration > 0 && abLoop.pointB !== null && (
-            <div
-              data-testid="ab-marker-b"
-              className="pointer-events-none absolute top-0 h-full w-0.5 -translate-x-1/2 bg-primary"
-              style={{ left: `${(abLoop.pointB / duration) * 100}%` }}
-            />
-          )}
-        </div>
+        <SeekBar
+          progress={progress}
+          duration={duration}
+          isPlaying={isPlaying}
+          onSeek={onSeek}
+          videoRef={videoRef}
+          chapters={chapters}
+          abLoop={abLoop}
+          onSeekHover={onSeekHover}
+          seekPreviewThumbnail={seekPreviewThumbnail}
+        />
 
         {/* Current chapter name */}
         {currentChapter && (

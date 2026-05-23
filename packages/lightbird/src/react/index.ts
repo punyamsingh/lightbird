@@ -18,6 +18,7 @@ export { useSeekPreview } from './use-seek-preview'
 export type { SeekPreviewState, UseSeekPreviewOptions } from './use-seek-preview'
 export { useABLoop } from './use-ab-loop'
 export type { ABLoopState } from './use-ab-loop'
+export { useSmoothProgress } from './use-smooth-progress'
 export { useTouchGestures } from './use-touch-gestures'
 export type {
   TouchGestureHandlers,

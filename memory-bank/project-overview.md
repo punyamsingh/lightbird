@@ -1,7 +1,7 @@
 # LightBird — Project Overview
 
-> **Last updated:** 2026-05-22
-> **Branch context:** Plans 01–12 implemented. Project is now a pnpm monorepo publishing two npm packages: `@lightbird/core` (core) and `@lightbird/ui` (React components). Docs page refactored into a server component with client islands (issue #35). FFmpeg.wasm lazy loading is now guaranteed zero-cost for HTML5-native playback and protected by a CI bundle-size budget (issue #54). Player UX polish added seek-hover thumbnail previews, A-B loop, and mobile touch gestures (issue #57).
+> **Last updated:** 2026-05-23
+> **Branch context:** Plans 01–12 implemented. Project is now a pnpm monorepo publishing two npm packages: `@lightbird/core` (core) and `@lightbird/ui` (React components). Docs page refactored into a server component with client islands (issue #35). FFmpeg.wasm lazy loading is now guaranteed zero-cost for HTML5-native playback and protected by a CI bundle-size budget (issue #54). Player UX polish added seek-hover thumbnail previews, A-B loop, and mobile touch gestures (issue #57). Seek bar now glides at rAF rate via `useSmoothProgress`, with a dedicated `SeekBar` component extracted from `PlayerControls` and a polished hover/scrub treatment (issue #64).
 
 ---
 
@@ -69,6 +69,7 @@ apps/web/src/app/page.tsx
 | `use-seek-preview.ts` | Seek-bar hover thumbnail previews via an offscreen video |
 | `use-ab-loop.ts` | A-B loop: repeat playback between two user-set points |
 | `use-touch-gestures.ts` | Mobile touch gestures: double-tap seek, swipe volume/brightness |
+| `use-smooth-progress.ts` | rAF-driven `currentTime` reader so the seek-bar thumb glides between coarse `timeupdate` events |
 
 ---
 
