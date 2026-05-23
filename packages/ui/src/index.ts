@@ -5,6 +5,8 @@ export { default as LightBirdPlayer } from './lightbird-player'
 
 // Individual components (for custom layouts)
 export { default as PlayerControls } from './player-controls'
+export { default as MenuBar } from './menu-bar'
+export { SeekBar } from './seek-bar'
 export { default as PlaylistPanel } from './playlist-panel'
 export { VideoOverlay } from './video-overlay'
 export { SubtitleOverlay } from './subtitle-overlay'
