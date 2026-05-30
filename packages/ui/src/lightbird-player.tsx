@@ -779,9 +779,14 @@ const LightBirdPlayer = () => {
 
         {!playlist.currentItem && !isLoading && !loadingMessage && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center text-muted-foreground">
-              <p className="text-2xl font-semibold">LightBird Player</p>
-              <p>Add a local file or stream to begin.</p>
+            <div className="text-center">
+              <p
+                className="text-5xl font-headline font-black tracking-widest"
+                style={{ color: 'hsl(var(--accent))' }}
+              >
+                LIGHTBIRD
+              </p>
+              <p className="mt-2 text-muted-foreground">Add a local file or stream to begin.</p>
             </div>
           </div>
         )}
