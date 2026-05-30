@@ -129,6 +129,103 @@ describe('parseStreamInfo', () => {
     const { audioTracks } = parseStreamInfo(logs);
     expect(audioTracks[0].lang).toBeUndefined();
   });
+
+  it('captures the embedded title from the stream metadata block', () => {
+    const logs = [
+      '  Stream #0:1(eng): Audio: aac, 48000 Hz, stereo',
+      '    Metadata:',
+      '      title           : Director Commentary',
+      '  Stream #0:2(jpn): Audio: ac3, 5.1',
+    ].join('\n');
+
+    const { audioTracks } = parseStreamInfo(logs);
+    expect(audioTracks[0].title).toBe('Director Commentary');
+    // The next stream resets the current-track tracker — no title leaks across.
+    expect(audioTracks[1].title).toBeUndefined();
+  });
+
+  it('keeps the full title including commas (no truncation)', () => {
+    const logs = [
+      '  Stream #0:2(eng): Subtitle: subrip',
+      '    Metadata:',
+      '      title           : Signs, Songs & Captions',
+    ].join('\n');
+
+    const { subtitleTracks } = parseStreamInfo(logs);
+    expect(subtitleTracks[0].title).toBe('Signs, Songs & Captions');
+  });
+
+  it('parses forced and default dispositions', () => {
+    const logs = [
+      '  Stream #0:1(eng): Audio: aac, stereo (default)',
+      '  Stream #0:2(eng): Subtitle: subrip (forced)',
+      '  Stream #0:3(jpn): Subtitle: subrip',
+    ].join('\n');
+
+    const { audioTracks, subtitleTracks } = parseStreamInfo(logs);
+    expect(audioTracks[0].default).toBe(true);
+    expect(subtitleTracks[0].forced).toBe(true);
+    expect(subtitleTracks[1].forced).toBe(false);
+  });
+
+  it('does not attach chapter titles to the preceding stream', () => {
+    const logs = [
+      '  Stream #0:2(eng): Subtitle: subrip',
+      '  Chapter #0:0: start 0.000000, end 60.000000',
+      '    Metadata:',
+      '      title           : Intro',
+    ].join('\n');
+
+    const { subtitleTracks } = parseStreamInfo(logs);
+    expect(subtitleTracks[0].title).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// VLC-style track naming
+// ---------------------------------------------------------------------------
+
+describe('VLC-style track naming', () => {
+  it('uses full language names instead of raw ISO codes', async () => {
+    const player = new MKVPlayer(makeFile());
+    const videoEl = document.createElement('video');
+    await initializeSuccess(player, videoEl);
+
+    // DEFAULT_LOGS: eng aac, jpn ac3, eng subrip
+    expect(player.getAudioTracks()[0].name).toBe('Track 1 - [English]');
+    expect(player.getAudioTracks()[1].name).toBe('Track 2 - [Japanese]');
+    expect(player.getSubtitles()[0].name).toBe('Track 1 - [English]');
+  });
+
+  it('prefers the embedded title and marks forced subtitles', async () => {
+    const logs = [
+      '  Stream #0:0: Video: h264, 1920x1080',
+      '  Stream #0:1(eng): Audio: aac, stereo',
+      '    Metadata:',
+      '      title           : Commentary',
+      '  Stream #0:2(eng): Subtitle: subrip (forced)',
+    ].join('\n');
+
+    const player = new MKVPlayer(makeFile());
+    const videoEl = document.createElement('video');
+    await initializeSuccess(player, videoEl, logs);
+
+    expect(player.getAudioTracks()[0].name).toBe('Commentary - [English]');
+    expect(player.getSubtitles()[0].name).toBe('Track 1 - [English] [Forced]');
+  });
+
+  it('omits the language suffix when the code is undetermined', async () => {
+    const logs = [
+      '  Stream #0:0: Video: h264, 1920x1080',
+      '  Stream #0:1(und): Audio: aac, stereo',
+    ].join('\n');
+
+    const player = new MKVPlayer(makeFile());
+    const videoEl = document.createElement('video');
+    await initializeSuccess(player, videoEl, logs);
+
+    expect(player.getAudioTracks()[0].name).toBe('Track 1');
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -31,7 +31,7 @@ packages/ui/        — UI components (npm: @lightbird/ui)
 | Player | Handles | Implementation |
 |---|---|---|
 | `SimplePlayer` | MP4, WebM, AVI, MOV, WMV, FLV, OGV | Native HTML5 `<video>` element |
-| `MKVPlayer` | MKV | FFmpeg.wasm in Web Worker — probes, remuxes to MP4, extracts subtitles |
+| `MKVPlayer` | MKV | FFmpeg.wasm in Web Worker — probes, remuxes to MP4, extracts subtitles. Audio/subtitle tracks are labelled VLC-style: embedded track name verbatim, full language name (`getLanguageName` resolves ISO 639 → "English"), and a `[Forced]` marker, falling back to `Track N`. |
 | `HLSPlayer` | HLS `.m3u8` adaptive streams | `hls.js` (lazy dynamic import), or native HLS on Safari |
 
 The factory function `createVideoPlayer(source)` in `packages/lightbird/src/video-processor.ts` selects the right player. It accepts a `File` (MP4/MKV/etc., routed by format detection) or an HLS `.m3u8` URL string (routed to `HLSPlayer`); other URL strings throw.
