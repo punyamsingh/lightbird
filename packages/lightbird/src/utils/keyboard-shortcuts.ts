@@ -91,11 +91,22 @@ export function matchesShortcut(e: KeyboardEvent, binding: ShortcutBinding): boo
 export function isInteractiveElement(el: EventTarget | null): boolean {
   if (!el || !(el instanceof HTMLElement)) return false;
   const tag = el.tagName.toLowerCase();
-  return (
-    ['input', 'textarea', 'select', 'button', 'a'].includes(tag) ||
-    el.contentEditable === 'true' ||
-    el.getAttribute('contenteditable') !== null
-  );
+  // Block only real text-entry surfaces. Buttons/links are skipped so
+  // shortcuts keep working after the user clicks any toolbar control —
+  // VLC / YouTube / Spotify behave the same way.
+  if (['input', 'textarea', 'select'].includes(tag)) return true;
+  if (el.contentEditable === 'true' || el.getAttribute('contenteditable') !== null) return true;
+  // Honour open dialogs / popover content so a focused radio/menu item
+  // there can still consume Space/Enter/arrow keys.
+  if (
+    typeof el.closest === 'function' &&
+    el.closest(
+      '[role="dialog"], [role="alertdialog"], [role="menu"], [data-radix-popper-content-wrapper]',
+    )
+  ) {
+    return true;
+  }
+  return false;
 }
 
 export function formatShortcutKey(binding: ShortcutBinding): string {

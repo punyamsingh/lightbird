@@ -41,7 +41,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "./primitives/alert-dialog";
-import { Film, FolderUp, Link2 } from "lucide-react";
+import { Film } from "lucide-react";
 
 const MAX_RETRIES = 3;
 
@@ -814,17 +814,6 @@ const LightBirdPlayer = () => {
               <p className="mt-1 text-sm text-muted-foreground">
                 Drop files anywhere, or pick a source from the playlist panel.
               </p>
-              <div className="mt-5 flex flex-wrap items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
-                <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-muted/40 px-2 py-1">
-                  <FolderUp className="h-3 w-3" /> local files
-                </span>
-                <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-muted/40 px-2 py-1">
-                  <Link2 className="h-3 w-3" /> stream URL
-                </span>
-                <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-muted/40 px-2 py-1 font-mono">
-                  ? for shortcuts
-                </span>
-              </div>
             </div>
           </div>
         )}

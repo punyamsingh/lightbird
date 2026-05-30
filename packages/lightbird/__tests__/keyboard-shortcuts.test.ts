@@ -101,15 +101,40 @@ describe("isInteractiveElement", () => {
     expect(isInteractiveElement(el)).toBe(true);
   });
 
-  it("returns true for BUTTON", () => {
+  it("returns false for BUTTON (shortcuts must keep working after a toolbar click)", () => {
     const el = document.createElement("button");
-    expect(isInteractiveElement(el)).toBe(true);
+    expect(isInteractiveElement(el)).toBe(false);
+  });
+
+  it("returns false for plain anchor", () => {
+    const el = document.createElement("a");
+    expect(isInteractiveElement(el)).toBe(false);
   });
 
   it("returns true for contentEditable element", () => {
     const el = document.createElement("div");
     el.contentEditable = "true";
     expect(isInteractiveElement(el)).toBe(true);
+  });
+
+  it("returns true when focus is inside an open dialog", () => {
+    const dialog = document.createElement("div");
+    dialog.setAttribute("role", "dialog");
+    const btn = document.createElement("button");
+    dialog.appendChild(btn);
+    document.body.appendChild(dialog);
+    expect(isInteractiveElement(btn)).toBe(true);
+    document.body.removeChild(dialog);
+  });
+
+  it("returns true when focus is inside a Radix popover content wrapper", () => {
+    const popper = document.createElement("div");
+    popper.setAttribute("data-radix-popper-content-wrapper", "");
+    const btn = document.createElement("button");
+    popper.appendChild(btn);
+    document.body.appendChild(popper);
+    expect(isInteractiveElement(btn)).toBe(true);
+    document.body.removeChild(popper);
   });
 
   it("returns false for plain DIV", () => {
