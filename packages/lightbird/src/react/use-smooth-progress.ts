@@ -43,7 +43,14 @@ export function useSmoothProgress(
     const tick = () => {
       if (cancelled) return;
       const current = videoRef.current;
-      if (current) setProgress(current.currentTime);
+      if (!current) {
+        // Element detached mid-playback — stop the loop so we don't spin
+        // forever (effect deps don't track ref.current).
+        setProgress(fallback);
+        stop();
+        return;
+      }
+      setProgress(current.currentTime);
       rafRef.current = requestAnimationFrame(tick);
     };
 
