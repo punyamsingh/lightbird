@@ -9,7 +9,7 @@ import { Label } from "./primitives/label";
 import { SeekBar } from "./seek-bar";
 import {
   Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward,
-  FastForward, Rewind, RotateCcw, Settings2, Subtitles, Camera, AudioLines, Plus, X,
+  Settings2, Subtitles, Camera, AudioLines, Plus, X,
   Info, Keyboard, List, PictureInPicture2, Loader2
 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "./primitives/radio-group";
@@ -140,8 +140,35 @@ export const PlayerControls = React.memo(function PlayerControls({
             </span>
           </div>
 
-          {/* ── Right: subs + speed + gear + fullscreen ─────────── */}
+          {/* ── Right: audio + subs + speed + gear + chapters + fullscreen ─── */}
           <div className="flex items-center gap-1">
+            {audioTracks.length > 0 && (
+              <Popover>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <PopoverTrigger asChild>
+                      <Button variant="ghost" size="icon" className="relative" aria-label="Audio track">
+                        <AudioLines />
+                        {tracksLoading && <Loader2 className="absolute top-0 right-0 h-2.5 w-2.5 animate-spin text-primary" />}
+                      </Button>
+                    </PopoverTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent><p>Audio track</p></TooltipContent>
+                </Tooltip>
+                <PopoverContent className="w-56">
+                  <div className="max-h-48 overflow-y-auto overscroll-contain pr-1">
+                    <RadioGroup value={activeAudioTrack} onValueChange={onAudioTrackChange}>
+                      {audioTracks.map(track => (
+                        <div key={track.id} className="flex items-center space-x-2">
+                          <RadioGroupItem value={track.id} id={`audio-${track.id}`} />
+                          <Label htmlFor={`audio-${track.id}`}>{track.name}</Label>
+                        </div>
+                      ))}
+                    </RadioGroup>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
             <Popover>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -227,71 +254,8 @@ export const PlayerControls = React.memo(function PlayerControls({
                 <TooltipContent><p>Settings</p></TooltipContent>
               </Tooltip>
               <PopoverContent className="w-72 p-2 space-y-1" align="end">
-                {/* Frame step + A-B + loop row */}
-                <div className="flex items-center justify-around py-1 border-b border-border/40">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" onClick={() => onFrameStep('backward')} aria-label="Frame backward"><Rewind size={18} /></Button>
-                    </TooltipTrigger>
-                    <TooltipContent><p>Frame backward</p></TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" onClick={() => onFrameStep('forward')} aria-label="Frame forward"><FastForward size={18} /></Button>
-                    </TooltipTrigger>
-                    <TooltipContent><p>Frame forward</p></TooltipContent>
-                  </Tooltip>
-                  {onABLoopCycle && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={onABLoopCycle}
-                          aria-label="A-B loop"
-                          data-testid="ab-loop-button"
-                          data-active={abLoop.isLooping}
-                          className={cn("font-mono text-xs font-bold", abLoop.isLooping && "text-primary")}
-                        >
-                          <span className={cn(abLoop.pointA !== null && "text-primary")}>A</span>
-                          <span className="opacity-50">-</span>
-                          <span className={cn(abLoop.pointB !== null && "text-primary")}>B</span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{abLoop.pointA === null ? "Set loop start (A)" : abLoop.pointB === null ? "Set loop end (B)" : "Clear A-B loop"}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  )}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" onClick={onLoopToggle} data-active={loop} className="data-[active=true]:text-primary" aria-label="Loop"><RotateCcw /></Button>
-                    </TooltipTrigger>
-                    <TooltipContent><p>Loop</p></TooltipContent>
-                  </Tooltip>
-                </div>
-
-                {/* Audio track */}
-                {audioTracks.length > 0 && (
-                  <div className="px-2 py-1.5">
-                    <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Audio</Label>
-                    <RadioGroup
-                      value={activeAudioTrack}
-                      onValueChange={onAudioTrackChange}
-                      className="mt-1.5 max-h-32 overflow-y-auto overscroll-contain"
-                    >
-                      {audioTracks.map(track => (
-                        <div key={track.id} className="flex items-center space-x-2">
-                          <RadioGroupItem value={track.id} id={`audio-${track.id}`} />
-                          <Label htmlFor={`audio-${track.id}`} className="text-sm">{track.name}</Label>
-                        </div>
-                      ))}
-                    </RadioGroup>
-                  </div>
-                )}
-
                 {/* Secondary action rows */}
-                <div className="border-t border-border/40 pt-1 space-y-0.5">
+                <div className="space-y-0.5">
                   {pipSupported && (
                     <button
                       onClick={onTogglePiP}

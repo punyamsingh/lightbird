@@ -293,24 +293,9 @@ describe('PlayerControls — A-B loop', () => {
     jest.clearAllMocks();
   });
 
-  it('does not render the A-B loop button when onABLoopCycle is not provided', () => {
-    render(<PlayerControls {...defaultProps} />);
-    expect(screen.queryByTestId('ab-loop-button')).not.toBeInTheDocument();
-  });
-
-  it('renders the A-B loop button when onABLoopCycle is provided', () => {
-    render(<PlayerControls {...defaultProps} onABLoopCycle={jest.fn()} />);
-    fireEvent.click(screen.getByLabelText('Settings'));
-    expect(screen.getByTestId('ab-loop-button')).toBeInTheDocument();
-  });
-
-  it('calls onABLoopCycle when the A-B loop button is clicked', () => {
-    const onABLoopCycle = jest.fn();
-    render(<PlayerControls {...defaultProps} onABLoopCycle={onABLoopCycle} />);
-    fireEvent.click(screen.getByLabelText('Settings'));
-    fireEvent.click(screen.getByTestId('ab-loop-button'));
-    expect(onABLoopCycle).toHaveBeenCalledTimes(1);
-  });
+  // A-B loop has no visible button anymore — it is keyboard-only.
+  // The seek-bar markers / region remain as visual confirmation that the
+  // shortcut took effect, so the rest of the suite still covers them.
 
   it('renders no A-B markers when no points are set', () => {
     render(<PlayerControls {...defaultProps} duration={200} onABLoopCycle={jest.fn()} />);
@@ -347,15 +332,4 @@ describe('PlayerControls — A-B loop', () => {
     expect(screen.getByTestId('ab-loop-region')).toHaveStyle({ left: '25%', width: '50%' });
   });
 
-  it('marks the A-B loop button active when the loop is running', () => {
-    render(
-      <PlayerControls
-        {...defaultProps}
-        onABLoopCycle={jest.fn()}
-        abLoop={{ pointA: 50, pointB: 150, isLooping: true }}
-      />,
-    );
-    fireEvent.click(screen.getByLabelText('Settings'));
-    expect(screen.getByTestId('ab-loop-button')).toHaveAttribute('data-active', 'true');
-  });
 });
