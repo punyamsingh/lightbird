@@ -13,7 +13,11 @@ export type ShortcutAction =
   | 'screenshot'
   | 'show-shortcuts'
   | 'next-chapter'
-  | 'prev-chapter';
+  | 'prev-chapter'
+  | 'frame-step-forward'
+  | 'frame-step-backward'
+  | 'loop-toggle'
+  | 'ab-loop-cycle';
 
 export interface ShortcutBinding {
   action: ShortcutAction;
@@ -43,6 +47,10 @@ export const DEFAULT_SHORTCUTS: ShortcutBinding[] = [
   { action: 'show-shortcuts',   label: 'Show Shortcuts Help',  defaultKey: '?',          key: '?' },
   { action: 'next-chapter',     label: 'Next Chapter',         defaultKey: ']',          key: ']' },
   { action: 'prev-chapter',     label: 'Previous Chapter',     defaultKey: '[',          key: '[' },
+  { action: 'frame-step-forward',  label: 'Step Forward One Frame',  defaultKey: '.', key: '.' },
+  { action: 'frame-step-backward', label: 'Step Backward One Frame', defaultKey: ',', key: ',' },
+  { action: 'loop-toggle',         label: 'Toggle Loop',             defaultKey: 'l', key: 'l' },
+  { action: 'ab-loop-cycle',       label: 'A-B Loop (Set/Cycle)',    defaultKey: 'r', key: 'r' },
 ];
 
 const STORAGE_KEY = 'lightbird-shortcuts';

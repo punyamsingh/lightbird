@@ -106,6 +106,10 @@ const LightBirdPlayer = () => {
   const [mediaThumbnail, setMediaThumbnail] = useState<string | null>(null);
   const [tracksLoading, setTracksLoading] = useState(false);
 
+  // Refs that hold the latest of these callbacks so keyboard handlers
+  // (declared before the callbacks are defined) can still invoke them.
+  const abLoopCycleRef = useRef<() => void>(() => {});
+
   const shortcutHandlers = useMemo(() => ({
     'play-pause': () => playback.togglePlay(),
     'seek-forward-5': () => { const el = videoRef.current; if (el) playback.seek(el.currentTime + 5); },
@@ -139,8 +143,12 @@ const LightBirdPlayer = () => {
         if (prev) el.currentTime = prev.startTime;
       }
     },
+    'frame-step-forward': () => playback.frameStep('forward'),
+    'frame-step-backward': () => playback.frameStep('backward'),
+    'loop-toggle': () => playback.toggleLoop(),
+    'ab-loop-cycle': () => abLoopCycleRef.current(),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [playback.togglePlay, playback.seek, playback.setVolume, playback.toggleMute, fullscreen.toggle, chapters, currentChapter]);
+  }), [playback.togglePlay, playback.seek, playback.setVolume, playback.toggleMute, playback.frameStep, playback.toggleLoop, fullscreen.toggle, chapters, currentChapter]);
 
   useKeyboardShortcuts(shortcuts, shortcutHandlers);
 
@@ -583,6 +591,11 @@ const LightBirdPlayer = () => {
     else if (abLoop.pointB === null) abLoop.setPointB();
     else abLoop.clear();
   }, [abLoop.pointA, abLoop.pointB, abLoop.setPointA, abLoop.setPointB, abLoop.clear]);
+
+  // Keep the keyboard-shortcut ref pointed at the latest cycle handler.
+  useEffect(() => {
+    abLoopCycleRef.current = handleABLoopCycle;
+  }, [handleABLoopCycle]);
 
   const abLoopState = useMemo(
     () => ({ pointA: abLoop.pointA, pointB: abLoop.pointB, isLooping: abLoop.isLooping }),
