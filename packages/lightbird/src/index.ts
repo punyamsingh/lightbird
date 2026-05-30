@@ -11,7 +11,7 @@ export { SimplePlayer } from './players/simple-player'
 export type { SimplePlayerFile } from './players/simple-player'
 export { MKVPlayer, CancellationError } from './players/mkv-player'
 export type { MKVPlayerFile } from './players/mkv-player'
-export { HLSPlayer, isHlsUrl } from './players/hls-player'
+export { HLSPlayer, isHlsUrl, parseHlsCodec } from './players/hls-player'
 
 // Subtitle pipeline
 export { UniversalSubtitleManager } from './subtitles/subtitle-manager'

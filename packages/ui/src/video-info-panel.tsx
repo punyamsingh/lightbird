@@ -42,6 +42,9 @@ export function VideoInfoPanel({ metadata, onClose }: VideoInfoPanelProps) {
     ["Frame Rate", metadata.frameRate ? `${metadata.frameRate} fps` : "—"],
     ["Video Codec", metadata.videoCodec ?? "—"],
     ["Video Bitrate", formatBitrate(metadata.videoBitrate)],
+    ...(metadata.streamRenditions
+      ? ([["Stream Renditions", `${metadata.streamRenditions} levels`]] as [string, string][])
+      : []),
     ...metadata.audioTracks.map(
       (t, i) =>
         [

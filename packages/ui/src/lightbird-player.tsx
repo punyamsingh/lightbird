@@ -10,7 +10,7 @@ import { PlayerErrorDisplay } from "./player-error-display";
 import { VideoInfoPanel } from "./video-info-panel";
 import { ShortcutSettingsDialog } from "./shortcut-settings-dialog";
 import { useToast } from "./hooks/use-toast";
-import { createVideoPlayer, type VideoPlayer, CancellationError } from "@lightbird/core";
+import { createVideoPlayer, isHlsUrl, type VideoPlayer, CancellationError } from "@lightbird/core";
 import {
   useVideoPlayback,
   useVideoFilters,
@@ -80,7 +80,7 @@ const LightBirdPlayer = () => {
     setBrightness: (v) =>
       filters.setFilters({ ...filters.filters, brightness: Math.round(v * 200) }),
   });
-  const { metadata: videoMetadata } = useVideoInfo(videoRef, playlist.currentItem?.file ?? null);
+  const { metadata: videoMetadata, enrichMetadata } = useVideoInfo(videoRef, playlist.currentItem?.file ?? null);
   useProgressPersistence(videoRef, playlist.currentItem?.name ?? null);
   const { chapters, currentChapter, goToChapter } = useChapters(videoRef, playerRef);
   // Default to enabled: the feature shows unless Unleash explicitly turns it off.
@@ -291,19 +291,43 @@ const LightBirdPlayer = () => {
     if (item.type === "stream") {
       playerRef.current?.destroy();
       playerRef.current = null;
-      if (videoRef.current) videoRef.current.src = item.url;
       subtitles.reset();
       setAudioTracks([]);
       setActiveAudioTrack("0");
       isStreamRef.current = true;
       startStallDetection();
+      if (isHlsUrl(item.url) && videoRef.current) {
+        // HLS streams play through hls.js, which exposes richer metadata
+        // (codec, bitrate, renditions) than the bare <video> element.
+        const player = createVideoPlayer(item.url);
+        playerRef.current = player;
+        player
+          .initialize(videoRef.current)
+          .then(() => {
+            const refresh = () => {
+              if (playerRef.current !== player) return;
+              enrichMetadata(player.getMetadata?.() ?? {});
+              const tracks = player.getAudioTracks();
+              setAudioTracks(tracks);
+              setActiveAudioTrack((prev) => prev || tracks[0]?.id || "0");
+            };
+            // Re-enrich on manifest parse, quality switch, and audio updates.
+            player.onMetadataChange?.(refresh);
+            refresh();
+          })
+          .catch((error) => {
+            console.error(error);
+          });
+      } else if (videoRef.current) {
+        videoRef.current.src = item.url;
+      }
     } else if (item.file) {
       isStreamRef.current = false;
       stopStallDetection();
       const subs = subtitleFilesMapRef.current.get(item.name) ?? [];
       processFile(item.file, subs);
     }
-  }, [playlist.playlist, playlist.selectItem, subtitles, processFile]);
+  }, [playlist.playlist, playlist.selectItem, subtitles, processFile, enrichMetadata]);
 
   const handleSkipToNext = useCallback(() => {
     setPlayerError(null);

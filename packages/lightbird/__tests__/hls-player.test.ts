@@ -7,15 +7,25 @@ jest.mock('hls.js', () => {
     loadSource: jest.Mock;
     attachMedia: jest.Mock;
     destroy: jest.Mock;
-    audioTracks: Array<{ id: number; name: string; lang?: string }>;
-    levels: Array<{ height: number; bitrate: number; name: string }>;
+    on: jest.Mock;
+    off: jest.Mock;
+    emit: (event: string) => void;
+    audioTracks: Array<{ id: number; name: string; lang?: string; audioCodec?: string }>;
+    levels: Array<{ height: number; bitrate: number; name: string; videoCodec?: string }>;
     audioTrack: number;
     currentLevel: number;
   }
 
+  const Events = {
+    MANIFEST_PARSED: 'hlsManifestParsed',
+    LEVEL_SWITCHED: 'hlsLevelSwitched',
+    AUDIO_TRACKS_UPDATED: 'hlsAudioTracksUpdated',
+  };
+
   class MockHls {
     static isSupported = jest.fn(() => true);
     static instances = instances;
+    static Events = Events;
     static reset() {
       instances.length = 0;
       MockHls.isSupported.mockReset();
@@ -30,6 +40,18 @@ jest.mock('hls.js', () => {
     audioTrack = -1;
     currentLevel = -1;
 
+    private listeners = new Map<string, Set<(...args: unknown[]) => void>>();
+    on = jest.fn((event: string, cb: (...args: unknown[]) => void) => {
+      if (!this.listeners.has(event)) this.listeners.set(event, new Set());
+      this.listeners.get(event)!.add(cb);
+    });
+    off = jest.fn((event: string, cb: (...args: unknown[]) => void) => {
+      this.listeners.get(event)?.delete(cb);
+    });
+    emit(event: string) {
+      this.listeners.get(event)?.forEach((cb) => cb());
+    }
+
     constructor() {
       instances.push(this);
     }
@@ -39,18 +61,22 @@ jest.mock('hls.js', () => {
 });
 
 import HlsImport from 'hls.js';
-import { HLSPlayer, isHlsUrl } from '../src/players/hls-player';
+import { HLSPlayer, isHlsUrl, parseHlsCodec } from '../src/players/hls-player';
 
 // The mock exposes a test-only static surface that hls.js's real types lack.
 const MockHls = HlsImport as unknown as {
   isSupported: jest.Mock;
   reset: () => void;
+  Events: { MANIFEST_PARSED: string; LEVEL_SWITCHED: string; AUDIO_TRACKS_UPDATED: string };
   instances: Array<{
     loadSource: jest.Mock;
     attachMedia: jest.Mock;
     destroy: jest.Mock;
-    audioTracks: Array<{ id: number; name: string; lang?: string }>;
-    levels: Array<{ height: number; bitrate: number; name: string }>;
+    on: jest.Mock;
+    off: jest.Mock;
+    emit: (event: string) => void;
+    audioTracks: Array<{ id: number; name: string; lang?: string; audioCodec?: string }>;
+    levels: Array<{ height: number; bitrate: number; name: string; videoCodec?: string }>;
     audioTrack: number;
     currentLevel: number;
   }>;
@@ -249,5 +275,97 @@ describe('HLSPlayer misc', () => {
   it('isCompatible matches .m3u8 URLs only', () => {
     expect(HLSPlayer.isCompatible('https://example.com/a.m3u8')).toBe(true);
     expect(HLSPlayer.isCompatible('https://example.com/a.mp4')).toBe(false);
+  });
+});
+
+describe('parseHlsCodec', () => {
+  it('maps known MIME codec families to human labels', () => {
+    expect(parseHlsCodec('avc1.640028')).toBe('H.264 (AVC)');
+    expect(parseHlsCodec('hvc1.1.6.L93.B0')).toBe('H.265 (HEVC)');
+    expect(parseHlsCodec('hev1.1.6.L93.B0')).toBe('H.265 (HEVC)');
+    expect(parseHlsCodec('vp09.00.10.08')).toBe('VP9');
+    expect(parseHlsCodec('av01.0.04M.08')).toBe('AV1');
+  });
+
+  it('is case-insensitive about the codec family', () => {
+    expect(parseHlsCodec('AVC1.640028')).toBe('H.264 (AVC)');
+  });
+
+  it('falls back to the raw string for unknown families', () => {
+    expect(parseHlsCodec('mp4a.40.2')).toBe('mp4a.40.2');
+  });
+
+  it('returns null for empty / nullish input', () => {
+    expect(parseHlsCodec('')).toBeNull();
+    expect(parseHlsCodec(null)).toBeNull();
+    expect(parseHlsCodec(undefined)).toBeNull();
+  });
+});
+
+describe('HLSPlayer.getMetadata', () => {
+  it('derives container, codec, bitrate, renditions and audio tracks from the active level', async () => {
+    const player = new HLSPlayer(HLS_URL);
+    await player.initialize(document.createElement('video'));
+    const hls = MockHls.instances[0];
+    hls.levels = [
+      { height: 1080, bitrate: 5_000_000, name: '1080p', videoCodec: 'avc1.640028' },
+      { height: 720, bitrate: 2_500_000, name: '720p', videoCodec: 'avc1.64001f' },
+    ];
+    hls.audioTracks = [{ id: 0, name: 'English', lang: 'en', audioCodec: 'mp4a.40.2' }];
+    hls.currentLevel = 1;
+
+    expect(player.getMetadata()).toEqual({
+      container: 'HLS',
+      videoCodec: 'H.264 (AVC)',
+      videoBitrate: 2_500_000,
+      streamRenditions: 2,
+      audioTracks: [
+        { index: 0, codec: 'mp4a.40.2', channels: null, sampleRate: null, language: 'en', bitrate: null },
+      ],
+    });
+  });
+
+  it('falls back to the first level when currentLevel is -1 (ABR not yet settled)', async () => {
+    const player = new HLSPlayer(HLS_URL);
+    await player.initialize(document.createElement('video'));
+    const hls = MockHls.instances[0];
+    hls.levels = [
+      { height: 1080, bitrate: 5_000_000, name: '1080p', videoCodec: 'hvc1.1.6.L93.B0' },
+      { height: 720, bitrate: 2_500_000, name: '720p', videoCodec: 'avc1.64001f' },
+    ];
+    hls.currentLevel = -1;
+
+    const meta = player.getMetadata();
+    expect(meta.videoCodec).toBe('H.265 (HEVC)');
+    expect(meta.videoBitrate).toBe(5_000_000);
+    expect(meta.streamRenditions).toBe(2);
+  });
+
+  it('returns an empty object before initialize / on the native path', () => {
+    expect(new HLSPlayer(HLS_URL).getMetadata()).toEqual({});
+  });
+});
+
+describe('HLSPlayer.onMetadataChange', () => {
+  it('invokes the callback when a metadata event fires and stops after unsubscribe', async () => {
+    const player = new HLSPlayer(HLS_URL);
+    await player.initialize(document.createElement('video'));
+    const hls = MockHls.instances[0];
+    const cb = jest.fn();
+
+    const unsubscribe = player.onMetadataChange(cb);
+    hls.emit(MockHls.Events.MANIFEST_PARSED);
+    hls.emit(MockHls.Events.LEVEL_SWITCHED);
+    hls.emit(MockHls.Events.AUDIO_TRACKS_UPDATED);
+    expect(cb).toHaveBeenCalledTimes(3);
+
+    unsubscribe();
+    hls.emit(MockHls.Events.LEVEL_SWITCHED);
+    expect(cb).toHaveBeenCalledTimes(3);
+  });
+
+  it('returns a no-op unsubscribe before initialize / on the native path', () => {
+    const unsubscribe = new HLSPlayer(HLS_URL).onMetadataChange(jest.fn());
+    expect(() => unsubscribe()).not.toThrow();
   });
 });

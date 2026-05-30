@@ -69,6 +69,8 @@ export interface VideoMetadata {
   colorSpace: string | null;
   audioTracks: AudioTrackMeta[];
   subtitleTracks: SubtitleTrackMeta[];
+  /** Number of HLS/adaptive renditions, when playing an adaptive stream. */
+  streamRenditions?: number | null;
 }
 
 export interface AudioTrackMeta {
