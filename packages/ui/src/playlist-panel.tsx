@@ -308,9 +308,16 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
 
   return (
     <TooltipProvider>
+      <div
+        className={cn(
+          "h-full flex flex-col bg-card border-l border-border shrink-0 overflow-hidden",
+          "transition-[width] duration-300 ease-in-out motion-reduce:transition-none",
+          isOpen ? SIZE_WIDTHS[size] : "w-11",
+        )}
+      >
       {!isOpen ? (
         /* ── Collapsed drawer strip ── */
-        <div className="flex flex-col items-center w-11 h-full bg-card border-l border-border shrink-0">
+        <div className="flex flex-col items-center w-11 h-full shrink-0">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -343,7 +350,7 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
         </div>
       ) : (
         /* ── Full panel ── */
-        <div className={cn("h-full flex flex-col bg-card border-l border-border shrink-0 transition-[width] duration-200", SIZE_WIDTHS[size])}>
+        <div className={cn("h-full flex flex-col shrink-0 transition-[width] duration-200", SIZE_WIDTHS[size])}>
 
           {/* Header */}
           <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
@@ -627,6 +634,7 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
           </ScrollArea>
         </div>
       )}
+      </div>
     </TooltipProvider>
   );
 };
