@@ -41,6 +41,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "./primitives/alert-dialog";
+import { Film, FolderUp, Link2 } from "lucide-react";
 
 const MAX_RETRIES = 3;
 
@@ -731,8 +732,8 @@ const LightBirdPlayer = () => {
           </div>
         )}
 
-        {playlist.currentItem && (
-          <PlayerControls
+        <PlayerControls
+            isDisabled={!playlist.currentItem}
             videoRef={videoRef}
             isPlaying={playback.isPlaying}
             progress={playback.progress}
@@ -779,7 +780,6 @@ const LightBirdPlayer = () => {
             isPiP={pip.isPiP}
             pipSupported={!!pip.isSupported}
           />
-        )}
 
         {showShortcutsDialog && (
           <ShortcutSettingsDialog
@@ -802,15 +802,29 @@ const LightBirdPlayer = () => {
         />
 
         {!playlist.currentItem && !isLoading && !loadingMessage && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center">
-              <p
-                className="text-5xl font-headline font-black tracking-widest"
-                style={{ color: 'hsl(var(--accent))' }}
+          <div className="absolute inset-0 flex items-center justify-center px-6">
+            <div className="flex flex-col items-center text-center max-w-sm">
+              <div
+                aria-hidden
+                className="flex h-16 w-16 items-center justify-center rounded-full bg-accent/10 ring-1 ring-accent/30"
               >
-                LIGHTBIRD
+                <Film className="h-7 w-7" style={{ color: 'hsl(var(--accent))' }} />
+              </div>
+              <p className="mt-5 text-lg font-medium text-foreground">No video loaded</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Drop files anywhere, or pick a source from the playlist panel.
               </p>
-              <p className="mt-2 text-muted-foreground">Add a local file or stream to begin.</p>
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+                <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-muted/40 px-2 py-1">
+                  <FolderUp className="h-3 w-3" /> local files
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-muted/40 px-2 py-1">
+                  <Link2 className="h-3 w-3" /> stream URL
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-muted/40 px-2 py-1 font-mono">
+                  ? for shortcuts
+                </span>
+              </div>
             </div>
           </div>
         )}

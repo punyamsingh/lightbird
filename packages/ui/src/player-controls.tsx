@@ -61,6 +61,8 @@ interface PlayerControlsProps {
   abLoop?: { pointA: number | null; pointB: number | null; isLooping: boolean };
   onABLoopCycle?: () => void;
   videoRef?: RefObject<HTMLVideoElement | null>;
+  /** When true, the bar still renders but every control is non-interactive. */
+  isDisabled?: boolean;
 }
 
 const formatTime = (time: number) => {
@@ -83,6 +85,7 @@ export const PlayerControls = React.memo(function PlayerControls({
   onSeekHover, seekPreviewThumbnail = null,
   abLoop = { pointA: null, pointB: null, isLooping: false }, onABLoopCycle,
   videoRef,
+  isDisabled = false,
 }: PlayerControlsProps) {
   const formattedProgress = useMemo(() => formatTime(progress), [progress]);
   const formattedDuration = useMemo(() => formatTime(duration), [duration]);
@@ -90,7 +93,16 @@ export const PlayerControls = React.memo(function PlayerControls({
 
   return (
     <TooltipProvider>
-      <div className="absolute bottom-0 left-0 right-0 px-4 pb-3 pt-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-in-out flex flex-col gap-1.5">
+      <div
+        aria-disabled={isDisabled || undefined}
+        className={cn(
+          "absolute bottom-0 left-0 right-0 px-4 pb-3 pt-10 flex flex-col gap-1.5",
+          "bg-gradient-to-t from-black/80 via-black/40 to-transparent transition-opacity duration-300 ease-in-out",
+          isDisabled
+            ? "opacity-60 pointer-events-none"
+            : "opacity-0 group-hover:opacity-100",
+        )}
+      >
         <SeekBar
           progress={progress}
           duration={duration}
@@ -122,7 +134,7 @@ export const PlayerControls = React.memo(function PlayerControls({
               <TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={onNext}><SkipForward /></Button></TooltipTrigger>
               <TooltipContent><p>Next (P)</p></TooltipContent>
             </Tooltip>
-            <div className="flex items-center gap-1 ml-1 group/vol">
+            <div className="flex items-center gap-2 ml-1">
               <Tooltip>
                 <TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={onMuteToggle}>{isMuted || volume === 0 ? <VolumeX /> : <Volume2 />}</Button></TooltipTrigger>
                 <TooltipContent><p>Mute (M)</p></TooltipContent>
@@ -132,7 +144,8 @@ export const PlayerControls = React.memo(function PlayerControls({
                 max={1}
                 step={0.05}
                 onValueChange={([val]) => onVolumeChange(val)}
-                className="w-0 group-hover/vol:w-24 transition-[width] duration-200 ease-out overflow-hidden"
+                aria-label="Volume"
+                className="w-24"
                 trackClassName="h-[3px]"
                 thumbClassName="h-3 w-3 border"
               />
