@@ -1,7 +1,7 @@
 import { SimplePlayer, type SimplePlayerFile } from './players/simple-player';
 import { MKVPlayer, type MKVPlayerFile } from './players/mkv-player';
 import { HLSPlayer, isHlsUrl } from './players/hls-player';
-import type { AudioTrack, Subtitle, Chapter, HLSPlayerFile } from "./types";
+import type { AudioTrack, Subtitle, Chapter, HLSPlayerFile, VideoMetadata } from "./types";
 
 export type ProcessedFile = SimplePlayerFile | MKVPlayerFile | HLSPlayerFile;
 
@@ -20,6 +20,10 @@ export interface VideoPlayer {
    * For all other players/paths this is already resolved when initialize() returns.
    */
   tracksReady?: Promise<void>;
+  /** HLS-only: metadata derived from the active rendition (see HLSPlayer). */
+  getMetadata?(): Partial<VideoMetadata>;
+  /** HLS-only: subscribe to stream events that change metadata. Returns an unsubscribe fn. */
+  onMetadataChange?(callback: () => void): () => void;
 }
 
 class SimplePlayerAdapter implements VideoPlayer {

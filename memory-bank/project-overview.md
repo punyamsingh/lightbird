@@ -32,7 +32,7 @@ packages/ui/        — UI components (npm: @lightbird/ui)
 |---|---|---|
 | `SimplePlayer` | MP4, WebM, AVI, MOV, WMV, FLV, OGV | Native HTML5 `<video>` element |
 | `MKVPlayer` | MKV | FFmpeg.wasm in Web Worker — probes, remuxes to MP4, extracts subtitles. Audio/subtitle tracks are labelled VLC-style: embedded track name verbatim, full language name (`getLanguageName` resolves ISO 639 → "English"), and a `[Forced]` marker, falling back to `Track N`. |
-| `HLSPlayer` | HLS `.m3u8` adaptive streams | `hls.js` (lazy dynamic import), or native HLS on Safari |
+| `HLSPlayer` | HLS `.m3u8` adaptive streams | `hls.js` (lazy dynamic import), or native HLS on Safari. Exposes `getMetadata()` (container/codec/bitrate/renditions/audio for the info panel) and `onMetadataChange()` (re-enrich on manifest/level/audio events). |
 
 The factory function `createVideoPlayer(source)` in `packages/lightbird/src/video-processor.ts` selects the right player. It accepts a `File` (MP4/MKV/etc., routed by format detection) or an HLS `.m3u8` URL string (routed to `HLSPlayer`); other URL strings throw.
 
@@ -148,7 +148,7 @@ The base `@lightbird/core` entry must stay FFmpeg-free and lean:
 | MS | Media Session API | **DONE** |
 | PIP | Picture-in-Picture | **DONE** |
 | CH | Chapters & Cue Points | **DONE** |
-| HLS | HLS/DASH Adaptive Streaming | In progress ([#48](https://github.com/punyamsingh/lightbird/issues/48)) — HLS-01 `HLSPlayer` **DONE**, HLS-02/03 pending |
+| HLS | HLS/DASH Adaptive Streaming | In progress ([#48](https://github.com/punyamsingh/lightbird/issues/48)) — HLS-01 `HLSPlayer` **DONE**, HLS-03 stream info enrichment **DONE**, HLS-02 quality selector pending |
 
 ---
 
