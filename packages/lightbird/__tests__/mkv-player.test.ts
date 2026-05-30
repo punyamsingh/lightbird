@@ -168,6 +168,19 @@ describe('parseStreamInfo', () => {
     expect(subtitleTracks[1].forced).toBe(false);
   });
 
+  it('does not leak attachment-stream metadata onto the preceding track', () => {
+    const logs = [
+      '  Stream #0:2(eng): Subtitle: subrip',
+      '  Stream #0:3: Attachment: ttf',
+      '    Metadata:',
+      '      filename        : font.ttf',
+      '      title           : SomeFont',
+    ].join('\n');
+
+    const { subtitleTracks } = parseStreamInfo(logs);
+    expect(subtitleTracks[0].title).toBeUndefined();
+  });
+
   it('does not attach chapter titles to the preceding stream', () => {
     const logs = [
       '  Stream #0:2(eng): Subtitle: subrip',
