@@ -133,6 +133,8 @@ export const PlayerControls = React.memo(function PlayerControls({
                 step={0.05}
                 onValueChange={([val]) => onVolumeChange(val)}
                 className="w-0 group-hover/vol:w-24 transition-[width] duration-200 ease-out overflow-hidden"
+                trackClassName="h-[3px]"
+                thumbClassName="h-3 w-3 border"
               />
             </div>
             <span className="font-mono text-xs tabular-nums ml-2 text-white/90">
@@ -287,28 +289,28 @@ export const PlayerControls = React.memo(function PlayerControls({
                   )}
                 </div>
 
-                {/* Filters & zoom */}
+                {/* Filters & zoom — slim to match the main seek bar */}
                 <div className="border-t border-border/40 pt-2 space-y-2 px-1">
                   <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Display</Label>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Brightness: {filters.brightness}%</Label>
-                    <Slider value={[filters.brightness]} max={200} onValueChange={([val]) => onFiltersChange({...filters, brightness: val})} />
+                    <Slider value={[filters.brightness]} max={200} onValueChange={([val]) => onFiltersChange({...filters, brightness: val})} trackClassName="h-[3px]" thumbClassName="h-3 w-3 border" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Contrast: {filters.contrast}%</Label>
-                    <Slider value={[filters.contrast]} max={200} onValueChange={([val]) => onFiltersChange({...filters, contrast: val})} />
+                    <Slider value={[filters.contrast]} max={200} onValueChange={([val]) => onFiltersChange({...filters, contrast: val})} trackClassName="h-[3px]" thumbClassName="h-3 w-3 border" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Saturation: {filters.saturate}%</Label>
-                    <Slider value={[filters.saturate]} max={200} onValueChange={([val]) => onFiltersChange({...filters, saturate: val})} />
+                    <Slider value={[filters.saturate]} max={200} onValueChange={([val]) => onFiltersChange({...filters, saturate: val})} trackClassName="h-[3px]" thumbClassName="h-3 w-3 border" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Hue: {filters.hue}°</Label>
-                    <Slider value={[filters.hue]} max={360} onValueChange={([val]) => onFiltersChange({...filters, hue: val})} />
+                    <Slider value={[filters.hue]} max={360} onValueChange={([val]) => onFiltersChange({...filters, hue: val})} trackClassName="h-[3px]" thumbClassName="h-3 w-3 border" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Zoom: {Math.round(zoom * 100)}%</Label>
-                    <Slider value={[zoom]} min={1} max={3} step={0.1} onValueChange={([val]) => onZoomChange(val)} />
+                    <Slider value={[zoom]} min={1} max={3} step={0.1} onValueChange={([val]) => onZoomChange(val)} trackClassName="h-[3px]" thumbClassName="h-3 w-3 border" />
                   </div>
                 </div>
               </PopoverContent>
