@@ -84,11 +84,10 @@ describe('PlayerControls', () => {
     expect(defaultProps.onFullScreenToggle).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onScreenshot when the screenshot button is clicked', () => {
+  it('calls onScreenshot when the Screenshot item is clicked from the settings menu', () => {
     render(<PlayerControls {...defaultProps} />);
-    const buttons = screen.getAllByRole('button');
-    // Screenshot is 3rd from the end (before Loop and Fullscreen)
-    fireEvent.click(buttons[buttons.length - 3]);
+    fireEvent.click(screen.getByLabelText('Settings'));
+    fireEvent.click(screen.getByText('Screenshot'));
     expect(defaultProps.onScreenshot).toHaveBeenCalledTimes(1);
   });
 
@@ -120,31 +119,36 @@ describe('PlayerControls', () => {
     expect(defaultProps.onPlaybackRateChange).toHaveBeenCalledWith(2);
   });
 
-  describe('Picture-in-Picture button', () => {
+  describe('Picture-in-Picture button (inside settings menu)', () => {
     it('does not render PiP button when pipSupported=false', () => {
       render(<PlayerControls {...defaultProps} pipSupported={false} />);
+      fireEvent.click(screen.getByLabelText('Settings'));
       expect(screen.queryByLabelText(/picture-in-picture/i)).not.toBeInTheDocument();
     });
 
     it('renders PiP button when pipSupported=true', () => {
       render(<PlayerControls {...defaultProps} pipSupported={true} onTogglePiP={jest.fn()} />);
+      fireEvent.click(screen.getByLabelText('Settings'));
       expect(screen.getByLabelText('Enter picture-in-picture')).toBeInTheDocument();
     });
 
     it('clicking PiP button calls onTogglePiP', () => {
       const onTogglePiP = jest.fn();
       render(<PlayerControls {...defaultProps} pipSupported={true} onTogglePiP={onTogglePiP} />);
+      fireEvent.click(screen.getByLabelText('Settings'));
       fireEvent.click(screen.getByLabelText('Enter picture-in-picture'));
       expect(onTogglePiP).toHaveBeenCalledTimes(1);
     });
 
     it('shows "Exit picture-in-picture" label when isPiP=true', () => {
       render(<PlayerControls {...defaultProps} pipSupported={true} isPiP={true} onTogglePiP={jest.fn()} />);
+      fireEvent.click(screen.getByLabelText('Settings'));
       expect(screen.getByLabelText('Exit picture-in-picture')).toBeInTheDocument();
     });
 
     it('shows "Enter picture-in-picture" label when isPiP=false', () => {
       render(<PlayerControls {...defaultProps} pipSupported={true} isPiP={false} onTogglePiP={jest.fn()} />);
+      fireEvent.click(screen.getByLabelText('Settings'));
       expect(screen.getByLabelText('Enter picture-in-picture')).toBeInTheDocument();
     });
   });
@@ -296,12 +300,14 @@ describe('PlayerControls — A-B loop', () => {
 
   it('renders the A-B loop button when onABLoopCycle is provided', () => {
     render(<PlayerControls {...defaultProps} onABLoopCycle={jest.fn()} />);
+    fireEvent.click(screen.getByLabelText('Settings'));
     expect(screen.getByTestId('ab-loop-button')).toBeInTheDocument();
   });
 
   it('calls onABLoopCycle when the A-B loop button is clicked', () => {
     const onABLoopCycle = jest.fn();
     render(<PlayerControls {...defaultProps} onABLoopCycle={onABLoopCycle} />);
+    fireEvent.click(screen.getByLabelText('Settings'));
     fireEvent.click(screen.getByTestId('ab-loop-button'));
     expect(onABLoopCycle).toHaveBeenCalledTimes(1);
   });
@@ -349,6 +355,7 @@ describe('PlayerControls — A-B loop', () => {
         abLoop={{ pointA: 50, pointB: 150, isLooping: true }}
       />,
     );
+    fireEvent.click(screen.getByLabelText('Settings'));
     expect(screen.getByTestId('ab-loop-button')).toHaveAttribute('data-active', 'true');
   });
 });
