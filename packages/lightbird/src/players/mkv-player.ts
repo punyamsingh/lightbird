@@ -85,6 +85,13 @@ export function parseStreamInfo(logs: string): {
 
   const lines = logs.split('\n');
   for (const line of lines) {
+    // Any new stream header ends the previous stream's metadata block — including
+    // non-media streams we don't track (e.g. Attachment/font streams), so their
+    // `title :` lines can't leak onto the last untitled media track.
+    if (/^\s*Stream #\d+:\d+/.test(line)) {
+      current = null;
+    }
+
     const streamMatch = line.match(
       /Stream #\d+:\d+(?:\((\w+)\))?: (Video|Audio|Subtitle): (.+)$/i,
     );
