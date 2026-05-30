@@ -52,6 +52,7 @@ export {
 export type { ShortcutBinding, ShortcutAction } from './utils/keyboard-shortcuts'
 export { ProgressEstimator } from './utils/progress-estimator'
 export { getFFmpeg, resetFFmpeg } from './utils/ffmpeg-singleton'
+export { getLanguageName } from './utils/language-names'
 
 // All types
 export type {

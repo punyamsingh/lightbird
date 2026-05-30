@@ -1,6 +1,7 @@
 import type { AudioTrack, Subtitle, Chapter } from "../types";
 import { SubtitleConverter } from "../subtitles/subtitle-converter";
 import { parseChaptersFromFFmpegLog } from "../parsers/chapter-parser";
+import { getLanguageName } from "../utils/language-names";
 import type { WorkerInbound, WorkerOutbound } from "../workers/ffmpeg-worker";
 
 /**
@@ -61,6 +62,10 @@ interface TrackInfo {
   codec: string;
   lang?: string;
   title?: string;
+  /** Matroska "forced" disposition — VLC marks these in the subtitle menu. */
+  forced?: boolean;
+  /** Matroska "default" disposition — the track FFmpeg auto-selects. */
+  default?: boolean;
 }
 
 export function parseStreamInfo(logs: string): {
@@ -72,25 +77,106 @@ export function parseStreamInfo(logs: string): {
   const audioTracks: TrackInfo[] = [];
   const subtitleTracks: TrackInfo[] = [];
 
+  // FFmpeg prints a stream's title on an indented `title : …` line *below* the
+  // `Stream #…` line (inside its `Metadata:` block), so we track the current
+  // stream across lines and attach metadata to it as we go — mirroring how VLC
+  // reads the Matroska track Name element.
+  let current: TrackInfo | null = null;
+
   const lines = logs.split('\n');
   for (const line of lines) {
-    const streamMatch = line.match(/Stream #\d+:\d+(?:\((\w+)\))?: (Video|Audio|Subtitle): (\S+)/i);
-    if (!streamMatch) continue;
+    const streamMatch = line.match(
+      /Stream #\d+:\d+(?:\((\w+)\))?: (Video|Audio|Subtitle): (.+)$/i,
+    );
 
-    const [, lang, type, codec] = streamMatch;
-    const titleMatch = line.match(/\btitle\s*:\s*([^,\n]+)/i);
-    const title = titleMatch ? titleMatch[1].trim() : undefined;
+    if (streamMatch) {
+      const [, lang, type, rest] = streamMatch;
+      // Codec is the first token after the type; the remainder may carry
+      // dispositions like "(default) (forced)".
+      const codec = rest.trim().split(/[\s,]/)[0];
+      const forced = /\(forced\)/i.test(rest);
+      const isDefault = /\(default\)/i.test(rest);
+      const t = type.toLowerCase();
+      const bucket =
+        t === 'video' ? videoTracks : t === 'audio' ? audioTracks : subtitleTracks;
 
-    if (type.toLowerCase() === 'video') {
-      videoTracks.push({ index: videoTracks.length, type: 'video', codec, lang, title });
-    } else if (type.toLowerCase() === 'audio') {
-      audioTracks.push({ index: audioTracks.length, type: 'audio', codec, lang, title });
-    } else if (type.toLowerCase() === 'subtitle') {
-      subtitleTracks.push({ index: subtitleTracks.length, type: 'subtitle', codec, lang, title });
+      current = {
+        index: bucket.length,
+        type: t as TrackInfo['type'],
+        codec,
+        lang,
+        forced,
+        default: isDefault,
+      };
+      bucket.push(current);
+      continue;
+    }
+
+    // Chapter/program metadata blocks follow the streams — stop attaching their
+    // titles to the last stream we saw.
+    if (/^\s*(Chapter #|Program )/i.test(line)) {
+      current = null;
+      continue;
+    }
+
+    // Attach the first `title : …` line of the current stream's metadata block.
+    // Keep the full value (VLC shows the whole track name; commas are allowed).
+    if (current && current.title === undefined) {
+      const titleMatch = line.match(/^\s*title\s*:\s*(.+)$/i);
+      if (titleMatch) {
+        current.title = titleMatch[1].trim();
+      }
     }
   }
 
   return { videoTracks, audioTracks, subtitleTracks };
+}
+
+/**
+ * Build a VLC-style track label: the embedded track name (verbatim) or a
+ * "Track N" fallback, suffixed with the full language name in brackets and a
+ * "[Forced]" marker when set — e.g. "Commentary - [English]" or
+ * "Track 2 - [Japanese] [Forced]".
+ */
+function formatTrackName(index: number, t: TrackInfo): string {
+  let label = t.title?.trim() || `Track ${index + 1}`;
+  const langName = getLanguageName(t.lang);
+  if (langName) label += ` - [${langName}]`;
+  if (t.forced) label += ' [Forced]';
+  return label;
+}
+
+/** Map parsed audio streams to AudioTrack metadata (VLC-style names). */
+function buildAudioTracks(tracks: TrackInfo[]): AudioTrack[] {
+  if (tracks.length === 0) {
+    return [{ id: '0', name: 'Default Audio', lang: 'unknown' }];
+  }
+  return tracks.map((t, i) => ({
+    id: String(i),
+    name: formatTrackName(i, t),
+    lang: t.lang ?? 'unknown',
+  }));
+}
+
+/**
+ * Map parsed subtitle streams to Subtitle metadata (VLC-style names) and
+ * (re)populate the id→ffmpeg-stream-index map used for extraction.
+ */
+function buildSubtitleTracks(
+  tracks: TrackInfo[],
+  trackMap: Map<string, number>,
+): Subtitle[] {
+  trackMap.clear();
+  return tracks.map((t, i) => {
+    const id = String(i);
+    trackMap.set(id, i);
+    return {
+      id,
+      name: formatTrackName(i, t),
+      lang: t.lang ?? 'unknown',
+      type: 'embedded' as const,
+    };
+  });
 }
 
 export class MKVPlayer {
@@ -264,28 +350,12 @@ export class MKVPlayer {
       // Parse chapter metadata from the FFmpeg probe logs
       this.chapters = parseChaptersFromFFmpegLog(result.logs, videoElement.duration || 0);
 
-      // Build audio track metadata
-      this.playerFile.audioTracks =
-        audioTracks.length > 0
-          ? audioTracks.map((t, i) => ({
-              id: String(i),
-              name: t.title ?? (t.lang ? `Audio ${i + 1} (${t.lang})` : `Audio ${i + 1}`),
-              lang: t.lang ?? 'unknown',
-            }))
-          : [{ id: '0', name: 'Default Audio', lang: 'unknown' }];
-
-      // Build subtitle track metadata and populate the ID→index map
-      this.subtitleTrackMap.clear();
-      this.playerFile.subtitleTracks = subtitleTracks.map((t, i) => {
-        const id = String(i);
-        this.subtitleTrackMap.set(id, i);
-        return {
-          id,
-          name: t.title ?? (t.lang ? `Subtitle ${i + 1} (${t.lang})` : `Subtitle ${i + 1}`),
-          lang: t.lang ?? 'unknown',
-          type: 'embedded' as const,
-        };
-      });
+      // Build audio + subtitle track metadata (VLC-style names)
+      this.playerFile.audioTracks = buildAudioTracks(audioTracks);
+      this.playerFile.subtitleTracks = buildSubtitleTracks(
+        subtitleTracks,
+        this.subtitleTrackMap,
+      );
 
       const blob = new Blob([result.data as BlobPart], { type: 'video/mp4' });
       const url = URL.createObjectURL(blob);
@@ -324,26 +394,11 @@ export class MKVPlayer {
 
     const { audioTracks, subtitleTracks } = parseStreamInfo(probeResult.logs);
 
-    this.playerFile.audioTracks =
-      audioTracks.length > 0
-        ? audioTracks.map((t, i) => ({
-            id: String(i),
-            name: t.title ?? (t.lang ? `Audio ${i + 1} (${t.lang})` : `Audio ${i + 1}`),
-            lang: t.lang ?? 'unknown',
-          }))
-        : [{ id: '0', name: 'Default Audio', lang: 'unknown' }];
-
-    this.subtitleTrackMap.clear();
-    this.playerFile.subtitleTracks = subtitleTracks.map((t, i) => {
-      const id = String(i);
-      this.subtitleTrackMap.set(id, i);
-      return {
-        id,
-        name: t.title ?? (t.lang ? `Subtitle ${i + 1} (${t.lang})` : `Subtitle ${i + 1}`),
-        lang: t.lang ?? 'unknown',
-        type: 'embedded' as const,
-      };
-    });
+    this.playerFile.audioTracks = buildAudioTracks(audioTracks);
+    this.playerFile.subtitleTracks = buildSubtitleTracks(
+      subtitleTracks,
+      this.subtitleTrackMap,
+    );
   }
 
   private async _remux(audioTrackIndex: number): Promise<string> {
