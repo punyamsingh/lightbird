@@ -28,7 +28,7 @@ import {
   useABLoop,
   useTouchGestures,
 } from "@lightbird/core/react";
-import { captureVideoThumbnail, parseMediaError, validateFile, type ParsedMediaError, loadShortcuts, type ShortcutBinding, ProgressEstimator, hasAcceptedDisclaimer, acceptDisclaimer, FLAG_MAGNET_LINK } from "@lightbird/core";
+import { captureVideoThumbnail, exportVideoFrame, downloadDataUrl, frameExportFilename, parseMediaError, validateFile, type ParsedMediaError, loadShortcuts, type ShortcutBinding, ProgressEstimator, hasAcceptedDisclaimer, acceptDisclaimer, FLAG_MAGNET_LINK } from "@lightbird/core";
 import { useBooleanFlagValue } from "@openfeature/react-sdk";
 import { SubtitleOverlay } from "./subtitle-overlay";
 import {
@@ -48,7 +48,6 @@ const MAX_RETRIES = 3;
 const LightBirdPlayer = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const subtitleInputRef = useRef<HTMLInputElement>(null);
   const playerRef = useRef<VideoPlayer | null>(null);
   // Companion map: preserves external subtitle files for re-loading playlist items
@@ -571,19 +570,17 @@ const LightBirdPlayer = () => {
 
   const captureScreenshot = useCallback(() => {
     const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas) return;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.filter = video.style.filter;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL("image/png");
-    const a = document.createElement("a");
-    a.href = dataUrl;
-    a.download = `lightbird-screenshot-${new Date().toISOString()}.png`;
-    a.click();
+    if (!video) return;
+    const dataUrl = exportVideoFrame(video, { filter: video.style.filter });
+    if (!dataUrl) {
+      toast({
+        title: "Screenshot failed",
+        description: "The frame could not be captured (the video may be cross-origin protected).",
+        variant: "destructive",
+      });
+      return;
+    }
+    downloadDataUrl(dataUrl, frameExportFilename("png"));
     toast({ title: "Screenshot Saved" });
   }, [toast]);
 
@@ -672,7 +669,6 @@ const LightBirdPlayer = () => {
           onClick={playback.togglePlay}
           crossOrigin="anonymous"
         />
-        <canvas ref={canvasRef} className="hidden" />
         <SubtitleOverlay videoRef={videoRef} activeSubtitle={subtitles.activeSubtitle} />
         <VideoOverlay
           isLoading={isLoading}

@@ -45,6 +45,8 @@ export { parseMediaError, validateFile } from './utils/media-error'
 export type { ParsedMediaError, MediaErrorType } from './utils/media-error'
 export { extractNativeMetadata } from './utils/video-info'
 export { captureVideoThumbnail, captureFrameAt } from './utils/video-thumbnail'
+export { exportVideoFrame, downloadDataUrl, frameExportFilename } from './utils/frame-export'
+export type { ExportFrameOptions } from './utils/frame-export'
 export {
   loadShortcuts, saveShortcuts, matchesShortcut, isInteractiveElement,
   formatShortcutKey, DEFAULT_SHORTCUTS
