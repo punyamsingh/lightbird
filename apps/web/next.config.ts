@@ -2,7 +2,7 @@ import type { NextConfig } from 'next';
 import path from 'path';
 
 const nextConfig: NextConfig = {
-  transpilePackages: ['@lightbird/core', '@lightbird/ui', 'lucide-react'],
+  transpilePackages: ['@lightbird/core', '@lightbird/player-react', 'lucide-react'],
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'placehold.co', port: '', pathname: '/**' },
@@ -35,7 +35,7 @@ const nextConfig: NextConfig = {
       ...config.resolve.alias,
       '@lightbird/core/react': path.resolve(__dirname, '../../packages/lightbird/src/react/index.ts'),
       '@lightbird/core': path.resolve(__dirname, '../../packages/lightbird/src/index.ts'),
-      '@lightbird/ui': path.resolve(__dirname, '../../packages/ui/src/index.ts'),
+      '@lightbird/player-react': path.resolve(__dirname, '../../packages/ui/src/index.ts'),
     };
 
     return config;

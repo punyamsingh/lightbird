@@ -6,7 +6,7 @@ import { CodeBlock } from "./code-block";
 const INSTALL_TABS = ["React UI", "Headless React", "Vanilla JS"] as const;
 
 const REACT_UI_CODE = `"use client"
-import { LightBirdPlayer } from '@lightbird/ui'
+import { LightBirdPlayer } from '@lightbird/player-react'
 
 export default function VideoPage() {
   return <LightBirdPlayer />
@@ -51,7 +51,7 @@ input.addEventListener('change', async (e) => {
 })`;
 
 const INSTALL_COMMANDS: Record<string, string> = {
-  "React UI": "npm install @lightbird/core @lightbird/ui",
+  "React UI": "npm install @lightbird/core @lightbird/player-react",
   "Headless React": "npm install @lightbird/core",
   "Vanilla JS": "npm install @lightbird/core",
 };
@@ -119,11 +119,11 @@ export function InstallTabs() {
           <p className="text-sm text-muted-foreground mt-3">
             Add{" "}
             <code className="text-foreground text-xs bg-white/5 px-1.5 py-0.5 rounded">
-              ./node_modules/@lightbird/ui/dist/**/*.js
+              ./node_modules/@lightbird/player-react/dist/**/*.js
             </code>{" "}
             to your Tailwind content config, or import{" "}
             <code className="text-foreground text-xs bg-white/5 px-1.5 py-0.5 rounded">
-              @lightbird/ui/styles.css
+              @lightbird/player-react/styles.css
             </code>{" "}
             for zero-config styling.
           </p>

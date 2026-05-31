@@ -16,6 +16,7 @@ const NAV_SECTIONS = [
       { id: "api-ui", label: "UI Components" },
     ],
   },
+  { id: "web-component", label: "Web Component" },
   { id: "bundle-size", label: "Bundle Size" },
   { id: "browser-support", label: "Browser Support" },
 ] as const;

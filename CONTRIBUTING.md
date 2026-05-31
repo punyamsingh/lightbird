@@ -12,7 +12,7 @@ pnpm turbo test
 
 ```
 packages/lightbird/   — @lightbird/core (framework-agnostic engine)
-packages/ui/          — @lightbird/ui (React components)
+packages/ui/          — @lightbird/player-react (React components)
 apps/web/             — lightbird.vercel.app
 ```
 
@@ -43,7 +43,7 @@ This project uses **Conventional Commits** and **semantic-release**. Your PR tit
 
 ### Important
 
-- Only use `feat:` or `fix:` when the change affects the published npm packages (`@lightbird/core` or `@lightbird/ui`)
+- Only use `feat:` or `fix:` when the change affects the published npm packages (`@lightbird/core`, `@lightbird/player-react`, or `@lightbird/player`)
 - Changes only to the web app (docs page, landing page) should use `docs:` or `chore:`
 - Breaking changes add `!` after the type: `feat!:` or `fix!:`
 
@@ -61,7 +61,7 @@ This project uses **Conventional Commits** and **semantic-release**. Your PR tit
 ```bash
 pnpm turbo test                              # all tests
 pnpm test --filter @lightbird/core           # core only
-pnpm test --filter @lightbird/ui             # UI only
+pnpm test --filter @lightbird/player-react             # UI only
 cd packages/lightbird && pnpm jest --watch   # watch mode
 ```
 

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Toaster, FeatureFlagsProvider } from "@lightbird/ui";
+import { Toaster, FeatureFlagsProvider } from "@lightbird/player-react";
 
 export const metadata: Metadata = {
   title: "LightBird",

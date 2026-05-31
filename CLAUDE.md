@@ -2,14 +2,14 @@
 
 ## Project Summary
 
-LightBird is a modern, lightweight video player built as a **pnpm monorepo** with **Next.js 15** and **React 18**. It publishes two npm packages (`@lightbird/core` and `@lightbird/ui`) while keeping the web app at lightbird.vercel.app fully functional.
+LightBird is a modern, lightweight video player built as a **pnpm monorepo** with **Next.js 15** and **React 18**. It publishes three npm packages (`@lightbird/core`, `@lightbird/player-react`, and `@lightbird/player`) while keeping the web app at lightbird.vercel.app fully functional.
 
 **Tech stack:** pnpm workspaces, Turborepo, tsup, Next.js 15, React 18, TypeScript, Tailwind CSS, ShadCN UI (Radix UI), FFmpeg.wasm.
 
 **Monorepo structure:**
 - `packages/lightbird/` — Framework-agnostic core: players, parsers, subtitle pipeline, utilities, types
 - `packages/lightbird/src/react/` — React hooks (headless, no UI deps) — subpath export `@lightbird/core/react`
-- `packages/ui/` — Drop-in styled React components (`@lightbird/ui`)
+- `packages/ui/` — Drop-in styled React components (`@lightbird/player-react`)
 - `apps/web/` — Next.js app (lightbird.vercel.app)
 
 **Key source files:**
@@ -38,7 +38,7 @@ LightBird is a modern, lightweight video player built as a **pnpm monorepo** wit
 ```bash
 pnpm turbo test           # run all package tests
 pnpm test --filter @lightbird/core   # core package only
-pnpm test --filter @lightbird/ui  # UI package only
+pnpm test --filter @lightbird/player-react  # UI package only
 cd packages/lightbird && pnpm jest --watch  # dev mode
 ```
 
@@ -118,7 +118,7 @@ The memory bank lives in `memory-bank/`. It is the single source of truth for th
 ### Rules
 
 1. **PR titles matter most.** When a PR is squash-merged, the PR title becomes the commit message. Use the correct type prefix.
-2. **`feat:` and `fix:` trigger npm releases.** Only use these when the change affects the published packages (`@lightbird/core` or `@lightbird/ui`). UI changes to the web app only (e.g., docs page redesign) should use `docs:` or `chore:`.
+2. **`feat:` and `fix:` trigger npm releases.** Only use these when the change affects the published packages (`@lightbird/core` or `@lightbird/player-react`). UI changes to the web app only (e.g., docs page redesign) should use `docs:` or `chore:`.
 3. **Breaking changes** use `!` after the type: `feat!:` or `fix!:`. This triggers a major version bump.
 4. **Keep descriptions concise.** One line, lowercase start, no period at end.
 5. **Scope is optional** but useful: `feat(subtitles): add SSA format support`, `fix(player): handle missing audio track`.

@@ -23,7 +23,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Build packages
-        run: pnpm turbo build --filter=@lightbird/core --filter=@lightbird/ui
+        run: pnpm turbo build --filter=@lightbird/core --filter=@lightbird/player-react --filter=@lightbird/player
 
       - name: Bundle size budget
         run: node scripts/check-core-bundle.js

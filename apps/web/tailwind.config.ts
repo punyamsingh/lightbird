@@ -5,7 +5,7 @@ export default {
   content: [
     './src/**/*.{ts,tsx}',
     '../../packages/ui/src/**/*.{ts,tsx}',          // dev (workspace)
-    './node_modules/@lightbird/ui/dist/**/*.js',     // production
+    './node_modules/@lightbird/player-react/dist/**/*.js',     // production
   ],
   theme: {
     extend: {

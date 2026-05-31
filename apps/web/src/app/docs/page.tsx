@@ -222,6 +222,30 @@ const UI_DATA = [
   ["<Toaster />", "Toast notification provider"],
 ];
 
+/* ------------------------------------------------------------------ */
+/*  Web Component                                                      */
+/* ------------------------------------------------------------------ */
+
+const WC_USAGE = `<!-- Register the element once, anywhere in your app -->
+<script type="module">
+  import '@lightbird/player';
+</script>
+
+<!-- Then use it like any other element -->
+<lightbird-player
+  src="video.mp4"
+  controls
+  poster="cover.jpg"
+></lightbird-player>`;
+
+const WC_DATA = [
+  ["src", "Video URL — .m3u8 → HLS, .mkv → MKV, otherwise native"],
+  ["controls / autoplay / muted", "Boolean playback attributes"],
+  ["poster", "Poster image shown before playback"],
+  ["subtitles", "JSON array of { src, label, srclang } tracks"],
+  ["CustomEvents", "play, pause, timeupdate, ended, error, and more"],
+];
+
 function ApiTable({
   headers,
   rows,
@@ -274,9 +298,14 @@ const BUNDLE_SIZES = [
     "Optional subpath: 11 headless React hooks.",
   ],
   [
-    "@lightbird/ui",
+    "@lightbird/player-react",
     "~21 KB + 6 KB CSS",
     "Optional: styled drop-in components.",
+  ],
+  [
+    "@lightbird/player",
+    "~3 KB",
+    "Optional: framework-agnostic <lightbird-player> Web Component. Core stays a lazy chunk.",
   ],
   [
     "FFmpeg.wasm (deferred)",
@@ -423,9 +452,39 @@ export default function DocsPage() {
 
             <div id="api-ui" className="scroll-mt-24">
               <SectionHeading id="api-ui-heading" sub>
-                UI Components &mdash; <code className="text-sm font-normal font-code text-muted-foreground">@lightbird/ui</code>
+                UI Components &mdash; <code className="text-sm font-normal font-code text-muted-foreground">@lightbird/player-react</code>
               </SectionHeading>
               <ApiTable headers={["Component", "Description"]} rows={UI_DATA} />
+            </div>
+          </section>
+        </FadeSection>
+
+        {/* ---- Web Component ---- */}
+        <FadeSection>
+          <section id="web-component" className="mb-20 scroll-mt-24">
+            <SectionHeading id="web-component-heading">
+              Web Component &mdash;{" "}
+              <code className="text-base font-normal font-code text-muted-foreground">
+                @lightbird/player
+              </code>
+            </SectionHeading>
+            <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+              The{" "}
+              <code className="text-foreground text-xs bg-white/5 px-1.5 py-0.5 rounded">
+                &lt;lightbird-player&gt;
+              </code>{" "}
+              custom element wraps{" "}
+              <code className="text-foreground text-xs bg-white/5 px-1.5 py-0.5 rounded">
+                @lightbird/core
+              </code>{" "}
+              as a framework-agnostic Web Component — usable in Vue, Svelte, Angular, Solid, or
+              plain HTML with no React dependency. It uses Shadow DOM for style encapsulation and
+              lazy-loads the core engine (and FFmpeg.wasm, for MKV) only when an HLS or MKV source
+              is first encountered.
+            </p>
+            <CodeBlock>{WC_USAGE}</CodeBlock>
+            <div className="mt-6">
+              <ApiTable headers={["Attribute / API", "Description"]} rows={WC_DATA} />
             </div>
           </section>
         </FadeSection>

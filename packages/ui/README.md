@@ -1,4 +1,4 @@
-# @lightbird/ui
+# @lightbird/player-react
 
 Drop-in React video player component powered by [@lightbird/core](https://www.npmjs.com/package/@lightbird/core). Full controls, playlist, subtitles, chapters — one import.
 
@@ -7,7 +7,7 @@ Drop-in React video player component powered by [@lightbird/core](https://www.np
 ## Install
 
 ```bash
-npm install @lightbird/core @lightbird/ui
+npm install @lightbird/core @lightbird/player-react
 ```
 
 ## Usage
@@ -15,7 +15,7 @@ npm install @lightbird/core @lightbird/ui
 ```tsx
 "use client"
 
-import { LightBirdPlayer } from '@lightbird/ui'
+import { LightBirdPlayer } from '@lightbird/player-react'
 
 export default function VideoPage() {
   return <LightBirdPlayer />
@@ -29,14 +29,14 @@ Add to your `tailwind.config.ts`:
 ```ts
 content: [
   // ...your paths
-  './node_modules/@lightbird/ui/dist/**/*.js',
+  './node_modules/@lightbird/player-react/dist/**/*.js',
 ]
 ```
 
 Or use the pre-compiled stylesheet:
 
 ```tsx
-import '@lightbird/ui/styles.css'
+import '@lightbird/player-react/styles.css'
 ```
 
 ## Exported Components
