@@ -108,6 +108,14 @@ export class HLSPlayer implements VideoPlayer {
   }
 
   /**
+   * Index of the active rendition, or `-1` for automatic (ABR) selection /
+   * before the manifest loads / on the native-HLS path.
+   */
+  getCurrentLevel(): number {
+    return this.hls?.currentLevel ?? -1;
+  }
+
+  /**
    * HLS-specific metadata for the video info panel, derived from the active
    * rendition. Returns an empty object before the manifest loads or on the
    * native-HLS path (where hls.js is never instantiated).

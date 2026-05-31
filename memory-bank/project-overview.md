@@ -64,6 +64,7 @@ apps/web/src/app/page.tsx
 | `use-media-session.ts` | MediaSession API: metadata, hardware key handlers |
 | `use-picture-in-picture.ts` | PiP enter/exit/toggle/detect |
 | `use-video-info.ts` | Video metadata extraction |
+| `use-hls-quality.ts` | HLS quality-level list + active level + switch (Auto/ABR or pinned rendition) |
 | `use-chapters.ts` | Chapter navigation from MKV metadata |
 | `use-magnet.ts` | Magnet link → torrent metadata → playlist items |
 | `use-seek-preview.ts` | Seek-bar hover thumbnail previews via an offscreen video |
