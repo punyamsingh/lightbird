@@ -122,13 +122,13 @@ describe('styled control bar', () => {
     expect(el.mediaElement.controls).toBe(true);
   });
 
-  it('renders play, mute, speed and fullscreen affordances', () => {
+  it('renders play, mute, seek, settings and fullscreen affordances', () => {
     const el = mount({ controls: '' });
     const root = el.shadowRoot!;
     expect(root.querySelector('.lb-play')).not.toBeNull();
     expect(root.querySelector('.lb-mute')).not.toBeNull();
     expect(root.querySelector('.lb-seek')).not.toBeNull();
-    expect(root.querySelector('.lb-speed')).not.toBeNull();
+    expect(root.querySelector('.lb-settings')).not.toBeNull();
     expect(root.querySelector('.lb-fs')).not.toBeNull();
   });
 
@@ -137,14 +137,6 @@ describe('styled control bar', () => {
     const playBtn = el.shadowRoot!.querySelector('.lb-play') as HTMLButtonElement;
     playBtn.click();
     expect(el.mediaElement.play).toHaveBeenCalled();
-  });
-
-  it('cycles playback speed on the speed button', () => {
-    const el = mount({ controls: '' });
-    const speedBtn = el.shadowRoot!.querySelector('.lb-speed') as HTMLButtonElement;
-    expect(el.mediaElement.playbackRate).toBe(1);
-    speedBtn.click();
-    expect(el.mediaElement.playbackRate).toBe(1.25);
   });
 
   it('hides the CC toggle when the media has no text tracks', () => {
@@ -161,6 +153,94 @@ describe('styled control bar', () => {
     expect(el.shadowRoot!.querySelector('.lb-controls')).not.toBeNull();
     el.remove();
     expect(el.shadowRoot!.querySelector('.lb-controls')).toBeNull();
+  });
+});
+
+describe('control bar — settings menu', () => {
+  it('is closed until the settings button is clicked', () => {
+    const el = mount({ controls: '' });
+    const menu = el.shadowRoot!.querySelector('.lb-settings-menu') as HTMLElement;
+    expect(menu.dataset.open).not.toBe('1');
+    (el.shadowRoot!.querySelector('.lb-settings') as HTMLButtonElement).click();
+    expect(menu.dataset.open).toBe('1');
+  });
+
+  it('offers playback-speed presets and applies them', () => {
+    const el = mount({ controls: '' });
+    (el.shadowRoot!.querySelector('.lb-settings') as HTMLButtonElement).click();
+    const items = el.shadowRoot!.querySelectorAll('.lb-settings-menu .lb-menu-item[data-speed]');
+    expect(items.length).toBeGreaterThanOrEqual(5);
+    const twoX = Array.from(items).find(
+      (i) => (i as HTMLElement).dataset.speed === '2',
+    ) as HTMLButtonElement;
+    twoX.click();
+    expect(el.mediaElement.playbackRate).toBe(2);
+    expect(twoX.classList.contains('lb-checked')).toBe(true);
+  });
+
+  it('applies a CSS filter when a display slider changes', () => {
+    const el = mount({ controls: '' });
+    (el.shadowRoot!.querySelector('.lb-settings') as HTMLButtonElement).click();
+    const brightness = el.shadowRoot!.querySelector(
+      '.lb-settings-menu .lb-filter input',
+    ) as HTMLInputElement;
+    brightness.value = '150';
+    brightness.dispatchEvent(new Event('input'));
+    expect(el.mediaElement.style.filter).toContain('brightness(150%)');
+  });
+
+  it('resets display filters', () => {
+    const el = mount({ controls: '' });
+    (el.shadowRoot!.querySelector('.lb-settings') as HTMLButtonElement).click();
+    const brightness = el.shadowRoot!.querySelector(
+      '.lb-settings-menu .lb-filter input',
+    ) as HTMLInputElement;
+    brightness.value = '40';
+    brightness.dispatchEvent(new Event('input'));
+    expect(el.mediaElement.style.filter).toContain('brightness(40%)');
+    (el.shadowRoot!.querySelector('.lb-settings-menu .lb-reset') as HTMLButtonElement).click();
+    expect(el.mediaElement.style.filter).toContain('brightness(100%)');
+  });
+
+  it('keeps the bar pinned open while a menu is open', () => {
+    const el = mount({ controls: '' });
+    const controls = el.shadowRoot!.querySelector('.lb-controls') as HTMLElement;
+    (el.shadowRoot!.querySelector('.lb-settings') as HTMLButtonElement).click();
+    expect(controls.dataset.show).toBe('1');
+  });
+});
+
+describe('control bar — picture-in-picture', () => {
+  it('hides the PiP button when the API is unavailable', () => {
+    // jsdom does not implement the PiP API, so the button stays hidden.
+    const el = mount({ controls: '' });
+    const pip = el.shadowRoot!.querySelector('.lb-pip') as HTMLButtonElement;
+    expect(pip.hidden).toBe(true);
+  });
+
+  it('shows and wires the PiP button when the API is present', () => {
+    Object.defineProperty(document, 'pictureInPictureEnabled', {
+      value: true,
+      configurable: true,
+    });
+    const requestPip = jest.fn().mockResolvedValue(undefined);
+    (HTMLVideoElement.prototype as unknown as { requestPictureInPicture: unknown })
+      .requestPictureInPicture = requestPip;
+
+    try {
+      const el = mount({ controls: '' });
+      const pip = el.shadowRoot!.querySelector('.lb-pip') as HTMLButtonElement;
+      expect(pip.hidden).toBe(false);
+      pip.click();
+      expect(requestPip).toHaveBeenCalled();
+    } finally {
+      delete (HTMLVideoElement.prototype as unknown as { requestPictureInPicture?: unknown })
+        .requestPictureInPicture;
+      Object.defineProperty(document, 'pictureInPictureEnabled', {
+        value: false,
+        configurable: true,
+      });
+    }
   });
 });
 

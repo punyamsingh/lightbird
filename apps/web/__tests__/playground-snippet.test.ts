@@ -103,4 +103,18 @@ describe("generateSnippet — Web Component target", () => {
     const { code } = generateSnippet(makeConfig({ src: 'a"b' }), "web-component");
     expect(code).toContain('src="a&quot;b"');
   });
+
+  it("emits a subtitles JSON attribute when a subtitle URL is given", () => {
+    const { code } = generateSnippet(
+      makeConfig({ subtitleUrl: "https://x.test/en.vtt" }),
+      "web-component",
+    );
+    expect(code).toContain("subtitles='");
+    expect(code).toContain('"src":"https://x.test/en.vtt"');
+  });
+
+  it("omits the subtitles attribute when no URL is given", () => {
+    const { code } = generateSnippet(makeConfig(), "web-component");
+    expect(code).not.toContain("subtitles");
+  });
 });

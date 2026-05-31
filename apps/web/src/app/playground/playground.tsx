@@ -140,6 +140,14 @@ function WebComponentPreview({ config }: { config: PlaygroundConfig }) {
     el.toggleAttribute("muted", config.muted);
     if (config.poster) el.setAttribute("poster", config.poster);
     else el.removeAttribute("poster");
+    if (config.subtitleUrl) {
+      el.setAttribute(
+        "subtitles",
+        JSON.stringify([{ src: config.subtitleUrl, label: "Subtitles", srclang: "en" }]),
+      );
+    } else {
+      el.removeAttribute("subtitles");
+    }
   }, [ready, config]);
 
   // Early return must come after all hooks so hook order stays stable.
@@ -167,6 +175,7 @@ export function Playground() {
   const [autoPlay, setAutoPlay] = useState(false);
   const [muted, setMuted] = useState(false);
   const [poster, setPoster] = useState("");
+  const [subtitleUrl, setSubtitleUrl] = useState("");
   const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
@@ -201,8 +210,9 @@ export function Playground() {
       nativeControls,
       autoPlay,
       muted,
+      subtitleUrl: subtitleUrl.trim() || undefined,
     }),
-    [snippetSrc, poster, controls, nativeControls, autoPlay, muted],
+    [snippetSrc, poster, controls, nativeControls, autoPlay, muted, subtitleUrl],
   );
 
   // The live preview needs the real (possibly blob) src, not the snippet placeholder.
@@ -340,6 +350,23 @@ export function Playground() {
                   className="mt-1 w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ring"
                 />
               </label>
+              <label className="mt-3 block">
+                <span className="text-sm font-medium">Subtitle URL</span>
+                <input
+                  type="text"
+                  value={subtitleUrl}
+                  onChange={(e) => setSubtitleUrl(e.target.value)}
+                  placeholder="https://…/captions.vtt (or .srt)"
+                  className="mt-1 w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ring"
+                />
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  Adds a track so the control bar&apos;s CC picker appears. .srt is converted to VTT automatically.
+                </span>
+              </label>
+              <p className="mt-3 border-t border-border/60 pt-3 text-xs text-muted-foreground">
+                The styled bar also includes a settings menu (playback speed + brightness/contrast/saturation/hue)
+                and a picture-in-picture button where supported.
+              </p>
             </>
           ) : (
             <p className="text-sm text-muted-foreground">

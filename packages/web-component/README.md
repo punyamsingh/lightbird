@@ -38,7 +38,7 @@ That is the whole API surface for a basic player. For HLS or MKV, just point
 | Attribute / property | Type | Description |
 |---|---|---|
 | `src` | `string` | Video URL. `.m3u8` → HLS, `.mkv` → MKV (via core), anything else → native. |
-| `controls` | `boolean` | Show LightBird's styled control bar (play/pause, scrubber, volume, time, speed, subtitles, fullscreen). |
+| `controls` | `boolean` | Show LightBird's styled control bar — play/pause, scrubber, volume, time, a subtitle (CC) track picker, picture-in-picture, a settings menu (playback-speed presets + brightness/contrast/saturation/hue), and fullscreen. |
 | `nativecontrols` | `boolean` | With `controls`, use the browser's built-in `<video>` controls instead of the styled bar. |
 | `autoplay` | `boolean` | Autoplay once ready (pair with `muted`). |
 | `muted` | `boolean` | Start muted. |
