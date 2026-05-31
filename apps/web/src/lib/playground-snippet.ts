@@ -9,8 +9,8 @@
  *  - `@lightbird/player-react` exports a zero-config `<LightBirdPlayer />`
  *    (its own upload UI, controls, playlist — no props).
  *  - `@lightbird/player` is the `<lightbird-player>` custom element, which
- *    accepts `src`, `controls`, `nativecontrols`, `autoplay`, `muted`, and
- *    `poster` attributes.
+ *    accepts `src`, `controls`, `nativecontrols`, `autoplay`, `muted`,
+ *    `poster`, and `subtitles` attributes.
  */
 
 export type PlaygroundTarget = "react" | "web-component";

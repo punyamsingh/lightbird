@@ -208,6 +208,17 @@ describe('control bar — settings menu', () => {
     (el.shadowRoot!.querySelector('.lb-settings') as HTMLButtonElement).click();
     expect(controls.dataset.show).toBe('1');
   });
+
+  it('advertises menu semantics and toggles aria-expanded on the trigger', () => {
+    const el = mount({ controls: '' });
+    const settingsBtn = el.shadowRoot!.querySelector('.lb-settings') as HTMLButtonElement;
+    expect(settingsBtn.getAttribute('aria-haspopup')).toBe('menu');
+    expect(settingsBtn.getAttribute('aria-expanded')).toBe('false');
+    settingsBtn.click();
+    expect(settingsBtn.getAttribute('aria-expanded')).toBe('true');
+    settingsBtn.click();
+    expect(settingsBtn.getAttribute('aria-expanded')).toBe('false');
+  });
 });
 
 describe('control bar — picture-in-picture', () => {

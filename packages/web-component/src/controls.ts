@@ -39,7 +39,13 @@ export const CONTROL_STYLES = `
     pointer-events: none;
   }
   :host(:hover) .lb-controls,
+  :host(:focus-within) .lb-controls,
   .lb-controls[data-show="1"] { opacity: 1; pointer-events: auto; }
+
+  /* Touch / coarse-pointer devices have no hover — keep the bar reachable. */
+  @media (hover: none), (pointer: coarse) {
+    .lb-controls { opacity: 1; pointer-events: auto; }
+  }
 
   .lb-row { display: flex; align-items: center; gap: 8px; }
   .lb-spacer { flex: 1; }
@@ -276,9 +282,14 @@ export function createControlBar(video: HTMLVideoElement, host: HTMLElement): Co
 
   const ccBtn = makeButton('lb-cc', 'Subtitles', ICONS.cc);
   ccBtn.hidden = true;
+  // These two buttons open pop-up menus — advertise that to assistive tech.
+  ccBtn.setAttribute('aria-haspopup', 'menu');
+  ccBtn.setAttribute('aria-expanded', 'false');
   const pipBtn = makeButton('lb-pip', 'Picture in picture', ICONS.pip);
   pipBtn.hidden = !pipSupported(video);
   const settingsBtn = makeButton('lb-settings', 'Settings', ICONS.settings);
+  settingsBtn.setAttribute('aria-haspopup', 'menu');
+  settingsBtn.setAttribute('aria-expanded', 'false');
   const fsBtn = makeButton('lb-fs', 'Fullscreen', ICONS.enterFs);
 
   row.append(playBtn, muteBtn, volume, time, spacer, ccBtn, pipBtn, settingsBtn, fsBtn);
@@ -315,16 +326,24 @@ export function createControlBar(video: HTMLVideoElement, host: HTMLElement): Co
     root.dataset.show = video.paused || anyMenuOpen() ? '1' : '0';
   };
 
+  // Keep each trigger's aria-expanded in step with its menu's open state.
+  const syncMenuAria = (): void => {
+    for (let i = 0; i < menus.length; i++) {
+      triggers[i].setAttribute('aria-expanded', String(menus[i].dataset.open === '1'));
+    }
+  };
   const closeMenus = (except?: HTMLElement): void => {
     for (const m of menus) {
       if (m !== except) m.dataset.open = '0';
     }
+    syncMenuAria();
     refreshShow();
   };
   const toggleMenu = (menu: HTMLElement): void => {
     const open = menu.dataset.open === '1';
     closeMenus(menu);
     menu.dataset.open = open ? '0' : '1';
+    syncMenuAria();
     refreshShow();
   };
 
