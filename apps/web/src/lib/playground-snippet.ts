@@ -28,6 +28,8 @@ export interface PlaygroundConfig {
   autoPlay: boolean;
   /** Start muted (Web Component). */
   muted: boolean;
+  /** Optional subtitle track URL (.vtt/.srt) for the Web Component. */
+  subtitleUrl?: string;
 }
 
 export interface GeneratedSnippet {
@@ -51,6 +53,7 @@ export function defaultPlaygroundConfig(): PlaygroundConfig {
     nativeControls: false,
     autoPlay: false,
     muted: false,
+    subtitleUrl: undefined,
   };
 }
 
@@ -92,6 +95,11 @@ function generateWebComponent(config: PlaygroundConfig): GeneratedSnippet {
   if (config.controls && config.nativeControls) attrs.push("nativecontrols");
   if (config.autoPlay) attrs.push("autoplay");
   if (config.muted) attrs.push("muted");
+  if (config.subtitleUrl) {
+    // The `subtitles` attribute takes a JSON array of track descriptors.
+    const tracks = JSON.stringify([{ src: config.subtitleUrl, label: "Subtitles", srclang: "en" }]);
+    attrs.push(`subtitles='${tracks}'`);
+  }
 
   const indented = attrs.map((a) => `  ${a}`).join("\n");
 
