@@ -1,6 +1,6 @@
 {
   "name": "@lightbird/core",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Client-side video player engine. Plays MKV, MP4, WebM with full subtitle, audio track, and chapter support. No server required.",
   "license": "MIT",
   "author": "Punyam Singh",
