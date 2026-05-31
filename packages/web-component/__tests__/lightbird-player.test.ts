@@ -61,26 +61,29 @@ describe('shadow DOM', () => {
 });
 
 describe('media attributes', () => {
-  it('reflects controls / autoplay / muted / poster onto the internal video', () => {
+  it('reflects autoplay / muted / poster onto the internal video', () => {
     const el = mount({
-      controls: '',
       autoplay: '',
       muted: '',
       poster: 'cover.jpg',
     });
     const video = el.mediaElement;
-    expect(video.controls).toBe(true);
     expect(video.autoplay).toBe(true);
     expect(video.muted).toBe(true);
     expect(video.poster).toContain('cover.jpg');
   });
 
-  it('updates the video when an attribute changes after connection', () => {
-    const el = mount();
+  it('uses the styled bar for `controls` and keeps native video controls off', () => {
+    const el = mount({ controls: '' });
+    // The styled bar is mounted; the native <video> controls stay disabled.
     expect(el.mediaElement.controls).toBe(false);
-    el.controls = true;
-    expect(el.hasAttribute('controls')).toBe(true);
+    expect(el.shadowRoot!.querySelector('.lb-controls')).not.toBeNull();
+  });
+
+  it('uses native video controls when `nativecontrols` is also set', () => {
+    const el = mount({ controls: '', nativecontrols: '' });
     expect(el.mediaElement.controls).toBe(true);
+    expect(el.shadowRoot!.querySelector('.lb-controls')).toBeNull();
   });
 
   it('keeps the muted property in sync with the internal video', () => {
@@ -89,6 +92,75 @@ describe('media attributes', () => {
     expect(el.muted).toBe(true);
     expect(el.mediaElement.muted).toBe(true);
     expect(el.hasAttribute('muted')).toBe(true);
+  });
+});
+
+describe('styled control bar', () => {
+  it('is absent until controls are enabled', () => {
+    const el = mount();
+    expect(el.shadowRoot!.querySelector('.lb-controls')).toBeNull();
+  });
+
+  it('mounts when `controls` is toggled on after connection', () => {
+    const el = mount();
+    el.controls = true;
+    expect(el.shadowRoot!.querySelector('.lb-controls')).not.toBeNull();
+  });
+
+  it('unmounts when `controls` is toggled back off', () => {
+    const el = mount({ controls: '' });
+    expect(el.shadowRoot!.querySelector('.lb-controls')).not.toBeNull();
+    el.controls = false;
+    expect(el.shadowRoot!.querySelector('.lb-controls')).toBeNull();
+  });
+
+  it('swaps to native controls when `nativecontrols` is toggled on', () => {
+    const el = mount({ controls: '' });
+    expect(el.shadowRoot!.querySelector('.lb-controls')).not.toBeNull();
+    el.nativeControls = true;
+    expect(el.shadowRoot!.querySelector('.lb-controls')).toBeNull();
+    expect(el.mediaElement.controls).toBe(true);
+  });
+
+  it('renders play, mute, speed and fullscreen affordances', () => {
+    const el = mount({ controls: '' });
+    const root = el.shadowRoot!;
+    expect(root.querySelector('.lb-play')).not.toBeNull();
+    expect(root.querySelector('.lb-mute')).not.toBeNull();
+    expect(root.querySelector('.lb-seek')).not.toBeNull();
+    expect(root.querySelector('.lb-speed')).not.toBeNull();
+    expect(root.querySelector('.lb-fs')).not.toBeNull();
+  });
+
+  it('toggles play/pause when the play button is clicked', () => {
+    const el = mount({ controls: '' });
+    const playBtn = el.shadowRoot!.querySelector('.lb-play') as HTMLButtonElement;
+    playBtn.click();
+    expect(el.mediaElement.play).toHaveBeenCalled();
+  });
+
+  it('cycles playback speed on the speed button', () => {
+    const el = mount({ controls: '' });
+    const speedBtn = el.shadowRoot!.querySelector('.lb-speed') as HTMLButtonElement;
+    expect(el.mediaElement.playbackRate).toBe(1);
+    speedBtn.click();
+    expect(el.mediaElement.playbackRate).toBe(1.25);
+  });
+
+  it('hides the CC toggle when the media has no text tracks', () => {
+    // jsdom does not populate video.textTracks from appended <track> elements,
+    // so we can only assert the no-tracks case here; the visible path is
+    // exercised in real browsers where textTracks reflects the DOM.
+    const el = mount({ controls: '' });
+    const cc = el.shadowRoot!.querySelector('.lb-cc') as HTMLButtonElement;
+    expect(cc.hidden).toBe(true);
+  });
+
+  it('removes the bar and its listeners on disconnect', () => {
+    const el = mount({ controls: '' });
+    expect(el.shadowRoot!.querySelector('.lb-controls')).not.toBeNull();
+    el.remove();
+    expect(el.shadowRoot!.querySelector('.lb-controls')).toBeNull();
   });
 });
 

@@ -1,5 +1,6 @@
 import type { VideoPlayer } from '@lightbird/core';
 import type { LightBirdEventDetail, SubtitleSource } from './types';
+import { createControlBar, CONTROL_STYLES, type ControlBar } from './controls';
 
 /** Native media events re-dispatched on the host as `CustomEvent`s. */
 const FORWARDED_EVENTS = [
@@ -33,7 +34,7 @@ const SHADOW_STYLES = `
     width: 100%;
     height: 100%;
   }
-`;
+${CONTROL_STYLES}`;
 
 /** Strips query string and hash, lower-cased, for extension matching. */
 function stripUrl(url: string): string {
@@ -85,11 +86,15 @@ export class LightBirdPlayerElement extends HTMLElementBase {
   static readonly tagName = 'lightbird-player';
 
   static get observedAttributes(): string[] {
-    return ['src', 'controls', 'autoplay', 'muted', 'poster', 'subtitles'];
+    return ['src', 'controls', 'nativecontrols', 'autoplay', 'muted', 'poster', 'subtitles'];
   }
 
+  private readonly shadow: ShadowRoot;
   private readonly video: HTMLVideoElement;
   private readonly forwardEvent: (event: Event) => void;
+
+  /** Our styled control bar; null when controls are off or native. */
+  private controlBar: ControlBar | null = null;
 
   private corePlayer: VideoPlayer | null = null;
   private subtitleSources: SubtitleSource[] = [];
@@ -101,6 +106,7 @@ export class LightBirdPlayerElement extends HTMLElementBase {
   constructor() {
     super();
     const root = this.attachShadow({ mode: 'open' });
+    this.shadow = root;
 
     const style = document.createElement('style');
     style.textContent = SHADOW_STYLES;
@@ -132,6 +138,7 @@ export class LightBirdPlayerElement extends HTMLElementBase {
     }
 
     this.syncMediaAttributes();
+    this.syncControlBar();
     this.renderSubtitleTracks();
     this.loadSource();
   }
@@ -145,6 +152,7 @@ export class LightBirdPlayerElement extends HTMLElementBase {
       this.video.removeEventListener(type, this.forwardEvent);
     }
 
+    this.teardownControlBar();
     this.teardownCorePlayer();
     this.revokeSubtitleUrls();
   }
@@ -159,6 +167,11 @@ export class LightBirdPlayerElement extends HTMLElementBase {
       case 'subtitles':
         this.subtitleSources = parseSubtitlesAttribute(newValue);
         this.renderSubtitleTracks();
+        break;
+      case 'controls':
+      case 'nativecontrols':
+        this.syncMediaAttributes();
+        this.syncControlBar();
         break;
       default:
         this.syncMediaAttributes();
@@ -180,6 +193,17 @@ export class LightBirdPlayerElement extends HTMLElementBase {
   }
   set controls(value: boolean) {
     this.toggleAttribute('controls', !!value);
+  }
+
+  /**
+   * When set alongside `controls`, the browser's built-in `<video>` controls
+   * are used instead of LightBird's styled bar.
+   */
+  get nativeControls(): boolean {
+    return this.hasAttribute('nativecontrols');
+  }
+  set nativeControls(value: boolean) {
+    this.toggleAttribute('nativecontrols', !!value);
   }
 
   get autoplay(): boolean {
@@ -276,13 +300,33 @@ export class LightBirdPlayerElement extends HTMLElementBase {
   }
 
   private syncMediaAttributes(): void {
-    this.video.controls = this.hasAttribute('controls');
+    // Native `<video>` controls appear only when the caller opts in via
+    // `nativecontrols`; otherwise LightBird renders its own styled bar.
+    this.video.controls = this.hasAttribute('controls') && this.hasAttribute('nativecontrols');
     this.video.autoplay = this.hasAttribute('autoplay');
     this.video.muted = this.hasAttribute('muted');
 
     const poster = this.getAttribute('poster');
     if (poster) this.video.poster = poster;
     else this.video.removeAttribute('poster');
+  }
+
+  /** Mount or unmount the styled control bar to match the current attributes. */
+  private syncControlBar(): void {
+    const wantBar = this.hasAttribute('controls') && !this.hasAttribute('nativecontrols');
+    if (wantBar && !this.controlBar) {
+      this.controlBar = createControlBar(this.video, this);
+      this.shadow.appendChild(this.controlBar.element);
+    } else if (!wantBar && this.controlBar) {
+      this.teardownControlBar();
+    } else if (this.controlBar) {
+      this.controlBar.update();
+    }
+  }
+
+  private teardownControlBar(): void {
+    this.controlBar?.destroy();
+    this.controlBar = null;
   }
 
   private loadSource(): void {
@@ -362,6 +406,9 @@ export class LightBirdPlayerElement extends HTMLElementBase {
 
       this.video.appendChild(track);
     }
+
+    // Let the styled bar show/hide its CC toggle for the new track set.
+    this.controlBar?.update();
   }
 
   /** Fetches an SRT file, converts it to VTT via core, attaches a blob URL. */
