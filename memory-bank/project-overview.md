@@ -64,6 +64,7 @@ apps/web/src/app/page.tsx
 | `use-media-session.ts` | MediaSession API: metadata, hardware key handlers |
 | `use-picture-in-picture.ts` | PiP enter/exit/toggle/detect |
 | `use-video-info.ts` | Video metadata extraction |
+| `use-hls-quality.ts` | HLS quality-level list + active level + switch (Auto/ABR or pinned rendition) |
 | `use-chapters.ts` | Chapter navigation from MKV metadata |
 | `use-magnet.ts` | Magnet link → torrent metadata → playlist items |
 | `use-seek-preview.ts` | Seek-bar hover thumbnail previews via an offscreen video |
@@ -148,7 +149,7 @@ The base `@lightbird/core` entry must stay FFmpeg-free and lean:
 | MS | Media Session API | **DONE** |
 | PIP | Picture-in-Picture | **DONE** |
 | CH | Chapters & Cue Points | **DONE** |
-| HLS | HLS/DASH Adaptive Streaming | In progress ([#48](https://github.com/punyamsingh/lightbird/issues/48)) — HLS-01 `HLSPlayer` **DONE**, HLS-03 stream info enrichment **DONE**, HLS-02 quality selector pending |
+| HLS | HLS/DASH Adaptive Streaming | In progress ([#48](https://github.com/punyamsingh/lightbird/issues/48)) — HLS-01 `HLSPlayer` **DONE**, HLS-02 quality selector **DONE**, HLS-03 stream info enrichment **DONE**; DASH pending |
 
 ---
 

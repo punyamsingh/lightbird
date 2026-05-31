@@ -1,6 +1,6 @@
 "use client";
 import React, { useMemo, useState, type RefObject } from "react";
-import type { Subtitle, VideoFilters, AudioTrack, Chapter } from "@lightbird/core";
+import type { Subtitle, VideoFilters, AudioTrack, Chapter, QualityLevel } from "@lightbird/core";
 import { Slider } from "./primitives/slider";
 import { Button } from "./primitives/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./primitives/popover";
@@ -10,7 +10,7 @@ import { SeekBar } from "./seek-bar";
 import {
   Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward,
   Settings2, Subtitles, Camera, AudioLines, Plus, X,
-  Info, Keyboard, List, PictureInPicture2, Loader2
+  Info, Keyboard, List, PictureInPicture2, Loader2, Gauge
 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "./primitives/radio-group";
 import { cn } from "./utils/cn";
@@ -32,6 +32,11 @@ interface PlayerControlsProps {
   activeAudioTrack: string;
   chapters?: Chapter[];
   currentChapter?: Chapter | null;
+  /** HLS renditions; the quality selector is hidden unless there are 2+. */
+  qualityLevels?: QualityLevel[];
+  /** Active HLS level index, or -1 for automatic (ABR) selection. */
+  currentQualityLevel?: number;
+  onSetQualityLevel?: (idx: number) => void;
   onPlayPause: () => void;
   onSeek: (value: number) => void;
   onVolumeChange: (value: number) => void;
@@ -73,10 +78,17 @@ const formatTime = (time: number) => {
   return timeString.startsWith("00:") ? timeString.substr(3) : timeString;
 };
 
+const formatBitrate = (bitsPerSecond: number) => {
+  const mbps = bitsPerSecond / 1_000_000;
+  const rounded = mbps >= 10 ? Math.round(mbps) : Math.round(mbps * 10) / 10;
+  return `${rounded} Mbps`;
+};
+
 export const PlayerControls = React.memo(function PlayerControls({
   isPlaying, progress, duration, volume, isMuted, playbackRate, loop, isFullScreen,
   filters, zoom, subtitles, activeSubtitle, audioTracks, activeAudioTrack,
   chapters = [], currentChapter = null,
+  qualityLevels = [], currentQualityLevel = -1, onSetQualityLevel,
   onPlayPause, onSeek, onVolumeChange, onMuteToggle, onPlaybackRateChange, onLoopToggle,
   onFullScreenToggle, onFrameStep, onScreenshot, onNext, onPrevious, onFiltersChange,
   onZoomChange, onSubtitleChange, onAudioTrackChange, tracksLoading = false,
@@ -177,6 +189,41 @@ export const PlayerControls = React.memo(function PlayerControls({
                         <div key={track.id} className="flex items-center space-x-2">
                           <RadioGroupItem value={track.id} id={`audio-${track.id}`} />
                           <Label htmlFor={`audio-${track.id}`}>{track.name}</Label>
+                        </div>
+                      ))}
+                    </RadioGroup>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+            {qualityLevels.length > 1 && (
+              <Popover>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <PopoverTrigger asChild>
+                      <Button variant="ghost" size="icon" aria-label="Quality">
+                        <Gauge />
+                      </Button>
+                    </PopoverTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent><p>Quality</p></TooltipContent>
+                </Tooltip>
+                <PopoverContent className="w-48">
+                  <div className="max-h-48 overflow-y-auto overscroll-contain pr-1">
+                    <RadioGroup
+                      value={String(currentQualityLevel)}
+                      onValueChange={(val) => onSetQualityLevel?.(Number(val))}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="-1" id="quality-auto" />
+                        <Label htmlFor="quality-auto">Auto</Label>
+                      </div>
+                      {qualityLevels.map((level) => (
+                        <div key={level.index} className="flex items-center space-x-2">
+                          <RadioGroupItem value={String(level.index)} id={`quality-${level.index}`} />
+                          <Label htmlFor={`quality-${level.index}`}>
+                            {level.name} · {formatBitrate(level.bitrate)}
+                          </Label>
                         </div>
                       ))}
                     </RadioGroup>

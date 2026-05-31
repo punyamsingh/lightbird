@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import PlayerControls from '../src/player-controls';
-import type { VideoFilters, Chapter } from '@lightbird/core';
+import type { VideoFilters, Chapter, QualityLevel } from '@lightbird/core';
 
 const defaultFilters: VideoFilters = {
   brightness: 100,
@@ -332,4 +332,85 @@ describe('PlayerControls — A-B loop', () => {
     expect(screen.getByTestId('ab-loop-region')).toHaveStyle({ left: '25%', width: '50%' });
   });
 
+});
+
+const mockQualityLevels: QualityLevel[] = [
+  { index: 0, height: 1080, bitrate: 8_000_000, name: '1080p' },
+  { index: 1, height: 720, bitrate: 4_000_000, name: '720p' },
+];
+
+describe('PlayerControls — quality selector', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('does not render the quality button when there are no levels', () => {
+    render(<PlayerControls {...defaultProps} qualityLevels={[]} onSetQualityLevel={jest.fn()} />);
+    expect(screen.queryByRole('button', { name: /quality/i })).not.toBeInTheDocument();
+  });
+
+  it('does not render the quality button when there is only one level', () => {
+    render(
+      <PlayerControls
+        {...defaultProps}
+        qualityLevels={[mockQualityLevels[0]]}
+        onSetQualityLevel={jest.fn()}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /quality/i })).not.toBeInTheDocument();
+  });
+
+  it('renders the quality button when there are multiple levels', () => {
+    render(
+      <PlayerControls
+        {...defaultProps}
+        qualityLevels={mockQualityLevels}
+        onSetQualityLevel={jest.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /quality/i })).toBeInTheDocument();
+  });
+
+  it('shows Auto plus one option per level when opened', () => {
+    render(
+      <PlayerControls
+        {...defaultProps}
+        qualityLevels={mockQualityLevels}
+        onSetQualityLevel={jest.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /quality/i }));
+    expect(screen.getByText('Auto')).toBeInTheDocument();
+    expect(screen.getByText('1080p · 8 Mbps')).toBeInTheDocument();
+    expect(screen.getByText('720p · 4 Mbps')).toBeInTheDocument();
+  });
+
+  it('calls onSetQualityLevel with the selected level index', () => {
+    const onSetQualityLevel = jest.fn();
+    render(
+      <PlayerControls
+        {...defaultProps}
+        qualityLevels={mockQualityLevels}
+        onSetQualityLevel={onSetQualityLevel}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /quality/i }));
+    fireEvent.click(screen.getByText('720p · 4 Mbps'));
+    expect(onSetQualityLevel).toHaveBeenCalledWith(1);
+  });
+
+  it('calls onSetQualityLevel with -1 when Auto is selected', () => {
+    const onSetQualityLevel = jest.fn();
+    render(
+      <PlayerControls
+        {...defaultProps}
+        qualityLevels={mockQualityLevels}
+        currentQualityLevel={0}
+        onSetQualityLevel={onSetQualityLevel}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /quality/i }));
+    fireEvent.click(screen.getByText('Auto'));
+    expect(onSetQualityLevel).toHaveBeenCalledWith(-1);
+  });
 });

@@ -27,6 +27,7 @@ import {
   useSeekPreview,
   useABLoop,
   useTouchGestures,
+  useHlsQuality,
 } from "@lightbird/core/react";
 import { captureVideoThumbnail, exportVideoFrame, downloadDataUrl, frameExportFilename, parseMediaError, validateFile, type ParsedMediaError, loadShortcuts, type ShortcutBinding, ProgressEstimator, hasAcceptedDisclaimer, acceptDisclaimer, FLAG_MAGNET_LINK } from "@lightbird/core";
 import { useBooleanFlagValue } from "@openfeature/react-sdk";
@@ -81,6 +82,7 @@ const LightBirdPlayer = () => {
       filters.setFilters({ ...filters.filters, brightness: Math.round(v * 200) }),
   });
   const { metadata: videoMetadata, enrichMetadata } = useVideoInfo(videoRef, playlist.currentItem?.file ?? null);
+  const { qualityLevels, currentLevel: currentQualityLevel, setLevel: setQualityLevel } = useHlsQuality(playerRef);
   useProgressPersistence(videoRef, playlist.currentItem?.name ?? null);
   const { chapters, currentChapter, goToChapter } = useChapters(videoRef, playerRef);
   // Default to enabled: the feature shows unless Unleash explicitly turns it off.
@@ -769,6 +771,9 @@ const LightBirdPlayer = () => {
             activeSubtitle={subtitles.activeSubtitle}
             audioTracks={audioTracks}
             activeAudioTrack={activeAudioTrack}
+            qualityLevels={qualityLevels}
+            currentQualityLevel={currentQualityLevel}
+            onSetQualityLevel={setQualityLevel}
             tracksLoading={tracksLoading}
             onPlayPause={playback.togglePlay}
             onSeek={playback.seek}
