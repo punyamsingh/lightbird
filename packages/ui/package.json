@@ -1,5 +1,5 @@
 {
-  "name": "@lightbird/ui",
+  "name": "@lightbird/player-react",
   "version": "0.10.0",
   "description": "Drop-in React video player component powered by LightBird. Full controls, playlist, subtitles, chapters — one import.",
   "license": "MIT",

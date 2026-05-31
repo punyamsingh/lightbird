@@ -30,11 +30,11 @@ const { isPlaying, togglePlay, seek } = useVideoPlayback(videoRef)
 ### Full UI Component
 
 ```bash
-npm install @lightbird/core @lightbird/ui
+npm install @lightbird/core @lightbird/player-react
 ```
 
 ```tsx
-import { LightBirdPlayer } from '@lightbird/ui'
+import { LightBirdPlayer } from '@lightbird/player-react'
 
 <LightBirdPlayer />
 ```

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>&lt;lightbird-player&gt; — plain HTML</title>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; }
+      lightbird-player { width: 100%; aspect-ratio: 16 / 9; }
+      lightbird-player::part(video) { border-radius: 12px; }
+      #log { font-family: monospace; font-size: 12px; color: #555; }
+    </style>
+
+    <!--
+      Resolve the bare package specifiers. Build the monorepo first
+      (`pnpm build`) so these dist files exist, or point them at a CDN.
+    -->
+    <script type="importmap">
+      {
+        "imports": {
+          "@lightbird/player": "../dist/index.js",
+          "@lightbird/core": "../../lightbird/dist/index.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <h1>&lt;lightbird-player&gt;</h1>
+
+    <lightbird-player
+      src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+      controls
+      poster="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/images/BigBuckBunny.jpg"
+    ></lightbird-player>
+
+    <p id="log">Waiting for events…</p>
+
+    <script type="module">
+      // Importing the package registers the <lightbird-player> element.
+      import '@lightbird/player';
+
+      const player = document.querySelector('lightbird-player');
+      const log = document.getElementById('log');
+
+      for (const type of ['play', 'pause', 'ended', 'error']) {
+        player.addEventListener(type, (e) => {
+          log.textContent = `${type} @ ${e.detail.currentTime.toFixed(1)}s`;
+        });
+      }
+    </script>
+  </body>
+</html>

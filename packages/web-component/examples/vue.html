@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>&lt;lightbird-player&gt; — Vue 3</title>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; }
+      lightbird-player { width: 100%; aspect-ratio: 16 / 9; }
+    </style>
+
+    <!-- Build the monorepo first (`pnpm build`) so these dist files exist. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "vue": "https://unpkg.com/vue@3/dist/vue.esm-browser.js",
+          "@lightbird/player": "../dist/index.js",
+          "@lightbird/core": "../../lightbird/dist/index.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="module">
+      import { createApp } from 'vue';
+      // Registers the <lightbird-player> custom element.
+      import '@lightbird/player';
+
+      const App = {
+        template: `
+          <h1>Vue 3 + &lt;lightbird-player&gt;</h1>
+          <lightbird-player
+            :src="src"
+            controls
+            @timeupdate="onTimeUpdate"
+          ></lightbird-player>
+          <p>Current time: {{ time.toFixed(1) }}s</p>
+        `,
+        data() {
+          return {
+            src: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+            time: 0,
+          };
+        },
+        methods: {
+          onTimeUpdate(event) {
+            this.time = event.detail.currentTime;
+          },
+        },
+      };
+
+      const app = createApp(App);
+      // Tell Vue not to treat <lightbird-player> as a Vue component.
+      app.config.compilerOptions.isCustomElement = (tag) => tag === 'lightbird-player';
+      app.mount('#app');
+    </script>
+  </body>
+</html>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LightBirdPlayer, PlayerErrorBoundary } from "@lightbird/ui";
+import { LightBirdPlayer, PlayerErrorBoundary } from "@lightbird/player-react";
 
 export default function Home() {
   return (

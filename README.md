@@ -15,6 +15,29 @@ LightBird is a modern, lightweight, and feature-rich video player built with Nex
 - **Screenshot Capture**: One-click frame capture
 - **Keyboard Shortcuts**: Full keyboard control support
 
+## Use It Anywhere — Web Component
+
+LightBird ships a framework-agnostic `<lightbird-player>` custom element
+([`@lightbird/player`](packages/web-component)). It works in Vue, Svelte, Angular,
+Solid, or plain HTML — no React required.
+
+```bash
+npm install @lightbird/player
+```
+
+```html
+<script type="module">
+  import '@lightbird/player';
+</script>
+
+<lightbird-player src="video.mp4" controls poster="cover.jpg"></lightbird-player>
+```
+
+MP4/WebM play natively; `.m3u8` (HLS) and `.mkv` sources lazy-load the core
+engine — and FFmpeg.wasm, for MKV — only when first encountered. See
+[`packages/web-component`](packages/web-component) for attributes, events, and
+Vue/Svelte examples.
+
 ## Tech Stack
 
 - **Framework**: [Next.js](https://nextjs.org/) (with React)
