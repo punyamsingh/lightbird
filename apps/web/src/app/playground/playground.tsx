@@ -129,14 +129,6 @@ function WebComponentPreview({ config }: { config: PlaygroundConfig }) {
     };
   }, []);
 
-  if (loadError) {
-    return (
-      <div className="flex aspect-video w-full items-center justify-center rounded-xl border border-border bg-muted/30 text-sm text-muted-foreground">
-        Couldn&apos;t load the preview. Check your connection and refresh.
-      </div>
-    );
-  }
-
   useEffect(() => {
     const el = elRef.current;
     if (!el) return;
@@ -148,6 +140,15 @@ function WebComponentPreview({ config }: { config: PlaygroundConfig }) {
     if (config.poster) el.setAttribute("poster", config.poster);
     else el.removeAttribute("poster");
   }, [ready, config]);
+
+  // Early return must come after all hooks so hook order stays stable.
+  if (loadError) {
+    return (
+      <div className="flex aspect-video w-full items-center justify-center rounded-xl border border-border bg-muted/30 text-sm text-muted-foreground">
+        Couldn&apos;t load the preview. Check your connection and refresh.
+      </div>
+    );
+  }
 
   return <div ref={hostRef} />;
 }
