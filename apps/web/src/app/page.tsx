@@ -8,6 +8,12 @@ export default function Home() {
         <h1 className="text-xl font-headline font-black tracking-widest" style={{color: 'hsl(var(--accent))'}}>LIGHTBIRD</h1>
         <nav className="flex items-center gap-5">
           <Link
+            href="/playground"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Playground
+          </Link>
+          <Link
             href="/docs"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
