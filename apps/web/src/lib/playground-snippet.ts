@@ -9,7 +9,8 @@
  *  - `@lightbird/player-react` exports a zero-config `<LightBirdPlayer />`
  *    (its own upload UI, controls, playlist — no props).
  *  - `@lightbird/player` is the `<lightbird-player>` custom element, which
- *    accepts `src`, `controls`, `autoplay`, `muted`, and `poster` attributes.
+ *    accepts `src`, `controls`, `nativecontrols`, `autoplay`, `muted`, and
+ *    `poster` attributes.
  */
 
 export type PlaygroundTarget = "react" | "web-component";
@@ -19,8 +20,10 @@ export interface PlaygroundConfig {
   src: string;
   /** Poster image URL. */
   poster?: string;
-  /** Show native controls (Web Component). */
+  /** Show the LightBird control bar (Web Component). */
   controls: boolean;
+  /** Use the browser's native controls instead of the styled bar (Web Component). */
+  nativeControls: boolean;
   /** Auto-play on load (Web Component). */
   autoPlay: boolean;
   /** Start muted (Web Component). */
@@ -45,6 +48,7 @@ export function defaultPlaygroundConfig(): PlaygroundConfig {
     src: "https://your-cdn.example.com/video.mp4",
     poster: undefined,
     controls: true,
+    nativeControls: false,
     autoPlay: false,
     muted: false,
   };
@@ -84,6 +88,8 @@ function generateWebComponent(config: PlaygroundConfig): GeneratedSnippet {
 
   if (config.poster) attrs.push(`poster="${escapeAttr(config.poster)}"`);
   if (config.controls) attrs.push("controls");
+  // `nativecontrols` only has meaning alongside `controls`.
+  if (config.controls && config.nativeControls) attrs.push("nativecontrols");
   if (config.autoPlay) attrs.push("autoplay");
   if (config.muted) attrs.push("muted");
 

@@ -38,7 +38,8 @@ That is the whole API surface for a basic player. For HLS or MKV, just point
 | Attribute / property | Type | Description |
 |---|---|---|
 | `src` | `string` | Video URL. `.m3u8` → HLS, `.mkv` → MKV (via core), anything else → native. |
-| `controls` | `boolean` | Show native playback controls. |
+| `controls` | `boolean` | Show LightBird's styled control bar (play/pause, scrubber, volume, time, speed, subtitles, fullscreen). |
+| `nativecontrols` | `boolean` | With `controls`, use the browser's built-in `<video>` controls instead of the styled bar. |
 | `autoplay` | `boolean` | Autoplay once ready (pair with `muted`). |
 | `muted` | `boolean` | Start muted. |
 | `poster` | `string` | Poster image shown before playback. |
@@ -46,6 +47,14 @@ That is the whole API surface for a basic player. For HLS or MKV, just point
 
 `SubtitleSource` is `{ src, label?, srclang?, default? }`. `.vtt` files are
 used directly; `.srt` files are converted to VTT automatically.
+
+The styled control bar is themeable via the `--lb-accent` CSS custom property
+and exposes a `controls` CSS part, e.g.:
+
+```css
+lightbird-player { --lb-accent: #e91e63; }
+lightbird-player::part(controls) { padding-bottom: 16px; }
+```
 
 Read-only / live properties: `duration`, `paused`, `ended`. Read-write:
 `currentTime`, `volume`, `playbackRate`. `mediaElement` exposes the underlying

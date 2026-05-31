@@ -135,6 +135,7 @@ function WebComponentPreview({ config }: { config: PlaygroundConfig }) {
     if (config.src) el.setAttribute("src", config.src);
     else el.removeAttribute("src");
     el.toggleAttribute("controls", config.controls);
+    el.toggleAttribute("nativecontrols", config.controls && config.nativeControls);
     el.toggleAttribute("autoplay", config.autoPlay);
     el.toggleAttribute("muted", config.muted);
     if (config.poster) el.setAttribute("poster", config.poster);
@@ -162,6 +163,7 @@ export function Playground() {
   const objectUrlRef = useRef<string | null>(null);
 
   const [controls, setControls] = useState(true);
+  const [nativeControls, setNativeControls] = useState(false);
   const [autoPlay, setAutoPlay] = useState(false);
   const [muted, setMuted] = useState(false);
   const [poster, setPoster] = useState("");
@@ -196,10 +198,11 @@ export function Playground() {
       src: snippetSrc,
       poster: poster.trim() || undefined,
       controls,
+      nativeControls,
       autoPlay,
       muted,
     }),
-    [snippetSrc, poster, controls, autoPlay, muted],
+    [snippetSrc, poster, controls, nativeControls, autoPlay, muted],
   );
 
   // The live preview needs the real (possibly blob) src, not the snippet placeholder.
@@ -315,7 +318,15 @@ export function Playground() {
           {isWebComponent ? (
             <>
               <div className="divide-y divide-border/60">
-                <Toggle label="Native controls" hint="Browser playback controls" checked={controls} onChange={setControls} />
+                <Toggle label="Controls" hint="Show the LightBird control bar" checked={controls} onChange={setControls} />
+                {controls && (
+                  <Toggle
+                    label="Native controls"
+                    hint="Use the browser's built-in controls instead"
+                    checked={nativeControls}
+                    onChange={setNativeControls}
+                  />
+                )}
                 <Toggle label="Autoplay" hint="Start on load (pair with muted)" checked={autoPlay} onChange={setAutoPlay} />
                 <Toggle label="Muted" hint="Start without sound" checked={muted} onChange={setMuted} />
               </div>

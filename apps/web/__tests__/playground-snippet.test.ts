@@ -78,6 +78,27 @@ describe("generateSnippet — Web Component target", () => {
     expect(code).toContain('poster="https://x.test/p.jpg"');
   });
 
+  it("adds nativecontrols only when controls is also enabled", () => {
+    const both = generateSnippet(
+      makeConfig({ controls: true, nativeControls: true }),
+      "web-component",
+    ).code;
+    expect(both).toContain("nativecontrols");
+
+    // nativecontrols is meaningless without controls — it must be dropped.
+    const orphan = generateSnippet(
+      makeConfig({ controls: false, nativeControls: true }),
+      "web-component",
+    ).code;
+    expect(orphan).not.toContain("nativecontrols");
+
+    const styled = generateSnippet(
+      makeConfig({ controls: true, nativeControls: false }),
+      "web-component",
+    ).code;
+    expect(styled).not.toContain("nativecontrols");
+  });
+
   it("escapes double quotes in attribute values", () => {
     const { code } = generateSnippet(makeConfig({ src: 'a"b' }), "web-component");
     expect(code).toContain('src="a&quot;b"');
