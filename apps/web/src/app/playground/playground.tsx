@@ -100,29 +100,42 @@ function WebComponentPreview({ config }: { config: PlaygroundConfig }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const elRef = useRef<HTMLElement | null>(null);
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     // Registering the element is a one-time side effect of importing the package.
-    void import("@lightbird/player").then(() => {
-      if (cancelled || !hostRef.current || elRef.current) return;
-      const el = document.createElement("lightbird-player");
-      el.style.display = "block";
-      el.style.width = "100%";
-      el.style.aspectRatio = "16 / 9";
-      el.style.background = "#000";
-      el.style.borderRadius = "0.75rem";
-      el.style.overflow = "hidden";
-      hostRef.current.appendChild(el);
-      elRef.current = el;
-      setReady(true);
-    });
+    void import("@lightbird/player")
+      .then(() => {
+        if (cancelled || !hostRef.current || elRef.current) return;
+        const el = document.createElement("lightbird-player");
+        el.style.display = "block";
+        el.style.width = "100%";
+        el.style.aspectRatio = "16 / 9";
+        el.style.background = "#000";
+        el.style.borderRadius = "0.75rem";
+        el.style.overflow = "hidden";
+        hostRef.current.appendChild(el);
+        elRef.current = el;
+        setReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError(true);
+      });
     return () => {
       cancelled = true;
       elRef.current?.remove();
       elRef.current = null;
     };
   }, []);
+
+  if (loadError) {
+    return (
+      <div className="flex aspect-video w-full items-center justify-center rounded-xl border border-border bg-muted/30 text-sm text-muted-foreground">
+        Couldn&apos;t load the preview. Check your connection and refresh.
+      </div>
+    );
+  }
 
   useEffect(() => {
     const el = elRef.current;
@@ -264,7 +277,7 @@ export function Playground() {
             </div>
             <p className="text-xs text-muted-foreground">
               The React drop-in is self-configuring — it ships its own upload UI, controls,
-              subtitles, and playlist. Load a file above to try it, then copy the snippet.
+              subtitles, and playlist. Try it here, then copy the snippet.
             </p>
           </>
         )}
