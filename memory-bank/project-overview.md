@@ -149,7 +149,7 @@ The base `@lightbird/core` entry must stay FFmpeg-free and lean:
 | MS | Media Session API | **DONE** |
 | PIP | Picture-in-Picture | **DONE** |
 | CH | Chapters & Cue Points | **DONE** |
-| HLS | HLS/DASH Adaptive Streaming | In progress ([#48](https://github.com/punyamsingh/lightbird/issues/48)) — HLS-01 `HLSPlayer` **DONE**, HLS-03 stream info enrichment **DONE**, HLS-02 quality selector pending |
+| HLS | HLS/DASH Adaptive Streaming | In progress ([#48](https://github.com/punyamsingh/lightbird/issues/48)) — HLS-01 `HLSPlayer` **DONE**, HLS-02 quality selector **DONE**, HLS-03 stream info enrichment **DONE**; DASH pending |
 
 ---
 
