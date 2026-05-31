@@ -1,19 +1,18 @@
 # LightBird — Project Overview
 
-> **Last updated:** 2026-05-31
-> **Branch context:** Plans 01–12 implemented. Project is now a pnpm monorepo publishing three npm packages: `@lightbird/core` (core), `@lightbird/player-react` (React components), and `@lightbird/player` (framework-agnostic Web Component). Docs page refactored into a server component with client islands (issue #35). FFmpeg.wasm lazy loading is now guaranteed zero-cost for HTML5-native playback and protected by a CI bundle-size budget (issue #54). Player UX polish (issue #57) is now complete: seek-hover thumbnail previews, A-B loop, mobile touch gestures, and frame/screenshot export — the last extracted into a reusable, tested `exportVideoFrame()` core utility and wired into the player's Screenshot action with cross-origin-failure handling. Seek bar now glides at rAF rate via `useSmoothProgress`, with a dedicated `SeekBar` component extracted from `PlayerControls` and a polished hover/scrub treatment (issue #64). A framework-agnostic `<lightbird-player>` Web Component ships as `@lightbird/player` (issue #53).
+> **Last updated:** 2026-05-22
+> **Branch context:** Plans 01–12 implemented. Project is now a pnpm monorepo publishing two npm packages: `@lightbird/core` (core) and `@lightbird/ui` (React components). Docs page refactored into a server component with client islands (issue #35). FFmpeg.wasm lazy loading is now guaranteed zero-cost for HTML5-native playback and protected by a CI bundle-size budget (issue #54). Player UX polish added seek-hover thumbnail previews, A-B loop, and mobile touch gestures (issue #57).
 
 ---
 
 ## What is LightBird?
 
-LightBird is a modern, lightweight, browser-based video player built as a **pnpm + Turborepo monorepo**. It publishes three npm packages while keeping the web app at lightbird.vercel.app functional. Its core value proposition is playing a wide range of video formats directly in the browser without server-side transcoding, including MKV files via FFmpeg.wasm.
+LightBird is a modern, lightweight, browser-based video player built as a **pnpm + Turborepo monorepo**. It publishes two npm packages while keeping the web app at lightbird.vercel.app functional. Its core value proposition is playing a wide range of video formats directly in the browser without server-side transcoding, including MKV files via FFmpeg.wasm.
 
 **npm packages:**
 - `@lightbird/core` — Framework-agnostic core engine (players, parsers, subtitle pipeline, utilities, types)
 - `@lightbird/core/react` — React hooks (subpath export, same npm install)
-- `@lightbird/player-react` — Drop-in styled React components (Tailwind + Radix + Lucide)
-- `@lightbird/player` — Framework-agnostic `<lightbird-player>` Web Component (no React dependency)
+- `@lightbird/ui` — Drop-in styled React components (Tailwind + Radix + Lucide)
 
 ---
 
@@ -22,10 +21,9 @@ LightBird is a modern, lightweight, browser-based video player built as a **pnpm
 ### Monorepo Structure
 
 ```text
-apps/web/             — Next.js app (lightbird.vercel.app)
-packages/lightbird/      — Core library (npm: @lightbird/core)
-packages/ui/             — UI components (npm: @lightbird/player-react)
-packages/web-component/  — Web Component (npm: @lightbird/player)
+apps/web/          — Next.js app (lightbird.vercel.app)
+packages/lightbird/ — Core library (npm: @lightbird/core)
+packages/ui/        — UI components (npm: @lightbird/ui)
 ```
 
 ### Player System
@@ -33,8 +31,8 @@ packages/web-component/  — Web Component (npm: @lightbird/player)
 | Player | Handles | Implementation |
 |---|---|---|
 | `SimplePlayer` | MP4, WebM, AVI, MOV, WMV, FLV, OGV | Native HTML5 `<video>` element |
-| `MKVPlayer` | MKV | FFmpeg.wasm in Web Worker — probes, remuxes to MP4, extracts subtitles. Audio/subtitle tracks are labelled VLC-style: embedded track name verbatim, full language name (`getLanguageName` resolves ISO 639 → "English"), and a `[Forced]` marker, falling back to `Track N`. |
-| `HLSPlayer` | HLS `.m3u8` adaptive streams | `hls.js` (lazy dynamic import), or native HLS on Safari. Exposes `getMetadata()` (container/codec/bitrate/renditions/audio for the info panel) and `onMetadataChange()` (re-enrich on manifest/level/audio events). |
+| `MKVPlayer` | MKV | FFmpeg.wasm in Web Worker — probes, remuxes to MP4, extracts subtitles |
+| `HLSPlayer` | HLS `.m3u8` adaptive streams | `hls.js` (lazy dynamic import), or native HLS on Safari |
 
 The factory function `createVideoPlayer(source)` in `packages/lightbird/src/video-processor.ts` selects the right player. It accepts a `File` (MP4/MKV/etc., routed by format detection) or an HLS `.m3u8` URL string (routed to `HLSPlayer`); other URL strings throw.
 
@@ -42,8 +40,8 @@ The factory function `createVideoPlayer(source)` in `packages/lightbird/src/vide
 
 ```text
 apps/web/src/app/page.tsx
-└── @lightbird/player-react: PlayerErrorBoundary
-    └── @lightbird/player-react: LightBirdPlayer (coordinator)
+└── @lightbird/ui: PlayerErrorBoundary
+    └── @lightbird/ui: LightBirdPlayer (coordinator)
         ├── PlayerControls
         ├── PlaylistPanel
         ├── VideoOverlay
@@ -66,13 +64,11 @@ apps/web/src/app/page.tsx
 | `use-media-session.ts` | MediaSession API: metadata, hardware key handlers |
 | `use-picture-in-picture.ts` | PiP enter/exit/toggle/detect |
 | `use-video-info.ts` | Video metadata extraction |
-| `use-hls-quality.ts` | HLS quality-level list + active level + switch (Auto/ABR or pinned rendition) |
 | `use-chapters.ts` | Chapter navigation from MKV metadata |
 | `use-magnet.ts` | Magnet link → torrent metadata → playlist items |
 | `use-seek-preview.ts` | Seek-bar hover thumbnail previews via an offscreen video |
 | `use-ab-loop.ts` | A-B loop: repeat playback between two user-set points |
 | `use-touch-gestures.ts` | Mobile touch gestures: double-tap seek, swipe volume/brightness |
-| `use-smooth-progress.ts` | rAF-driven `currentTime` reader so the seek-bar thumb glides between coarse `timeupdate` events |
 
 ---
 
@@ -95,28 +91,29 @@ Magnet links are streamed in-browser via BitTorrent — no server required:
 - `feature-flags.ts` — initialises OpenFeature with the Unleash Web provider
   (`NEXT_PUBLIC_UNLEASH_URL` / `NEXT_PUBLIC_UNLEASH_CLIENT_KEY`). Missing
   credentials warn and fall back to flag defaults.
-- `feature-flags-provider.tsx` (`@lightbird/player-react`) — wraps the app so
+- `feature-flags-provider.tsx` (`@lightbird/ui`) — wraps the app so
   `useBooleanFlagValue` hooks resolve. The magnet UI is hidden when the flag
   is off.
 
-### Framework-Agnostic Web Component (`@lightbird/player`)
+### Interactive Playground (`/playground`, issue #55)
 
-`packages/web-component/` publishes the `<lightbird-player>` custom element,
-making LightBird usable in Vue, Svelte, Angular, Solid, or plain HTML with no
-React dependency:
+`apps/web/src/app/playground/` adds a client-side playground that drives library
+adoption — load a video, tweak options, copy a snippet:
 
-- `src/lightbird-player.ts` — the `LightBirdPlayerElement` class. Open Shadow
-  DOM wrapping one `<video>` (exposed via the `video` CSS part). Observed
-  attributes `src` / `controls` / `autoplay` / `muted` / `poster` /
-  `subtitles`, matching JS properties, and `play()` / `pause()` methods.
-- Re-dispatches native media events (`play`, `pause`, `timeupdate`, `error`,
-  …) as DOM `CustomEvent`s with a `detail` snapshot.
-- **Lazy core loading** — MP4/WebM play natively (zero core bytes). `.m3u8`
-  (HLS) and `.mkv` sources dynamically `import('@lightbird/core')`; MKV reaches
-  FFmpeg.wasm only through the core's existing lazy path. The built bundle is
-  ~3 KB gzipped with core kept external.
-- Importing the package auto-registers the element; `register(tagName?)` is
-  exported for explicit / custom-name registration.
+- `playground.tsx` — integration-target tabs (React / Web Component) plus a live
+  install + code panel with copy buttons. The **Web Component** tab drops/sample-
+  loads a video into a live `<lightbird-player>` (created imperatively once the
+  `@lightbird/player` package auto-registers) and toggles `controls` / `autoplay`
+  / `muted` / `poster` with immediate effect; local files preview via an object
+  URL while the snippet shows a CDN placeholder. The **React** tab renders the
+  zero-config `<LightBirdPlayer />` drop-in.
+- `src/lib/playground-snippet.ts` — pure, unit-tested snippet generator matching
+  the real APIs: the React drop-in takes no props; the Web Component emits only
+  its supported attributes. Tested in
+  `apps/web/__tests__/playground-snippet.test.ts`.
+- `apps/web` now carries its own ts-jest setup (`jest.config.ts` + jest devDeps)
+  so it joins `pnpm turbo test`. Linked from the landing-page header and the docs
+  hero.
 
 ---
 
@@ -127,14 +124,13 @@ Tests are per-package using ts-jest. Run with:
 ```bash
 pnpm turbo test         # all tests
 pnpm test --filter @lightbird/core  # core only
-pnpm test --filter @lightbird/player-react  # UI only
+pnpm test --filter @lightbird/ui  # UI only
 ```
 
 Test locations:
 - `packages/lightbird/__tests__/` — library tests (18 files)
 - `packages/lightbird/__tests__/react/` — hook tests (14 files)
 - `packages/ui/__tests__/` — component tests (5 files)
-- `packages/web-component/__tests__/` — Web Component tests (1 file)
 
 Shared setup: `jest.setup.ts` (root)
 
@@ -171,8 +167,8 @@ The base `@lightbird/core` entry must stay FFmpeg-free and lean:
 | MS | Media Session API | **DONE** |
 | PIP | Picture-in-Picture | **DONE** |
 | CH | Chapters & Cue Points | **DONE** |
-| HLS | HLS/DASH Adaptive Streaming | In progress ([#48](https://github.com/punyamsingh/lightbird/issues/48)) — HLS-01 `HLSPlayer` **DONE**, HLS-02 quality selector **DONE**, HLS-03 stream info enrichment **DONE**; DASH pending |
-| WC | Framework-Agnostic Web Component | **DONE** ([#53](https://github.com/punyamsingh/lightbird/issues/53)) |
+| HLS | HLS/DASH Adaptive Streaming | In progress ([#48](https://github.com/punyamsingh/lightbird/issues/48)) — HLS-01 `HLSPlayer` **DONE**, HLS-02/03 pending |
+| PG | Interactive Playground | **DONE** ([#55](https://github.com/punyamsingh/lightbird/issues/55)) |
 
 ---
 

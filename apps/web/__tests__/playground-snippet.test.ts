@@ -1,0 +1,85 @@
+import {
+  generateSnippet,
+  defaultPlaygroundConfig,
+  REACT_PACKAGE,
+  WEB_COMPONENT_PACKAGE,
+  type PlaygroundConfig,
+} from "../src/lib/playground-snippet";
+
+function makeConfig(overrides: Partial<PlaygroundConfig> = {}): PlaygroundConfig {
+  return { ...defaultPlaygroundConfig(), src: "https://x.test/v.mp4", ...overrides };
+}
+
+describe("generateSnippet — React target", () => {
+  it("emits install command and import for the React package", () => {
+    const { install, code, language } = generateSnippet(makeConfig(), "react");
+    expect(install).toBe(`npm install ${REACT_PACKAGE}`);
+    expect(code).toContain(`import { LightBirdPlayer, Toaster } from "${REACT_PACKAGE}";`);
+    expect(code).toContain(`import "${REACT_PACKAGE}/styles.css";`);
+    expect(language).toBe("tsx");
+  });
+
+  it("renders the zero-config drop-in component", () => {
+    const { code } = generateSnippet(makeConfig(), "react");
+    expect(code).toContain("<LightBirdPlayer />");
+  });
+
+  it("does not invent props that the drop-in does not accept", () => {
+    // The React component is self-configuring; toggles must not leak into JSX.
+    const { code } = generateSnippet(
+      makeConfig({ autoPlay: true, muted: true, controls: false, poster: "p.jpg" }),
+      "react",
+    );
+    expect(code).not.toContain("autoPlay");
+    expect(code).not.toContain("muted");
+    expect(code).not.toContain("poster");
+    expect(code).not.toContain("controls");
+  });
+});
+
+describe("generateSnippet — Web Component target", () => {
+  it("emits install command and module import for the web-component package", () => {
+    const { install, code, language } = generateSnippet(makeConfig(), "web-component");
+    expect(install).toBe(`npm install ${WEB_COMPONENT_PACKAGE}`);
+    expect(code).toContain(`import "${WEB_COMPONENT_PACKAGE}";`);
+    expect(code).toContain("<lightbird-player");
+    expect(code).toContain("></lightbird-player>");
+    expect(language).toBe("html");
+  });
+
+  it("always includes the src attribute", () => {
+    const { code } = generateSnippet(makeConfig({ src: "https://x.test/clip.mp4" }), "web-component");
+    expect(code).toContain('src="https://x.test/clip.mp4"');
+  });
+
+  it("includes only the enabled boolean attributes", () => {
+    const enabled = generateSnippet(
+      makeConfig({ controls: true, autoPlay: true, muted: true }),
+      "web-component",
+    ).code;
+    expect(enabled).toContain("controls");
+    expect(enabled).toContain("autoplay");
+    expect(enabled).toContain("muted");
+
+    const disabled = generateSnippet(
+      makeConfig({ controls: false, autoPlay: false, muted: false }),
+      "web-component",
+    ).code;
+    expect(disabled).not.toContain("autoplay");
+    expect(disabled).not.toContain("muted");
+    expect(disabled).not.toMatch(/\n\s*controls\n/);
+  });
+
+  it("includes the poster attribute when provided", () => {
+    const { code } = generateSnippet(
+      makeConfig({ poster: "https://x.test/p.jpg" }),
+      "web-component",
+    );
+    expect(code).toContain('poster="https://x.test/p.jpg"');
+  });
+
+  it("escapes double quotes in attribute values", () => {
+    const { code } = generateSnippet(makeConfig({ src: 'a"b' }), "web-component");
+    expect(code).toContain('src="a&quot;b"');
+  });
+});
