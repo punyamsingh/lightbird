@@ -1,18 +1,19 @@
 # LightBird — Project Overview
 
-> **Last updated:** 2026-05-22
-> **Branch context:** Plans 01–12 implemented. Project is now a pnpm monorepo publishing two npm packages: `@lightbird/core` (core) and `@lightbird/ui` (React components). Docs page refactored into a server component with client islands (issue #35). FFmpeg.wasm lazy loading is now guaranteed zero-cost for HTML5-native playback and protected by a CI bundle-size budget (issue #54). Player UX polish added seek-hover thumbnail previews, A-B loop, and mobile touch gestures (issue #57).
+> **Last updated:** 2026-05-31
+> **Branch context:** Plans 01–12 implemented. Project is now a pnpm monorepo publishing three npm packages: `@lightbird/core` (core), `@lightbird/player-react` (styled React components), and `@lightbird/player` (framework-agnostic Web Component). Docs page refactored into a server component with client islands (issue #35). FFmpeg.wasm lazy loading is now guaranteed zero-cost for HTML5-native playback and protected by a CI bundle-size budget (issue #54). Player UX polish added seek-hover thumbnail previews, A-B loop, and mobile touch gestures (issue #57).
 
 ---
 
 ## What is LightBird?
 
-LightBird is a modern, lightweight, browser-based video player built as a **pnpm + Turborepo monorepo**. It publishes two npm packages while keeping the web app at lightbird.vercel.app functional. Its core value proposition is playing a wide range of video formats directly in the browser without server-side transcoding, including MKV files via FFmpeg.wasm.
+LightBird is a modern, lightweight, browser-based video player built as a **pnpm + Turborepo monorepo**. It publishes three npm packages while keeping the web app at lightbird.vercel.app functional. Its core value proposition is playing a wide range of video formats directly in the browser without server-side transcoding, including MKV files via FFmpeg.wasm.
 
 **npm packages:**
 - `@lightbird/core` — Framework-agnostic core engine (players, parsers, subtitle pipeline, utilities, types)
-- `@lightbird/core/react` — React hooks (subpath export, same npm install)
-- `@lightbird/ui` — Drop-in styled React components (Tailwind + Radix + Lucide)
+- `@lightbird/core/react` — React hooks (subpath export of `@lightbird/core`, same npm install)
+- `@lightbird/player-react` — Drop-in styled React components (Tailwind + Radix + Lucide)
+- `@lightbird/player` — Framework-agnostic `<lightbird-player>` Web Component (no React dependency)
 
 ---
 
