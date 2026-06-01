@@ -365,7 +365,8 @@ export function Playground() {
               </label>
               <p className="mt-3 border-t border-border/60 pt-3 text-xs text-muted-foreground">
                 The styled bar also includes a settings menu (playback speed + brightness/contrast/saturation/hue)
-                and a picture-in-picture button where supported.
+                and a picture-in-picture button where supported. An audio-track picker appears automatically for
+                multi-track sources (e.g. MKV or HLS with several audio renditions).
               </p>
             </>
           ) : (

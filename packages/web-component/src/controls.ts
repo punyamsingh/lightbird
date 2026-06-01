@@ -16,8 +16,24 @@ export interface ControlBar {
   element: HTMLElement;
   /** Re-sync the controls to the current media/track state. */
   update: () => void;
+  /**
+   * Supply selectable audio tracks (e.g. from the core MKV/HLS player). The
+   * audio button + menu appear only when there are two or more tracks. Pass an
+   * empty array to hide them again.
+   */
+  setAudioTracks: (
+    tracks: AudioTrackOption[],
+    activeId: string,
+    onSelect: (id: string) => void,
+  ) => void;
   /** Detach all listeners. Safe to call more than once. */
   destroy: () => void;
+}
+
+/** A selectable audio track surfaced in the control bar's audio menu. */
+export interface AudioTrackOption {
+  id: string;
+  name: string;
 }
 
 /** Stylesheet for the control bar, concatenated into the element's `<style>`. */
@@ -171,6 +187,7 @@ const ICONS = {
   volume: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 00-2.5-4v8a4.5 4.5 0 002.5-4z"/></svg>',
   muted: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3zm13 .41L14.59 8 12 10.59 9.41 8 8 9.41 10.59 12 8 14.59 9.41 16 12 13.41 14.59 16 16 14.59 13.41 12 16 9.41z"/></svg>',
   cc: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 4H5a2 2 0 00-2 2v12a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2zm-8 7H9.5v-.5h-2v3h2V13H11v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-4a1 1 0 011-1h3a1 1 0 011 1v1zm7 0h-1.5v-.5h-2v3h2V13H18v1a1 1 0 01-1 1h-3a1 1 0 01-1-1v-4a1 1 0 011-1h3a1 1 0 011 1v1z"/></svg>',
+  audio: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v10.55A4 4 0 1014 17V7h4V3h-6z"/></svg>',
   pip: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 7h-8v6h8V7zm2-4H3a2 2 0 00-2 2v14a2 2 0 002 2h18a2 2 0 002-2V5a2 2 0 00-2-2zm0 16.01H3V4.98h18v14.03z"/></svg>',
   settings: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54A.48.48 0 0014.4 2h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87a.49.49 0 00.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1112 8.4a3.6 3.6 0 010 7.2z"/></svg>',
   enterFs: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>',
@@ -280,9 +297,13 @@ export function createControlBar(video: HTMLVideoElement, host: HTMLElement): Co
   const spacer = document.createElement('span');
   spacer.className = 'lb-spacer';
 
+  const audioBtn = makeButton('lb-audio', 'Audio track', ICONS.audio);
+  audioBtn.hidden = true;
+  // These buttons open pop-up menus — advertise that to assistive tech.
+  audioBtn.setAttribute('aria-haspopup', 'menu');
+  audioBtn.setAttribute('aria-expanded', 'false');
   const ccBtn = makeButton('lb-cc', 'Subtitles', ICONS.cc);
   ccBtn.hidden = true;
-  // These two buttons open pop-up menus — advertise that to assistive tech.
   ccBtn.setAttribute('aria-haspopup', 'menu');
   ccBtn.setAttribute('aria-expanded', 'false');
   const pipBtn = makeButton('lb-pip', 'Picture in picture', ICONS.pip);
@@ -292,9 +313,13 @@ export function createControlBar(video: HTMLVideoElement, host: HTMLElement): Co
   settingsBtn.setAttribute('aria-expanded', 'false');
   const fsBtn = makeButton('lb-fs', 'Fullscreen', ICONS.enterFs);
 
-  row.append(playBtn, muteBtn, volume, time, spacer, ccBtn, pipBtn, settingsBtn, fsBtn);
+  row.append(playBtn, muteBtn, volume, time, spacer, audioBtn, ccBtn, pipBtn, settingsBtn, fsBtn);
 
   // ── Menus ─────────────────────────────────────────────────────────────
+  const audioMenu = document.createElement('div');
+  audioMenu.className = 'lb-menu lb-audio-menu';
+  audioMenu.setAttribute('role', 'menu');
+
   const subtitleMenu = document.createElement('div');
   subtitleMenu.className = 'lb-menu lb-subtitle-menu';
   subtitleMenu.setAttribute('role', 'menu');
@@ -303,10 +328,11 @@ export function createControlBar(video: HTMLVideoElement, host: HTMLElement): Co
   settingsMenu.className = 'lb-menu lb-settings-menu';
   settingsMenu.setAttribute('role', 'menu');
 
-  const menus = [subtitleMenu, settingsMenu];
-  const triggers = [ccBtn, settingsBtn];
+  // Parallel arrays: triggers[i] opens menus[i] (used for aria + outside-click).
+  const menus = [audioMenu, subtitleMenu, settingsMenu];
+  const triggers = [audioBtn, ccBtn, settingsBtn];
 
-  root.append(seek, row, subtitleMenu, settingsMenu);
+  root.append(seek, row, audioMenu, subtitleMenu, settingsMenu);
 
   // ── State / helpers ───────────────────────────────────────────────────
   let scrubbing = false;
@@ -449,6 +475,50 @@ export function createControlBar(video: HTMLVideoElement, host: HTMLElement): Co
 
     subtitleMenu.replaceChildren(...items);
   }
+
+  // ── Audio-track picker (populated by the host from the core player) ────
+  const setAudioTracks = (
+    tracks: AudioTrackOption[],
+    activeId: string,
+    onSelect: (id: string) => void,
+  ): void => {
+    // A single track is not worth a switcher — hide the affordance entirely.
+    if (tracks.length < 2) {
+      audioBtn.hidden = true;
+      audioMenu.dataset.open = '0';
+      audioMenu.replaceChildren();
+      audioBtn.setAttribute('aria-expanded', 'false');
+      refreshShow();
+      return;
+    }
+
+    audioBtn.hidden = false;
+
+    const items: HTMLElement[] = [];
+    const label = document.createElement('div');
+    label.className = 'lb-menu-label';
+    label.textContent = 'Audio';
+    items.push(label);
+
+    for (const track of tracks) {
+      const checked = track.id === activeId;
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'lb-menu-item' + (checked ? ' lb-checked' : '');
+      item.setAttribute('role', 'menuitemradio');
+      item.setAttribute('aria-checked', String(checked));
+      item.textContent = track.name;
+      item.addEventListener('click', () => {
+        onSelect(track.id);
+        // Reflect the new selection immediately; the host may also re-call us.
+        setAudioTracks(tracks, track.id, onSelect);
+        closeMenus();
+      });
+      items.push(item);
+    }
+
+    audioMenu.replaceChildren(...items);
+  };
 
   // ── Settings menu (built once; values synced on open) ─────────────────
   const speedItems: HTMLButtonElement[] = [];
@@ -613,6 +683,7 @@ export function createControlBar(video: HTMLVideoElement, host: HTMLElement): Co
     video.currentTime = Number(seek.value);
     scrubbing = false;
   };
+  const onAudioClick = (): void => toggleMenu(audioMenu);
   const onCcClick = (): void => toggleMenu(subtitleMenu);
   const onSettingsClick = (): void => {
     syncSettings();
@@ -634,6 +705,7 @@ export function createControlBar(video: HTMLVideoElement, host: HTMLElement): Co
   seek.addEventListener('pointerdown', onSeekStart);
   seek.addEventListener('input', onSeekInput);
   seek.addEventListener('change', onSeekCommit);
+  audioBtn.addEventListener('click', onAudioClick);
   ccBtn.addEventListener('click', onCcClick);
   settingsBtn.addEventListener('click', onSettingsClick);
   pipBtn.addEventListener('click', onPipClick);
@@ -660,5 +732,5 @@ export function createControlBar(video: HTMLVideoElement, host: HTMLElement): Co
     root.remove();
   };
 
-  return { element: root, update, destroy };
+  return { element: root, update, setAudioTracks, destroy };
 }
