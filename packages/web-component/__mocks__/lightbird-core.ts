@@ -5,11 +5,26 @@
  * FFmpeg.wasm / hls.js without losing coverage of the core-routed paths.
  */
 
+/** Audio tracks the next-created mock player will report. Set in a test. */
+export let nextAudioTracks: { id: string; name: string; lang: string }[] = [];
+
+/** Configure the audio tracks the next `createVideoPlayer()` will expose. */
+export function __setNextAudioTracks(
+  tracks: { id: string; name: string; lang: string }[],
+): void {
+  nextAudioTracks = tracks;
+}
+
 export class MockVideoPlayer {
   initializedWith: HTMLVideoElement | null = null;
   destroyed = false;
+  tracksReady: Promise<void> = Promise.resolve();
+  readonly switchAudioTrackCalls: string[] = [];
+  private audioTracks: { id: string; name: string; lang: string }[];
 
-  constructor(public readonly source: File | string) {}
+  constructor(public readonly source: File | string) {
+    this.audioTracks = nextAudioTracks;
+  }
 
   async initialize(videoElement: HTMLVideoElement): Promise<{ url: string }> {
     this.initializedWith = videoElement;
@@ -19,15 +34,17 @@ export class MockVideoPlayer {
     return { url: typeof this.source === 'string' ? this.source : 'blob:mock-mkv' };
   }
 
-  getAudioTracks(): never[] {
-    return [];
+  getAudioTracks(): { id: string; name: string; lang: string }[] {
+    return this.audioTracks;
   }
 
   getSubtitles(): never[] {
     return [];
   }
 
-  async switchAudioTrack(): Promise<void> {}
+  async switchAudioTrack(id: string): Promise<void> {
+    this.switchAudioTrackCalls.push(id);
+  }
 
   async switchSubtitle(): Promise<void> {}
 
@@ -47,6 +64,7 @@ export const createdPlayers: CreatedPlayerRecord[] = [];
 /** Clears recorded calls — call from `beforeEach`. */
 export function __resetCoreMock(): void {
   createdPlayers.length = 0;
+  nextAudioTracks = [];
 }
 
 export function createVideoPlayer(source: File | string): MockVideoPlayer {

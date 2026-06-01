@@ -317,6 +317,9 @@ export class LightBirdPlayerElement extends HTMLElementBase {
     if (wantBar && !this.controlBar) {
       this.controlBar = createControlBar(this.video, this);
       this.shadow.appendChild(this.controlBar.element);
+      // A core player may already be loaded (controls toggled on later) —
+      // backfill its audio tracks into the freshly-created bar.
+      if (this.corePlayer) void this.syncAudioTracks(this.loadToken);
     } else if (!wantBar && this.controlBar) {
       this.teardownControlBar();
     } else if (this.controlBar) {
@@ -370,9 +373,34 @@ export class LightBirdPlayerElement extends HTMLElementBase {
         return;
       }
       this.corePlayer = player;
+      void this.syncAudioTracks(token);
     } catch (error) {
       if (token === this.loadToken) this.emitError(error);
     }
+  }
+
+  /**
+   * Surface the core player's audio tracks in the control bar. Tracks may
+   * populate asynchronously (MKV native path), so we await `tracksReady` and
+   * re-check the load token before touching the UI.
+   */
+  private async syncAudioTracks(token: number): Promise<void> {
+    const player = this.corePlayer;
+    if (!player) return;
+
+    try {
+      await player.tracksReady;
+    } catch {
+      // tracksReady may reject if the player was torn down — fall through and
+      // bail on the token check below.
+    }
+    if (token !== this.loadToken || this.corePlayer !== player) return;
+
+    const tracks = player.getAudioTracks().map((t) => ({ id: t.id, name: t.name }));
+    const active = tracks[0]?.id ?? '0';
+    this.controlBar?.setAudioTracks(tracks, active, (id) => {
+      void player.switchAudioTrack(id);
+    });
   }
 
   /** Downloads an MKV URL into a `File` so the core MKV player can probe it. */

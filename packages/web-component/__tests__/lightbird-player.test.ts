@@ -1,5 +1,9 @@
 import { LightBirdPlayerElement, register } from '../src/index';
-import { createdPlayers, __resetCoreMock } from '../__mocks__/lightbird-core';
+import {
+  createdPlayers,
+  __resetCoreMock,
+  __setNextAudioTracks,
+} from '../__mocks__/lightbird-core';
 
 /** Drains the microtask queue so lazy `import()` chains settle. */
 const flush = async (): Promise<void> => {
@@ -252,6 +256,64 @@ describe('control bar — picture-in-picture', () => {
         configurable: true,
       });
     }
+  });
+});
+
+describe('control bar — audio tracks', () => {
+  it('shows no audio button for a single-track source', async () => {
+    __setNextAudioTracks([{ id: '0', name: 'Default', lang: 'en' }]);
+    const el = mount({ controls: '', src: 'https://cdn.example.com/stream.m3u8' });
+    await flush();
+    await flush();
+    const audioBtn = el.shadowRoot!.querySelector('.lb-audio') as HTMLButtonElement;
+    expect(audioBtn.hidden).toBe(true);
+  });
+
+  it('exposes an audio picker for a multi-track source', async () => {
+    __setNextAudioTracks([
+      { id: '0', name: 'English', lang: 'en' },
+      { id: '1', name: 'Japanese', lang: 'ja' },
+    ]);
+    const el = mount({ controls: '', src: 'https://cdn.example.com/stream.m3u8' });
+    await flush();
+    await flush();
+
+    const audioBtn = el.shadowRoot!.querySelector('.lb-audio') as HTMLButtonElement;
+    expect(audioBtn.hidden).toBe(false);
+
+    audioBtn.click();
+    const items = el.shadowRoot!.querySelectorAll('.lb-audio-menu .lb-menu-item');
+    expect(items).toHaveLength(2);
+    expect(items[0].textContent).toBe('English');
+    expect(items[1].textContent).toBe('Japanese');
+  });
+
+  it('switches the core player audio track on selection', async () => {
+    __setNextAudioTracks([
+      { id: '0', name: 'English', lang: 'en' },
+      { id: '1', name: 'Japanese', lang: 'ja' },
+    ]);
+    const el = mount({ controls: '', src: 'https://cdn.example.com/stream.m3u8' });
+    await flush();
+    await flush();
+
+    (el.shadowRoot!.querySelector('.lb-audio') as HTMLButtonElement).click();
+    const items = el.shadowRoot!.querySelectorAll('.lb-audio-menu .lb-menu-item');
+    (items[1] as HTMLButtonElement).click();
+
+    expect(createdPlayers[0].player.switchAudioTrackCalls).toContain('1');
+
+    // Selecting rebuilds the menu, so re-query to read the new checked state.
+    (el.shadowRoot!.querySelector('.lb-audio') as HTMLButtonElement).click();
+    const refreshed = el.shadowRoot!.querySelectorAll('.lb-audio-menu .lb-menu-item');
+    expect(refreshed[1].classList.contains('lb-checked')).toBe(true);
+  });
+
+  it('keeps the audio button hidden for native (non-core) sources', async () => {
+    const el = mount({ controls: '', src: 'movie.mp4' });
+    await flush();
+    const audioBtn = el.shadowRoot!.querySelector('.lb-audio') as HTMLButtonElement;
+    expect(audioBtn.hidden).toBe(true);
   });
 });
 
