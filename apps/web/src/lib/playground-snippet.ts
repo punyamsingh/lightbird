@@ -30,7 +30,30 @@ export interface PlaygroundConfig {
   muted: boolean;
   /** Optional subtitle track URL (.vtt/.srt) for the Web Component. */
   subtitleUrl?: string;
+  /**
+   * Control-bar feature allow-list. `undefined` (or all features selected)
+   * emits a bare `controls`; a subset emits `controls="..."`.
+   */
+  features?: WebComponentFeature[];
+  /** Playlist entries; when 2+, emits a `sources` attribute. */
+  sources?: { src: string; title?: string }[];
 }
+
+/** Features that can be allow-listed on the Web Component's `controls` attribute. */
+export const WEB_COMPONENT_FEATURES = [
+  "play",
+  "seek",
+  "volume",
+  "time",
+  "audio",
+  "subtitles",
+  "pip",
+  "settings",
+  "fullscreen",
+  "playlist",
+] as const;
+
+export type WebComponentFeature = (typeof WEB_COMPONENT_FEATURES)[number];
 
 export interface GeneratedSnippet {
   /** Install command for the relevant package. */
@@ -87,10 +110,29 @@ export default function App() {
 }
 
 function generateWebComponent(config: PlaygroundConfig): GeneratedSnippet {
-  const attrs: string[] = [`src="${escapeAttr(config.src)}"`];
+  const hasPlaylist = (config.sources?.length ?? 0) >= 2;
+  const attrs: string[] = [];
+
+  // With a playlist, `sources` drives playback; otherwise a single `src`.
+  if (hasPlaylist) {
+    attrs.push(`sources='${JSON.stringify(config.sources)}'`);
+  } else {
+    attrs.push(`src="${escapeAttr(config.src)}"`);
+  }
 
   if (config.poster) attrs.push(`poster="${escapeAttr(config.poster)}"`);
-  if (config.controls) attrs.push("controls");
+
+  if (config.controls) {
+    // A full feature set emits a bare `controls`; a subset emits an allow-list.
+    const all = WEB_COMPONENT_FEATURES;
+    const selected = config.features;
+    if (selected && selected.length > 0 && selected.length < all.length) {
+      const ordered = all.filter((f) => selected.includes(f));
+      attrs.push(`controls="${ordered.join(" ")}"`);
+    } else {
+      attrs.push("controls");
+    }
+  }
   // `nativecontrols` only has meaning alongside `controls`.
   if (config.controls && config.nativeControls) attrs.push("nativecontrols");
   if (config.autoPlay) attrs.push("autoplay");

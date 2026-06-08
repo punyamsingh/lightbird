@@ -13,6 +13,16 @@ export interface SubtitleSource {
   default?: boolean;
 }
 
+/** A single entry in a `<lightbird-player>` playlist (the `sources` attribute). */
+export interface PlaylistItem {
+  /** Video URL. `.m3u8` → HLS, `.mkv` → MKV (via core), otherwise native. */
+  src: string;
+  /** Human-readable title shown in the playlist menu. */
+  title?: string;
+  /** Poster image for this entry. */
+  poster?: string;
+}
+
 /** `detail` payload carried by every `<lightbird-player>` `CustomEvent`. */
 export interface LightBirdEventDetail {
   currentTime: number;

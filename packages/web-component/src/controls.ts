@@ -26,6 +26,16 @@ export interface ControlBar {
     activeId: string,
     onSelect: (id: string) => void,
   ) => void;
+  /**
+   * Supply playlist entries. Prev/next buttons and a playlist menu appear only
+   * when there are two or more entries and the `playlist` feature is enabled.
+   * Pass an empty array to hide them.
+   */
+  setPlaylist: (
+    items: PlaylistEntry[],
+    activeIndex: number,
+    onSelect: (index: number) => void,
+  ) => void;
   /** Detach all listeners. Safe to call more than once. */
   destroy: () => void;
 }
@@ -34,6 +44,56 @@ export interface ControlBar {
 export interface AudioTrackOption {
   id: string;
   name: string;
+}
+
+/** A playlist entry surfaced in the control bar's playlist menu. */
+export interface PlaylistEntry {
+  title: string;
+}
+
+/** Individually toggleable control-bar features. */
+export type ControlFeature =
+  | 'play'
+  | 'seek'
+  | 'volume'
+  | 'time'
+  | 'audio'
+  | 'subtitles'
+  | 'pip'
+  | 'settings'
+  | 'fullscreen'
+  | 'playlist';
+
+/** Every feature, in render order — the default when no allow-list is given. */
+export const ALL_FEATURES: readonly ControlFeature[] = [
+  'play',
+  'seek',
+  'volume',
+  'time',
+  'audio',
+  'subtitles',
+  'pip',
+  'settings',
+  'fullscreen',
+  'playlist',
+];
+
+const FEATURE_SET = new Set<string>(ALL_FEATURES);
+
+/**
+ * Parse the `controls` attribute value into a feature allow-list.
+ *
+ * A bare `controls` (empty/whitespace value) enables everything. Otherwise the
+ * value is a space-separated allow-list, e.g. `"play volume fullscreen"`;
+ * unknown tokens are ignored.
+ */
+export function parseControlFeatures(value: string | null): Set<ControlFeature> {
+  const trimmed = (value ?? '').trim();
+  if (trimmed === '') return new Set(ALL_FEATURES);
+  const requested = trimmed.split(/\s+/).filter((t) => FEATURE_SET.has(t)) as ControlFeature[];
+  // An allow-list that matched nothing valid falls back to "all" rather than an
+  // empty, unusable bar.
+  return requested.length > 0 ? new Set(requested) : new Set(ALL_FEATURES);
 }
 
 /** Stylesheet for the control bar, concatenated into the element's `<style>`. */
@@ -188,6 +248,9 @@ const ICONS = {
   muted: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3zm13 .41L14.59 8 12 10.59 9.41 8 8 9.41 10.59 12 8 14.59 9.41 16 12 13.41 14.59 16 16 14.59 13.41 12 16 9.41z"/></svg>',
   cc: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 4H5a2 2 0 00-2 2v12a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2zm-8 7H9.5v-.5h-2v3h2V13H11v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-4a1 1 0 011-1h3a1 1 0 011 1v1zm7 0h-1.5v-.5h-2v3h2V13H18v1a1 1 0 01-1 1h-3a1 1 0 01-1-1v-4a1 1 0 011-1h3a1 1 0 011 1v1z"/></svg>',
   audio: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v10.55A4 4 0 1014 17V7h4V3h-6z"/></svg>',
+  prev: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>',
+  next: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>',
+  playlist: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10h11v2H3v-2zm0-4h11v2H3V6zm0 8h7v2H3v-2zm13-1v6l5-3-5-3z"/></svg>',
   pip: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 7h-8v6h8V7zm2-4H3a2 2 0 00-2 2v14a2 2 0 002 2h18a2 2 0 002-2V5a2 2 0 00-2-2zm0 16.01H3V4.98h18v14.03z"/></svg>',
   settings: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54A.48.48 0 0014.4 2h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87a.49.49 0 00.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1112 8.4a3.6 3.6 0 010 7.2z"/></svg>',
   enterFs: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>',
@@ -256,10 +319,17 @@ function pipSupported(video: HTMLVideoElement): boolean {
 /**
  * Build the control bar for a media element.
  *
- * @param video  The `<video>` the controls drive.
- * @param host   The element to fullscreen (the custom element host).
+ * @param video     The `<video>` the controls drive.
+ * @param host      The element to fullscreen (the custom element host).
+ * @param features  Allow-list of features to render. Defaults to all.
  */
-export function createControlBar(video: HTMLVideoElement, host: HTMLElement): ControlBar {
+export function createControlBar(
+  video: HTMLVideoElement,
+  host: HTMLElement,
+  features: Set<ControlFeature> = new Set(ALL_FEATURES),
+): ControlBar {
+  const has = (f: ControlFeature): boolean => features.has(f);
+
   const root = document.createElement('div');
   root.className = 'lb-controls';
   root.setAttribute('part', 'controls');
@@ -278,7 +348,11 @@ export function createControlBar(video: HTMLVideoElement, host: HTMLElement): Co
   const row = document.createElement('div');
   row.className = 'lb-row';
 
+  const prevBtn = makeButton('lb-prev', 'Previous', ICONS.prev);
+  prevBtn.hidden = true;
   const playBtn = makeButton('lb-play', 'Play', ICONS.play);
+  const nextBtn = makeButton('lb-next', 'Next', ICONS.next);
+  nextBtn.hidden = true;
   const muteBtn = makeButton('lb-mute', 'Mute', ICONS.volume);
 
   const volume = document.createElement('input');
@@ -311,9 +385,26 @@ export function createControlBar(video: HTMLVideoElement, host: HTMLElement): Co
   const settingsBtn = makeButton('lb-settings', 'Settings', ICONS.settings);
   settingsBtn.setAttribute('aria-haspopup', 'menu');
   settingsBtn.setAttribute('aria-expanded', 'false');
+  const playlistBtn = makeButton('lb-playlist', 'Playlist', ICONS.playlist);
+  playlistBtn.hidden = true;
+  playlistBtn.setAttribute('aria-haspopup', 'menu');
+  playlistBtn.setAttribute('aria-expanded', 'false');
   const fsBtn = makeButton('lb-fs', 'Fullscreen', ICONS.enterFs);
 
-  row.append(playBtn, muteBtn, volume, time, spacer, audioBtn, ccBtn, pipBtn, settingsBtn, fsBtn);
+  // Append only the affordances enabled by the feature allow-list. The dynamic
+  // controls (audio/subtitles/pip/playlist) also guard their show-logic on `has()`.
+  if (has('playlist')) row.append(prevBtn);
+  if (has('play')) row.append(playBtn);
+  if (has('playlist')) row.append(nextBtn);
+  if (has('volume')) row.append(muteBtn, volume);
+  if (has('time')) row.append(time);
+  row.append(spacer);
+  if (has('audio')) row.append(audioBtn);
+  if (has('subtitles')) row.append(ccBtn);
+  if (has('pip')) row.append(pipBtn);
+  if (has('settings')) row.append(settingsBtn);
+  if (has('playlist')) row.append(playlistBtn);
+  if (has('fullscreen')) row.append(fsBtn);
 
   // ── Menus ─────────────────────────────────────────────────────────────
   const audioMenu = document.createElement('div');
@@ -328,11 +419,16 @@ export function createControlBar(video: HTMLVideoElement, host: HTMLElement): Co
   settingsMenu.className = 'lb-menu lb-settings-menu';
   settingsMenu.setAttribute('role', 'menu');
 
-  // Parallel arrays: triggers[i] opens menus[i] (used for aria + outside-click).
-  const menus = [audioMenu, subtitleMenu, settingsMenu];
-  const triggers = [audioBtn, ccBtn, settingsBtn];
+  const playlistMenu = document.createElement('div');
+  playlistMenu.className = 'lb-menu lb-playlist-menu';
+  playlistMenu.setAttribute('role', 'menu');
 
-  root.append(seek, row, audioMenu, subtitleMenu, settingsMenu);
+  // Parallel arrays: triggers[i] opens menus[i] (used for aria + outside-click).
+  const menus = [audioMenu, subtitleMenu, settingsMenu, playlistMenu];
+  const triggers = [audioBtn, ccBtn, settingsBtn, playlistBtn];
+
+  if (has('seek')) root.append(seek);
+  root.append(row, audioMenu, subtitleMenu, settingsMenu, playlistMenu);
 
   // ── State / helpers ───────────────────────────────────────────────────
   let scrubbing = false;
@@ -422,7 +518,7 @@ export function createControlBar(video: HTMLVideoElement, host: HTMLElement): Co
   };
 
   const syncPip = (): void => {
-    pipBtn.hidden = !pipSupported(video);
+    pipBtn.hidden = !has('pip') || !pipSupported(video);
     pipBtn.classList.toggle('lb-active', isPip());
   };
 
@@ -430,7 +526,7 @@ export function createControlBar(video: HTMLVideoElement, host: HTMLElement): Co
   function syncCc(): void {
     const tracks = video.textTracks;
     const count = tracks.length;
-    ccBtn.hidden = count === 0;
+    ccBtn.hidden = !has('subtitles') || count === 0;
     const active = showingTrack();
     ccBtn.classList.toggle('lb-active', active !== -1);
 
@@ -482,8 +578,8 @@ export function createControlBar(video: HTMLVideoElement, host: HTMLElement): Co
     activeId: string,
     onSelect: (id: string) => void,
   ): void => {
-    // A single track is not worth a switcher — hide the affordance entirely.
-    if (tracks.length < 2) {
+    // Hidden when the feature is disabled or a single track isn't worth a switcher.
+    if (!has('audio') || tracks.length < 2) {
       audioBtn.hidden = true;
       audioMenu.dataset.open = '0';
       audioMenu.replaceChildren();
@@ -518,6 +614,62 @@ export function createControlBar(video: HTMLVideoElement, host: HTMLElement): Co
     }
 
     audioMenu.replaceChildren(...items);
+  };
+
+  // ── Playlist (populated by the host from the `sources` attribute) ──────
+  let playlistState: {
+    items: PlaylistEntry[];
+    active: number;
+    onSelect: (index: number) => void;
+  } | null = null;
+
+  const setPlaylist = (
+    items: PlaylistEntry[],
+    activeIndex: number,
+    onSelect: (index: number) => void,
+  ): void => {
+    // Prev/next + menu are only meaningful with the feature on and 2+ entries.
+    if (!has('playlist') || items.length < 2) {
+      playlistState = null;
+      prevBtn.hidden = true;
+      nextBtn.hidden = true;
+      playlistBtn.hidden = true;
+      playlistMenu.dataset.open = '0';
+      playlistMenu.replaceChildren();
+      playlistBtn.setAttribute('aria-expanded', 'false');
+      refreshShow();
+      return;
+    }
+
+    playlistState = { items, active: activeIndex, onSelect };
+    prevBtn.hidden = false;
+    nextBtn.hidden = false;
+    playlistBtn.hidden = false;
+    prevBtn.disabled = activeIndex <= 0;
+    nextBtn.disabled = activeIndex >= items.length - 1;
+
+    const menuItems: HTMLElement[] = [];
+    const label = document.createElement('div');
+    label.className = 'lb-menu-label';
+    label.textContent = 'Playlist';
+    menuItems.push(label);
+
+    items.forEach((entry, i) => {
+      const checked = i === activeIndex;
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'lb-menu-item' + (checked ? ' lb-checked' : '');
+      item.setAttribute('role', 'menuitemradio');
+      item.setAttribute('aria-checked', String(checked));
+      item.textContent = entry.title;
+      item.addEventListener('click', () => {
+        onSelect(i);
+        closeMenus();
+      });
+      menuItems.push(item);
+    });
+
+    playlistMenu.replaceChildren(...menuItems);
   };
 
   // ── Settings menu (built once; values synced on open) ─────────────────
@@ -684,6 +836,15 @@ export function createControlBar(video: HTMLVideoElement, host: HTMLElement): Co
     scrubbing = false;
   };
   const onAudioClick = (): void => toggleMenu(audioMenu);
+  const onPlaylistClick = (): void => toggleMenu(playlistMenu);
+  const onPrevClick = (): void => {
+    if (!playlistState || playlistState.active <= 0) return;
+    playlistState.onSelect(playlistState.active - 1);
+  };
+  const onNextClick = (): void => {
+    if (!playlistState || playlistState.active >= playlistState.items.length - 1) return;
+    playlistState.onSelect(playlistState.active + 1);
+  };
   const onCcClick = (): void => toggleMenu(subtitleMenu);
   const onSettingsClick = (): void => {
     syncSettings();
@@ -706,6 +867,9 @@ export function createControlBar(video: HTMLVideoElement, host: HTMLElement): Co
   seek.addEventListener('input', onSeekInput);
   seek.addEventListener('change', onSeekCommit);
   audioBtn.addEventListener('click', onAudioClick);
+  prevBtn.addEventListener('click', onPrevClick);
+  nextBtn.addEventListener('click', onNextClick);
+  playlistBtn.addEventListener('click', onPlaylistClick);
   ccBtn.addEventListener('click', onCcClick);
   settingsBtn.addEventListener('click', onSettingsClick);
   pipBtn.addEventListener('click', onPipClick);
@@ -732,5 +896,5 @@ export function createControlBar(video: HTMLVideoElement, host: HTMLElement): Co
     root.remove();
   };
 
-  return { element: root, update, setAudioTracks, destroy };
+  return { element: root, update, setAudioTracks, setPlaylist, destroy };
 }
