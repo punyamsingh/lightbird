@@ -114,8 +114,10 @@ function generateWebComponent(config: PlaygroundConfig): GeneratedSnippet {
   const attrs: string[] = [];
 
   // With a playlist, `sources` drives playback; otherwise a single `src`.
+  // JSON goes in a double-quoted attribute and is escaped — JSON.stringify does
+  // not escape quotes for HTML, so single-quoting would allow attribute breakout.
   if (hasPlaylist) {
-    attrs.push(`sources='${JSON.stringify(config.sources)}'`);
+    attrs.push(`sources="${escapeAttr(JSON.stringify(config.sources))}"`);
   } else {
     attrs.push(`src="${escapeAttr(config.src)}"`);
   }
@@ -140,7 +142,7 @@ function generateWebComponent(config: PlaygroundConfig): GeneratedSnippet {
   if (config.subtitleUrl) {
     // The `subtitles` attribute takes a JSON array of track descriptors.
     const tracks = JSON.stringify([{ src: config.subtitleUrl, label: "Subtitles", srclang: "en" }]);
-    attrs.push(`subtitles='${tracks}'`);
+    attrs.push(`subtitles="${escapeAttr(tracks)}"`);
   }
 
   const indented = attrs.map((a) => `  ${a}`).join("\n");

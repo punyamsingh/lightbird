@@ -110,8 +110,8 @@ describe("generateSnippet — Web Component target", () => {
       makeConfig({ subtitleUrl: "https://x.test/en.vtt" }),
       "web-component",
     );
-    expect(code).toContain("subtitles='");
-    expect(code).toContain('"src":"https://x.test/en.vtt"');
+    expect(code).toContain('subtitles="');
+    expect(code).toContain('&quot;src&quot;:&quot;https://x.test/en.vtt&quot;');
   });
 
   it("omits the subtitles attribute when no URL is given", () => {
@@ -146,8 +146,8 @@ describe("generateSnippet — Web Component target", () => {
       }),
       "web-component",
     );
-    expect(code).toContain("sources='");
-    expect(code).toContain('"src":"a.mp4"');
+    expect(code).toContain('sources="');
+    expect(code).toContain('&quot;src&quot;:&quot;a.mp4&quot;');
     expect(code).not.toContain('src="https://x.test');
   });
 
@@ -158,5 +158,33 @@ describe("generateSnippet — Web Component target", () => {
     );
     expect(code).toContain('src="https://x.test/solo.mp4"');
     expect(code).not.toContain("sources=");
+  });
+
+  it("escapes quotes in the sources JSON attribute (no attribute breakout)", () => {
+    const { code } = generateSnippet(
+      makeConfig({
+        sources: [
+          { src: "first.mp4", title: "It's a \"quote\"" },
+          { src: "second.mp4" },
+        ],
+      }),
+      "web-component",
+    );
+    // Double-quoted attribute with all JSON quotes escaped.
+    expect(code).toContain('sources="');
+    expect(code).not.toContain("sources='");
+    expect(code).toContain("&quot;");
+    // The raw double quotes from JSON must not appear unescaped and break out.
+    expect(code).not.toContain('title":"It');
+  });
+
+  it("escapes quotes in the subtitles JSON attribute", () => {
+    const { code } = generateSnippet(
+      makeConfig({ subtitleUrl: "https://x.test/a'b\".vtt" }),
+      "web-component",
+    );
+    expect(code).toContain('subtitles="');
+    expect(code).not.toContain("subtitles='");
+    expect(code).toContain("&quot;");
   });
 });
