@@ -328,6 +328,18 @@ describe('control bar — playlist', () => {
     // First entry still loads — playback is independent of the UI affordance.
     expect(el.mediaElement.src).toContain('a.mp4');
   });
+
+  it('keeps the active entry poster after an unrelated attribute sync', () => {
+    const sources = JSON.stringify([
+      { src: 'a.mp4', title: 'First', poster: 'a.jpg' },
+      { src: 'b.mp4', title: 'Second', poster: 'b.jpg' },
+    ]);
+    const el = mount({ controls: '', sources });
+    expect(el.mediaElement.poster).toContain('a.jpg');
+    // Toggling an unrelated attribute triggers syncMediaAttributes.
+    el.muted = true;
+    expect(el.mediaElement.poster).toContain('a.jpg');
+  });
 });
 
 describe('control bar — picture-in-picture', () => {

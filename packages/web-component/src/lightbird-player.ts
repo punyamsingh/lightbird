@@ -359,7 +359,11 @@ export class LightBirdPlayerElement extends HTMLElementBase {
     this.video.autoplay = this.hasAttribute('autoplay');
     this.video.muted = this.hasAttribute('muted');
 
-    const poster = this.getAttribute('poster');
+    // The active playlist entry's poster takes precedence over the host poster
+    // so unrelated attribute syncs (muted/autoplay/…) don't clobber it.
+    const playlistPoster =
+      this.playlist.length > 0 ? this.playlist[this.playlistIndex]?.poster : undefined;
+    const poster = playlistPoster ?? this.getAttribute('poster');
     if (poster) this.video.poster = poster;
     else this.video.removeAttribute('poster');
   }
