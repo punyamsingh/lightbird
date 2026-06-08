@@ -1,6 +1,6 @@
 {
   "name": "@lightbird/player",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Framework-agnostic <lightbird-player> Web Component. Drop-in video player for Vue, Svelte, Angular, Solid, or plain HTML — powered by @lightbird/core.",
   "license": "MIT",
   "author": "Punyam Singh",
