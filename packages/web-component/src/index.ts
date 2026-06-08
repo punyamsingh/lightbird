@@ -1,7 +1,7 @@
 import { LightBirdPlayerElement } from './lightbird-player';
 
 export { LightBirdPlayerElement } from './lightbird-player';
-export type { SubtitleSource, LightBirdEventDetail } from './types';
+export type { SubtitleSource, LightBirdEventDetail, PlaylistItem } from './types';
 
 let mainConstructorRegistered = false;
 

@@ -225,6 +225,111 @@ describe('control bar — settings menu', () => {
   });
 });
 
+describe('control bar — feature allow-list', () => {
+  it('renders every feature for a bare `controls` attribute', () => {
+    const el = mount({ controls: '' });
+    const root = el.shadowRoot!;
+    expect(root.querySelector('.lb-play')).not.toBeNull();
+    expect(root.querySelector('.lb-seek')).not.toBeNull();
+    expect(root.querySelector('.lb-mute')).not.toBeNull();
+    expect(root.querySelector('.lb-settings')).not.toBeNull();
+    expect(root.querySelector('.lb-fs')).not.toBeNull();
+  });
+
+  it('renders only the allow-listed features', () => {
+    const el = mount({ controls: 'play seek fullscreen' });
+    const root = el.shadowRoot!;
+    expect(root.querySelector('.lb-play')).not.toBeNull();
+    expect(root.querySelector('.lb-seek')).not.toBeNull();
+    expect(root.querySelector('.lb-fs')).not.toBeNull();
+    // Excluded affordances are not in the DOM at all.
+    expect(root.querySelector('.lb-mute')).toBeNull();
+    expect(root.querySelector('.lb-settings')).toBeNull();
+    expect(root.querySelector('.lb-volume')).toBeNull();
+  });
+
+  it('falls back to all features when the allow-list matches nothing valid', () => {
+    const el = mount({ controls: 'bogus nonsense' });
+    expect(el.shadowRoot!.querySelector('.lb-settings')).not.toBeNull();
+  });
+
+  it('keeps a disabled audio feature hidden even for multi-track sources', async () => {
+    __setNextAudioTracks([
+      { id: '0', name: 'English', lang: 'en' },
+      { id: '1', name: 'Japanese', lang: 'ja' },
+    ]);
+    const el = mount({ controls: 'play seek fullscreen', src: 'https://cdn.example.com/stream.m3u8' });
+    await flush();
+    await flush();
+    expect(el.shadowRoot!.querySelector('.lb-audio')).toBeNull();
+  });
+
+  it('rebuilds the bar when the allow-list changes', () => {
+    const el = mount({ controls: 'play' });
+    expect(el.shadowRoot!.querySelector('.lb-fs')).toBeNull();
+    el.setAttribute('controls', 'play fullscreen');
+    expect(el.shadowRoot!.querySelector('.lb-fs')).not.toBeNull();
+  });
+});
+
+describe('control bar — playlist', () => {
+  const TWO = JSON.stringify([
+    { src: 'a.mp4', title: 'First' },
+    { src: 'b.mp4', title: 'Second' },
+  ]);
+
+  it('shows no playlist affordances for a single entry', () => {
+    const el = mount({ controls: '', sources: JSON.stringify([{ src: 'a.mp4' }]) });
+    expect((el.shadowRoot!.querySelector('.lb-playlist') as HTMLButtonElement).hidden).toBe(true);
+    expect((el.shadowRoot!.querySelector('.lb-prev') as HTMLButtonElement).hidden).toBe(true);
+  });
+
+  it('loads the first entry and exposes prev/next + a menu for 2+ entries', () => {
+    const el = mount({ controls: '', sources: TWO });
+    expect(el.mediaElement.src).toContain('a.mp4');
+    const playlistBtn = el.shadowRoot!.querySelector('.lb-playlist') as HTMLButtonElement;
+    expect(playlistBtn.hidden).toBe(false);
+    playlistBtn.click();
+    const items = el.shadowRoot!.querySelectorAll('.lb-playlist-menu .lb-menu-item');
+    expect(items).toHaveLength(2);
+    expect(items[0].textContent).toBe('First');
+  });
+
+  it('disables Previous on the first entry and Next on the last', () => {
+    const el = mount({ controls: '', sources: TWO });
+    const prev = el.shadowRoot!.querySelector('.lb-prev') as HTMLButtonElement;
+    const next = el.shadowRoot!.querySelector('.lb-next') as HTMLButtonElement;
+    expect(prev.disabled).toBe(true);
+    expect(next.disabled).toBe(false);
+    next.click();
+    expect(el.mediaElement.src).toContain('b.mp4');
+    expect((el.shadowRoot!.querySelector('.lb-next') as HTMLButtonElement).disabled).toBe(true);
+    expect((el.shadowRoot!.querySelector('.lb-prev') as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('selecting a playlist item loads that source', () => {
+    const el = mount({ controls: '', sources: TWO });
+    (el.shadowRoot!.querySelector('.lb-playlist') as HTMLButtonElement).click();
+    const items = el.shadowRoot!.querySelectorAll('.lb-playlist-menu .lb-menu-item');
+    (items[1] as HTMLButtonElement).click();
+    expect(el.mediaElement.src).toContain('b.mp4');
+  });
+
+  it('auto-advances to the next entry when the current one ends', () => {
+    const el = mount({ controls: '', sources: TWO });
+    expect(el.mediaElement.src).toContain('a.mp4');
+    el.mediaElement.dispatchEvent(new Event('ended'));
+    expect(el.mediaElement.src).toContain('b.mp4');
+  });
+
+  it('hides playlist affordances when the feature is not allow-listed', () => {
+    const el = mount({ controls: 'play seek fullscreen', sources: TWO });
+    expect(el.shadowRoot!.querySelector('.lb-playlist')).toBeNull();
+    // First entry still loads — playback is independent of the UI affordance.
+    expect(el.mediaElement.src).toContain('a.mp4');
+  });
+});
+
 describe('control bar — picture-in-picture', () => {
   it('hides the PiP button when the API is unavailable', () => {
     // jsdom does not implement the PiP API, so the button stays hidden.

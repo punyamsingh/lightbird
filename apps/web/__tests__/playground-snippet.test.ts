@@ -3,6 +3,7 @@ import {
   defaultPlaygroundConfig,
   REACT_PACKAGE,
   WEB_COMPONENT_PACKAGE,
+  WEB_COMPONENT_FEATURES,
   type PlaygroundConfig,
 } from "../src/lib/playground-snippet";
 
@@ -116,5 +117,46 @@ describe("generateSnippet — Web Component target", () => {
   it("omits the subtitles attribute when no URL is given", () => {
     const { code } = generateSnippet(makeConfig(), "web-component");
     expect(code).not.toContain("subtitles");
+  });
+
+  it("emits a bare `controls` when all features are selected", () => {
+    const { code } = generateSnippet(
+      makeConfig({ controls: true, features: [...WEB_COMPONENT_FEATURES] }),
+      "web-component",
+    );
+    expect(code).toMatch(/\n\s*controls\n/);
+    expect(code).not.toContain('controls="');
+  });
+
+  it("emits a `controls` allow-list for a feature subset", () => {
+    const { code } = generateSnippet(
+      makeConfig({ controls: true, features: ["play", "seek", "fullscreen"] }),
+      "web-component",
+    );
+    expect(code).toContain('controls="play seek fullscreen"');
+  });
+
+  it("emits a sources attribute and drops src for a playlist", () => {
+    const { code } = generateSnippet(
+      makeConfig({
+        sources: [
+          { src: "a.mp4", title: "First" },
+          { src: "b.mp4", title: "Second" },
+        ],
+      }),
+      "web-component",
+    );
+    expect(code).toContain("sources='");
+    expect(code).toContain('"src":"a.mp4"');
+    expect(code).not.toContain('src="https://x.test');
+  });
+
+  it("uses a single src when fewer than two sources are given", () => {
+    const { code } = generateSnippet(
+      makeConfig({ src: "https://x.test/solo.mp4", sources: [{ src: "a.mp4" }] }),
+      "web-component",
+    );
+    expect(code).toContain('src="https://x.test/solo.mp4"');
+    expect(code).not.toContain("sources=");
   });
 });

@@ -38,7 +38,8 @@ That is the whole API surface for a basic player. For HLS or MKV, just point
 | Attribute / property | Type | Description |
 |---|---|---|
 | `src` | `string` | Video URL. `.m3u8` → HLS, `.mkv` → MKV (via core), anything else → native. |
-| `controls` | `boolean` | Show LightBird's styled control bar — play/pause, scrubber, volume, time, an audio-track picker (multi-track MKV/HLS), a subtitle (CC) track picker, picture-in-picture, a settings menu (playback-speed presets + brightness/contrast/saturation/hue), and fullscreen. |
+| `sources` | `PlaylistItem[]` | Playlist of videos as a JSON array of `{ src, title?, poster? }`. When set with 2+ entries it drives playback (overriding `src`) and the bar shows prev/next + a playlist menu; the player auto-advances on `ended`. |
+| `controls` | `boolean` \| allow-list | Show LightBird's styled control bar — play/pause, scrubber, volume, time, an audio-track picker (multi-track MKV/HLS), a subtitle (CC) track picker, picture-in-picture, a settings menu (playback-speed presets + brightness/contrast/saturation/hue), and fullscreen. A bare `controls` enables every feature; pass a space-separated allow-list to choose, e.g. `controls="play seek volume fullscreen"`. Features: `play seek volume time audio subtitles pip settings fullscreen playlist`. |
 | `nativecontrols` | `boolean` | With `controls`, use the browser's built-in `<video>` controls instead of the styled bar. |
 | `autoplay` | `boolean` | Autoplay once ready (pair with `muted`). |
 | `muted` | `boolean` | Start muted. |

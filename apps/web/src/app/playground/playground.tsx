@@ -6,8 +6,10 @@ import { cn } from "@/lib/utils";
 import {
   defaultPlaygroundConfig,
   generateSnippet,
+  WEB_COMPONENT_FEATURES,
   type PlaygroundConfig,
   type PlaygroundTarget,
+  type WebComponentFeature,
 } from "@/lib/playground-snippet";
 
 const TARGETS: { id: PlaygroundTarget; label: string }[] = [
@@ -24,6 +26,22 @@ const SAMPLES: { name: string; url: string }[] = [
   {
     name: "Sintel (HLS)",
     url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+  },
+];
+
+/** A multi-entry playlist for demonstrating the `sources` attribute. */
+const SAMPLE_PLAYLIST: { src: string; title: string }[] = [
+  {
+    src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+    title: "Big Buck Bunny",
+  },
+  {
+    src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+    title: "Elephants Dream",
+  },
+  {
+    src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+    title: "For Bigger Blazes",
   },
 ];
 
@@ -132,9 +150,30 @@ function WebComponentPreview({ config }: { config: PlaygroundConfig }) {
   useEffect(() => {
     const el = elRef.current;
     if (!el) return;
-    if (config.src) el.setAttribute("src", config.src);
-    else el.removeAttribute("src");
-    el.toggleAttribute("controls", config.controls);
+
+    // A playlist (`sources`) owns playback; otherwise a single `src`.
+    const hasPlaylist = (config.sources?.length ?? 0) >= 2;
+    if (hasPlaylist) {
+      el.setAttribute("sources", JSON.stringify(config.sources));
+      el.removeAttribute("src");
+    } else {
+      el.removeAttribute("sources");
+      if (config.src) el.setAttribute("src", config.src);
+      else el.removeAttribute("src");
+    }
+
+    // Mirror the snippet: full feature set → bare `controls`; subset → allow-list.
+    if (config.controls) {
+      const all = WEB_COMPONENT_FEATURES;
+      const sel = config.features ?? [...all];
+      if (sel.length > 0 && sel.length < all.length) {
+        el.setAttribute("controls", all.filter((f) => sel.includes(f)).join(" "));
+      } else {
+        el.setAttribute("controls", "");
+      }
+    } else {
+      el.removeAttribute("controls");
+    }
     el.toggleAttribute("nativecontrols", config.controls && config.nativeControls);
     el.toggleAttribute("autoplay", config.autoPlay);
     el.toggleAttribute("muted", config.muted);
@@ -177,6 +216,15 @@ export function Playground() {
   const [poster, setPoster] = useState("");
   const [subtitleUrl, setSubtitleUrl] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  // Per-feature allow-list (all enabled by default).
+  const [features, setFeatures] = useState<WebComponentFeature[]>([...WEB_COMPONENT_FEATURES]);
+  const [usePlaylist, setUsePlaylist] = useState(false);
+
+  const toggleFeature = useCallback((f: WebComponentFeature) => {
+    setFeatures((prev) =>
+      prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f],
+    );
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -211,8 +259,10 @@ export function Playground() {
       autoPlay,
       muted,
       subtitleUrl: subtitleUrl.trim() || undefined,
+      features,
+      sources: usePlaylist ? SAMPLE_PLAYLIST : undefined,
     }),
-    [snippetSrc, poster, controls, nativeControls, autoPlay, muted, subtitleUrl],
+    [snippetSrc, poster, controls, nativeControls, autoPlay, muted, subtitleUrl, features, usePlaylist],
   );
 
   // The live preview needs the real (possibly blob) src, not the snippet placeholder.
@@ -339,7 +389,44 @@ export function Playground() {
                 )}
                 <Toggle label="Autoplay" hint="Start on load (pair with muted)" checked={autoPlay} onChange={setAutoPlay} />
                 <Toggle label="Muted" hint="Start without sound" checked={muted} onChange={setMuted} />
+                <Toggle
+                  label="Playlist"
+                  hint="Load a 3-clip sample playlist (sources attribute)"
+                  checked={usePlaylist}
+                  onChange={setUsePlaylist}
+                />
               </div>
+
+              {controls && !nativeControls && (
+                <div className="mt-3 border-t border-border/60 pt-3">
+                  <span className="text-sm font-medium">Control-bar features</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    Allow-list shown in the control bar. Some only appear when relevant
+                    (audio for multi-track, subtitles with a track, playlist for 2+ sources).
+                  </span>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {WEB_COMPONENT_FEATURES.map((f) => {
+                      const on = features.includes(f);
+                      return (
+                        <button
+                          key={f}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => toggleFeature(f)}
+                          className={cn(
+                            "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                            on
+                              ? "border-primary bg-primary/15 text-foreground"
+                              : "border-border text-muted-foreground hover:text-foreground",
+                          )}
+                        >
+                          {f}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               <label className="mt-3 block border-t border-border/60 pt-3">
                 <span className="text-sm font-medium">Poster URL</span>
                 <input

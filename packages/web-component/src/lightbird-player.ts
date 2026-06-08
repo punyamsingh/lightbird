@@ -1,6 +1,11 @@
 import type { VideoPlayer } from '@lightbird/core';
-import type { LightBirdEventDetail, SubtitleSource } from './types';
-import { createControlBar, CONTROL_STYLES, type ControlBar } from './controls';
+import type { LightBirdEventDetail, SubtitleSource, PlaylistItem } from './types';
+import {
+  createControlBar,
+  parseControlFeatures,
+  CONTROL_STYLES,
+  type ControlBar,
+} from './controls';
 
 /** Native media events re-dispatched on the host as `CustomEvent`s. */
 const FORWARDED_EVENTS = [
@@ -68,6 +73,21 @@ function parseSubtitlesAttribute(value: string | null): SubtitleSource[] {
   }
 }
 
+/** Parse the JSON `sources` attribute into a validated playlist. */
+function parseSourcesAttribute(value: string | null): PlaylistItem[] {
+  if (!value) return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (entry): entry is PlaylistItem =>
+        !!entry && typeof entry === 'object' && typeof (entry as PlaylistItem).src === 'string',
+    );
+  } catch {
+    return [];
+  }
+}
+
 // SSR-safe base: in Node/SSR `HTMLElement` is undefined, so extending it at
 // module load would crash bare imports. The empty fallback lets the module
 // evaluate; construction still requires a real DOM (guarded by the
@@ -86,7 +106,16 @@ export class LightBirdPlayerElement extends HTMLElementBase {
   static readonly tagName = 'lightbird-player';
 
   static get observedAttributes(): string[] {
-    return ['src', 'controls', 'nativecontrols', 'autoplay', 'muted', 'poster', 'subtitles'];
+    return [
+      'src',
+      'sources',
+      'controls',
+      'nativecontrols',
+      'autoplay',
+      'muted',
+      'poster',
+      'subtitles',
+    ];
   }
 
   private readonly shadow: ShadowRoot;
@@ -95,6 +124,11 @@ export class LightBirdPlayerElement extends HTMLElementBase {
 
   /** Our styled control bar; null when controls are off or native. */
   private controlBar: ControlBar | null = null;
+  /** The `controls` attribute value the current bar was built from. */
+  private controlsValue: string | null = null;
+  /** Parsed `sources` playlist and the index currently playing. */
+  private playlist: PlaylistItem[] = [];
+  private playlistIndex = 0;
 
   private corePlayer: VideoPlayer | null = null;
   private subtitleSources: SubtitleSource[] = [];
@@ -121,7 +155,15 @@ export class LightBirdPlayerElement extends HTMLElementBase {
       const detail: LightBirdEventDetail = this.snapshot();
       this.dispatchEvent(new CustomEvent(event.type, { detail, composed: true }));
     };
+
+    this.onEnded = (): void => {
+      if (this.playlist.length > 1 && this.playlistIndex < this.playlist.length - 1) {
+        this.selectPlaylistItem(this.playlistIndex + 1);
+      }
+    };
   }
+
+  private readonly onEnded: () => void;
 
   /* ----------------------------- lifecycle ----------------------------- */
 
@@ -137,10 +179,16 @@ export class LightBirdPlayerElement extends HTMLElementBase {
       this.subtitleSources = parseSubtitlesAttribute(this.getAttribute('subtitles'));
     }
 
+    this.playlist = parseSourcesAttribute(this.getAttribute('sources'));
+
     this.syncMediaAttributes();
     this.syncControlBar();
+    this.syncPlaylist(false);
     this.renderSubtitleTracks();
     this.loadSource();
+
+    // Auto-advance to the next playlist entry when the current one ends.
+    this.video.addEventListener('ended', this.onEnded);
   }
 
   disconnectedCallback(): void {
@@ -151,6 +199,7 @@ export class LightBirdPlayerElement extends HTMLElementBase {
     for (const type of FORWARDED_EVENTS) {
       this.video.removeEventListener(type, this.forwardEvent);
     }
+    this.video.removeEventListener('ended', this.onEnded);
 
     this.teardownControlBar();
     this.teardownCorePlayer();
@@ -162,7 +211,11 @@ export class LightBirdPlayerElement extends HTMLElementBase {
 
     switch (name) {
       case 'src':
-        this.loadSource();
+        // The playlist, when present, owns playback — ignore bare src changes.
+        if (this.playlist.length === 0) this.loadSource();
+        break;
+      case 'sources':
+        this.syncPlaylist(true);
         break;
       case 'subtitles':
         this.subtitleSources = parseSubtitlesAttribute(newValue);
@@ -314,16 +367,26 @@ export class LightBirdPlayerElement extends HTMLElementBase {
   /** Mount or unmount the styled control bar to match the current attributes. */
   private syncControlBar(): void {
     const wantBar = this.hasAttribute('controls') && !this.hasAttribute('nativecontrols');
-    if (wantBar && !this.controlBar) {
-      this.controlBar = createControlBar(this.video, this);
-      this.shadow.appendChild(this.controlBar.element);
-      // A core player may already be loaded (controls toggled on later) —
-      // backfill its audio tracks into the freshly-created bar.
-      if (this.corePlayer) void this.syncAudioTracks(this.loadToken);
-    } else if (!wantBar && this.controlBar) {
-      this.teardownControlBar();
+    const featureValue = this.getAttribute('controls');
+
+    if (wantBar) {
+      // The feature allow-list is baked in at creation, so rebuild the bar when
+      // the `controls` value changes (or when first showing it).
+      if (!this.controlBar || this.controlsValue !== featureValue) {
+        this.teardownControlBar();
+        this.controlsValue = featureValue;
+        this.controlBar = createControlBar(this.video, this, parseControlFeatures(featureValue));
+        this.shadow.appendChild(this.controlBar.element);
+        // A core player may already be loaded — backfill its audio tracks.
+        if (this.corePlayer) void this.syncAudioTracks(this.loadToken);
+        // Backfill the playlist into the freshly-created bar.
+        if (this.playlist.length > 0) this.syncPlaylist(false);
+      } else {
+        this.controlBar.update();
+      }
     } else if (this.controlBar) {
-      this.controlBar.update();
+      this.teardownControlBar();
+      this.controlsValue = null;
     }
   }
 
@@ -332,11 +395,25 @@ export class LightBirdPlayerElement extends HTMLElementBase {
     this.controlBar = null;
   }
 
+  /** The source to play now: the active playlist entry, or the `src` attribute. */
+  private effectiveSource(): { src: string | null; poster?: string } {
+    if (this.playlist.length > 0) {
+      const item = this.playlist[this.playlistIndex];
+      return { src: item?.src ?? null, poster: item?.poster };
+    }
+    return { src: this.getAttribute('src') };
+  }
+
   private loadSource(): void {
-    const src = this.getAttribute('src');
+    const { src, poster } = this.effectiveSource();
     const token = ++this.loadToken;
 
     this.teardownCorePlayer();
+
+    // A per-entry poster overrides the attribute poster while it's playing.
+    if (poster) this.video.poster = poster;
+    else if (this.getAttribute('poster')) this.video.poster = this.getAttribute('poster') as string;
+    else this.video.removeAttribute('poster');
 
     if (!src) {
       this.video.removeAttribute('src');
@@ -349,6 +426,43 @@ export class LightBirdPlayerElement extends HTMLElementBase {
     } else {
       this.video.src = src;
     }
+  }
+
+  /** Re-parse the `sources` attribute and refresh the playlist UI/playback. */
+  private syncPlaylist(reload: boolean): void {
+    const next = parseSourcesAttribute(this.getAttribute('sources'));
+    const changed =
+      next.length !== this.playlist.length ||
+      next.some((item, i) => item.src !== this.playlist[i]?.src);
+    this.playlist = next;
+    if (changed) this.playlistIndex = 0;
+
+    this.controlBar?.setPlaylist(
+      this.playlist.map((item, i) => ({ title: item.title || `Track ${i + 1}` })),
+      this.playlistIndex,
+      (index) => this.selectPlaylistItem(index),
+    );
+
+    if (reload && changed) this.loadSource();
+  }
+
+  /** Jump to a playlist entry and start it. */
+  private selectPlaylistItem(index: number): void {
+    if (index < 0 || index >= this.playlist.length || index === this.playlistIndex) {
+      if (index === this.playlistIndex) return;
+    }
+    if (index < 0 || index >= this.playlist.length) return;
+    this.playlistIndex = index;
+    this.loadSource();
+    // Refresh the menu's checked state + prev/next disabled state.
+    this.controlBar?.setPlaylist(
+      this.playlist.map((item, i) => ({ title: item.title || `Track ${i + 1}` })),
+      this.playlistIndex,
+      (i) => this.selectPlaylistItem(i),
+    );
+    void this.video.play().catch(() => {
+      /* autoplay may be blocked — leave it paused */
+    });
   }
 
   /** Lazy-loads `@lightbird/core` to handle HLS streams and MKV files. */
