@@ -26,11 +26,17 @@ export const PROVIDER_TIMEOUT_MS = 10_000;
  * Throws a `TimeoutError`-named error on expiry so callers can map it to 504
  * rather than lumping it in with "provider unreachable".
  */
-export async function fetchWithTimeout(
+export async function fetchWithTimeout<T>(
   url: string,
-  init: RequestInit = {},
+  init: RequestInit,
+  /**
+   * Reads the response body. Called only for an ok response, and inside the
+   * deadline — `fetch` resolves as soon as headers arrive, so returning the
+   * Response and letting the caller read it would leave the body unbounded.
+   */
+  consume: (response: Response) => Promise<T>,
   timeoutMs = PROVIDER_TIMEOUT_MS
-): Promise<Response> {
+): Promise<{ response: Response; body?: T }> {
   const controller = new AbortController();
   let timedOut = false;
   const timer = setTimeout(() => {
@@ -39,7 +45,11 @@ export async function fetchWithTimeout(
   }, timeoutMs);
 
   try {
-    return await fetch(url, { ...init, signal: controller.signal });
+    const response = await fetch(url, { ...init, signal: controller.signal });
+    // A non-ok response never has its body read, so callers can map the status
+    // without paying for a payload they are going to discard.
+    if (!response.ok) return { response };
+    return { response, body: await consume(response) };
   } catch (error) {
     if (timedOut) {
       throw Object.assign(new Error('Provider request timed out'), { name: 'TimeoutError' });

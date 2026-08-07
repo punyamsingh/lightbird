@@ -370,6 +370,31 @@ describe('useSubtitleSearch', () => {
       expect(onError).not.toHaveBeenCalled();
     });
 
+    it('treats a generic rejection as cancellation when the download was aborted', async () => {
+      // Race: reset() aborts the controller while a non-AbortError rejection is
+      // already queued. Reporting that as a failure would toast the user for a
+      // download they cancelled themselves.
+      const onError = jest.fn();
+      let rejectDownload: ((e: Error) => void) | undefined;
+      downloadSubtitle.mockImplementation(
+        () => new Promise((_resolve, reject) => { rejectDownload = reject; })
+      );
+
+      const { result } = renderHook(() => useSubtitleSearch({ onError }));
+
+      let downloadPromise: Promise<unknown>;
+      act(() => {
+        downloadPromise = result.current.download(makeResult());
+      });
+      act(() => result.current.reset());
+      await act(async () => {
+        rejectDownload?.(new Error('socket closed'));
+        await expect(downloadPromise).rejects.toMatchObject({ name: 'AbortError' });
+      });
+
+      expect(onError).not.toHaveBeenCalled();
+    });
+
     it('passes a custom endpoint through to the download call', async () => {
       downloadSubtitle.mockResolvedValue({ content: 'x', fileName: 'a.srt', format: 'srt' });
 

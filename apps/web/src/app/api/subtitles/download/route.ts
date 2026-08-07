@@ -94,14 +94,18 @@ export async function POST(request: Request) {
   }
 
   // Hop 1 — exchange the file id for a time-limited download link.
-  let linkResponse: Response;
+  let linkResult: { response: Response; body?: { link?: string; file_name?: string } };
   try {
-    linkResponse = await fetchWithTimeout(`${OPENSUBTITLES_API_BASE}/download`, {
-      method: 'POST',
-      headers: { ...providerHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ file_id: Number(fileId) }),
-      cache: 'no-store',
-    });
+    linkResult = await fetchWithTimeout(
+      `${OPENSUBTITLES_API_BASE}/download`,
+      {
+        method: 'POST',
+        headers: { ...providerHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_id: Number(fileId) }),
+        cache: 'no-store',
+      },
+      (response) => response.json() as Promise<{ link?: string; file_name?: string }>
+    );
   } catch (error) {
     if (isTimeout(error)) {
       return NextResponse.json({ error: 'Subtitle provider timed out' }, { status: 504 });
@@ -109,18 +113,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Subtitle provider unreachable' }, { status: 502 });
   }
 
-  if (!linkResponse.ok) {
+  if (!linkResult.response.ok) {
     // 406 is the provider's "download quota exhausted"; surface it as a rate
     // limit so the client shows the try-again-later message.
-    const status = linkResponse.status === 406 ? 429 : linkResponse.status;
+    const status = linkResult.response.status === 406 ? 429 : linkResult.response.status;
     const mapped = [401, 403, 429].includes(status) ? status : 502;
     return NextResponse.json({ error: 'Subtitle download failed' }, { status: mapped });
   }
 
-  const linkPayload = (await linkResponse.json().catch(() => null)) as {
-    link?: string;
-    file_name?: string;
-  } | null;
+  const linkPayload = linkResult.body;
 
   if (!linkPayload?.link) {
     return NextResponse.json({ error: 'Provider returned no download link' }, { status: 502 });
@@ -128,31 +129,29 @@ export async function POST(request: Request) {
 
   // Hop 2 — fetch the subtitle itself. fetch transparently gunzips when the
   // CDN sets Content-Encoding: gzip.
-  let fileResponse: Response;
+  // readBounded runs inside the deadline: a CDN that sends headers promptly and
+  // then trickles the body is exactly the case a header-only timeout misses.
+  let fileResult: { response: Response; body?: Uint8Array };
   try {
-    fileResponse = await fetchWithTimeout(linkPayload.link, { cache: 'no-store' });
+    fileResult = await fetchWithTimeout(linkPayload.link, { cache: 'no-store' }, (response) =>
+      readBounded(response, MAX_SUBTITLE_BYTES)
+    );
   } catch (error) {
     if (isTimeout(error)) {
       return NextResponse.json({ error: 'Subtitle file timed out' }, { status: 504 });
     }
-    return NextResponse.json({ error: 'Subtitle file unreachable' }, { status: 502 });
-  }
-
-  if (!fileResponse.ok) {
-    return NextResponse.json({ error: 'Subtitle file could not be fetched' }, { status: 502 });
-  }
-
-  let buffer: Uint8Array;
-  try {
-    buffer = await readBounded(fileResponse, MAX_SUBTITLE_BYTES);
-  } catch (error) {
     if (error instanceof SubtitleTooLargeError) {
       return NextResponse.json({ error: 'Subtitle file was unexpectedly large' }, { status: 502 });
     }
-    return NextResponse.json({ error: 'Subtitle file could not be read' }, { status: 502 });
+    return NextResponse.json({ error: 'Subtitle file unreachable' }, { status: 502 });
   }
 
-  if (buffer.byteLength === 0) {
+  if (!fileResult.response.ok) {
+    return NextResponse.json({ error: 'Subtitle file could not be fetched' }, { status: 502 });
+  }
+
+  const buffer = fileResult.body;
+  if (!buffer || buffer.byteLength === 0) {
     return NextResponse.json({ error: 'Subtitle file was empty' }, { status: 502 });
   }
 

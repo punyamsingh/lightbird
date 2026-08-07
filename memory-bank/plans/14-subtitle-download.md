@@ -81,8 +81,8 @@ Modified: `subtitle-manager.ts`, `use-subtitles.ts`, `types/index.ts`,
 `src/index.ts`, `src/react/index.ts`, `tsup.config.ts`, `package.json`,
 `packages/ui/src/{index.ts,player-controls.tsx,lightbird-player.tsx}`
 
-New tests (109): `opensubtitles-hash.test.ts` (17), `subtitle-search.test.ts` (38),
-`react/use-subtitle-search.test.ts` (24), `subtitle-manager-download.test.ts` (13),
+New tests (110): `opensubtitles-hash.test.ts` (17), `subtitle-search.test.ts` (38),
+`react/use-subtitle-search.test.ts` (25), `subtitle-manager-download.test.ts` (13),
 `ui/__tests__/subtitle-search-panel.test.tsx` (17)
 
 ### Review hardening (PR #80)
@@ -132,6 +132,26 @@ Three further defects found reading the diff back:
   of the fetch block, before `response.json()`, so a response whose headers
   arrived promptly but whose body stalled would hang forever. The timer now
   stays armed across the body read.
+
+### Second review pass
+
+Two more, both the server-side or sibling half of a fix already applied elsewhere:
+
+- **The proxy's deadline stopped at the response headers.** `fetchWithTimeout`
+  cleared its timer in a `finally` as soon as `fetch()` resolved, then handed the
+  Response back for the caller to read — so `readBounded()` and `.json()` ran
+  unprotected. This is the same defect fixed client-side in the self-review pass;
+  it was fixed on one side of the wire and missed on the other. `fetchWithTimeout`
+  now takes a `consume` callback and reads the body inside the deadline.
+- **A cancelled download could still be reported as a failure.** The download
+  catch tested only `err.name === 'AbortError'`. A generic rejection already
+  queued when `reset()` aborts would fall through to `onError`. It now checks
+  `controller.signal.aborted` too — the same guard the search path already had.
+
+Declined: a suggestion to change "afterwards" to "afterward" in this file.
+CodeRabbit's LanguageTool runs an American-English profile, but the project's
+prose is British (`behaviour` in `language-names.ts`, "Optimisation" in
+CLAUDE.md), so the change would introduce the inconsistency it aims to remove.
 
 ### Known limitation
 

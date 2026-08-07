@@ -210,6 +210,15 @@ export function useSubtitleSearch(
         // "the user moved on" from "the download actually failed", and no
         // error toast fires for the former.
         if ((err as Error)?.name === "AbortError") throw err;
+        // The signal check matters on its own: a generic rejection can already
+        // be queued when reset() or a replacement download aborts this
+        // controller, and reporting that as a failure would toast the user for
+        // a download they themselves cancelled.
+        if (controller.signal.aborted) {
+          throw Object.assign(new Error("Subtitle download was cancelled"), {
+            name: "AbortError",
+          });
+        }
         const { message } = messageFor(err);
         onError?.(message);
         throw new Error(message);

@@ -42,32 +42,38 @@ export async function GET(request: Request) {
   forwarded.set('order_by', 'download_count');
   forwarded.set('order_direction', 'desc');
 
-  let upstream: Response;
+  // The body is read inside fetchWithTimeout so the deadline covers it too.
+  let result: { response: Response; body?: unknown };
   try {
-    upstream = await fetchWithTimeout(
+    result = await fetchWithTimeout(
       `${OPENSUBTITLES_API_BASE}/subtitles?${forwarded.toString()}`,
-      { headers: providerHeaders(), next: { revalidate: 3600 } } as RequestInit
+      { headers: providerHeaders(), next: { revalidate: 3600 } } as RequestInit,
+      (response) => response.json()
     );
   } catch (error) {
     if (isTimeout(error)) {
       return NextResponse.json({ error: 'Subtitle provider timed out' }, { status: 504 });
     }
+    if (error instanceof SyntaxError) {
+      return NextResponse.json({ error: 'Malformed provider response' }, { status: 502 });
+    }
     return NextResponse.json({ error: 'Subtitle provider unreachable' }, { status: 502 });
   }
 
-  if (!upstream.ok) {
+  if (!result.response.ok) {
     // Pass through the statuses the client classifies (401/403/429); collapse
     // the rest to 502 so a provider 404 is never mistaken for "not configured".
-    const status = [401, 403, 429].includes(upstream.status) ? upstream.status : 502;
+    const status = [401, 403, 429].includes(result.response.status)
+      ? result.response.status
+      : 502;
     return NextResponse.json({ error: 'Subtitle search failed' }, { status });
   }
 
-  const payload = await upstream.json().catch(() => null);
-  if (!payload) {
+  if (!result.body) {
     return NextResponse.json({ error: 'Malformed provider response' }, { status: 502 });
   }
 
-  return NextResponse.json(payload, {
+  return NextResponse.json(result.body, {
     headers: { 'Cache-Control': 'public, max-age=3600' },
   });
 }
