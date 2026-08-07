@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import type { PlaylistItem, AudioTrack } from "@lightbird/core";
+import type { PlaylistItem, AudioTrack, SubtitleSearchResult } from "@lightbird/core";
 import { cn } from "./utils/cn";
 import PlayerControls from "./player-controls";
 import PlaylistPanel, { type PlaylistSize } from "./playlist-panel";
@@ -28,6 +28,7 @@ import {
   useABLoop,
   useTouchGestures,
   useHlsQuality,
+  useSubtitleSearch,
 } from "@lightbird/core/react";
 import { captureVideoThumbnail, exportVideoFrame, downloadDataUrl, frameExportFilename, parseMediaError, validateFile, type ParsedMediaError, loadShortcuts, type ShortcutBinding, ProgressEstimator, hasAcceptedDisclaimer, acceptDisclaimer, FLAG_MAGNET_LINK } from "@lightbird/core";
 import { useBooleanFlagValue } from "@openfeature/react-sdk";
@@ -63,6 +64,10 @@ const LightBirdPlayer = () => {
   const playback = useVideoPlayback(videoRef);
   const filters = useVideoFilters(videoRef);
   const subtitles = useSubtitles({
+    onError: (msg) => toast({ title: msg, variant: "destructive" }),
+    onSuccess: (msg) => toast({ title: msg }),
+  });
+  const subtitleSearch = useSubtitleSearch({
     onError: (msg) => toast({ title: msg, variant: "destructive" }),
     onSuccess: (msg) => toast({ title: msg }),
   });
@@ -642,6 +647,64 @@ const LightBirdPlayer = () => {
     subtitleInputRef.current?.click();
   }, []);
 
+  // Clear stale results when the video changes — subtitles found for the
+  // previous file are meaningless for this one.
+  const currentItemId = playlist.currentItem?.id ?? null;
+  const resetSubtitleSearch = subtitleSearch.reset;
+  useEffect(() => {
+    resetSubtitleSearch();
+  }, [currentItemId, resetSubtitleSearch]);
+
+  const handleSubtitleSearch = useCallback(() => {
+    const item = playlist.currentItem;
+    if (!item) return;
+    // Remote and torrent-backed items have no File to hash, so the search
+    // falls back to the filename on its own.
+    void subtitleSearch.search({ file: item.file, fileName: item.name });
+  }, [playlist.currentItem, subtitleSearch]);
+
+  const handleSubtitleSearchApply = useCallback(
+    async (result: SubtitleSearchResult) => {
+      try {
+        const downloaded = await subtitleSearch.download(result);
+        await subtitles.addSubtitleFromText(
+          downloaded.content,
+          downloaded.fileName,
+          result.language,
+          downloaded.format
+        );
+      } catch {
+        // download() already reported the failure through the error toast.
+      }
+    },
+    [subtitleSearch, subtitles]
+  );
+
+  const subtitleSearchProps = useMemo(
+    () => ({
+      status: subtitleSearch.status,
+      results: subtitleSearch.results,
+      mode: subtitleSearch.mode,
+      error: subtitleSearch.error,
+      unavailable: subtitleSearch.errorKind === "unavailable",
+      downloadingId: subtitleSearch.downloadingId,
+      canSearch: Boolean(playlist.currentItem),
+      onSearch: handleSubtitleSearch,
+      onApply: handleSubtitleSearchApply,
+    }),
+    [
+      subtitleSearch.status,
+      subtitleSearch.results,
+      subtitleSearch.mode,
+      subtitleSearch.error,
+      subtitleSearch.errorKind,
+      subtitleSearch.downloadingId,
+      playlist.currentItem,
+      handleSubtitleSearch,
+      handleSubtitleSearchApply,
+    ]
+  );
+
   const handleSelectVideo = useCallback((index: number) => {
     loadVideo(index);
   }, [loadVideo]);
@@ -796,6 +859,7 @@ const LightBirdPlayer = () => {
             onAudioTrackChange={handleAudioTrackChange}
             onSubtitleUpload={handleSubtitleUpload}
             onSubtitleRemove={subtitles.removeSubtitle}
+            subtitleSearch={subtitleSearchProps}
             onShowInfo={() => setShowInfo((v: boolean) => !v)}
             onOpenShortcuts={() => setShowShortcutsDialog(true)}
             chapters={chapters}

@@ -45,6 +45,16 @@
         "types": "./dist/react/index.d.cts",
         "default": "./dist/react/index.cjs"
       }
+    },
+    "./search": {
+      "import": {
+        "types": "./dist/search.d.ts",
+        "default": "./dist/search.js"
+      },
+      "require": {
+        "types": "./dist/search.d.cts",
+        "default": "./dist/search.cjs"
+      }
     }
   },
   "files": [

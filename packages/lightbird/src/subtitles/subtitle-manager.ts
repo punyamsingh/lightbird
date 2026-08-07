@@ -90,70 +90,107 @@ export class UniversalSubtitleManager {
       const langMatch = file.name.match(/\.([a-z]{2,3})\.(?:srt|vtt|ass|ssa)$/i);
       const lang = langMatch ? langMatch[1] : "unknown";
 
-      const subtitle: Subtitle = {
-        id: String(this.nextId++),
-        name: `${lang.toUpperCase()} (${file.name})`,
-        lang,
-        type: "external",
-        format: ext ?? "vtt",
-      };
-
-      let rawVtt: string | undefined;
-      let cues: SubtitleCue[] = [];
-
-      if (ext === "ass" || ext === "ssa") {
-        // ASS/SSA: store raw text, mark url as undefined (handled by ASSRenderer in player)
-        const rawText = await readSubtitleFile(file);
-        subtitle.url = undefined;
-        // Store the raw ASS text in a data URL so the player can retrieve it
-        const blob = new Blob([rawText], { type: "text/plain" });
-        subtitle.url = URL.createObjectURL(blob);
-        rawVtt = undefined;
-      } else {
-        // VTT/SRT: read with encoding detection, then convert to VTT
-        const fileText = await readSubtitleFile(file);
-        let vttText: string;
-        if (ext === "srt") {
-          vttText = await SubtitleConverter.convertSrtToVtt(fileText);
-        } else {
-          vttText = fileText;
-        }
-        rawVtt = vttText;
-        cues = parseVttCues(vttText);
-        const blob = new Blob([vttText], { type: "text/vtt" });
-        subtitle.url = URL.createObjectURL(blob);
-      }
-
-      newSubtitles.push(subtitle);
-      this.records.push({ subtitle, rawVtt, offset: 0, cues });
-
-      // Add track element for VTT/SRT subtitles
-      if (this.videoElement && ext !== "ass" && ext !== "ssa" && subtitle.url) {
-        const track = document.createElement("track");
-        track.kind = "subtitles";
-        track.label = subtitle.name;
-        track.srclang = subtitle.lang;
-        track.src = subtitle.url;
-        track.setAttribute("data-id", subtitle.id);
-        track.default = false;
-
-        track.addEventListener("load", () => {
-          console.log(`Subtitle track loaded: ${subtitle.name}`);
-        });
-        track.addEventListener("error", (e) => {
-          console.error(`Failed to load subtitle track: ${subtitle.name}`, e);
-        });
-
-        this.videoElement.appendChild(track);
-        const textTrack = track.track;
-        textTrack.mode = "hidden";
-        setTimeout(() => {
-          textTrack.mode = "disabled";
-        }, 100);
-      }
+      // Read with encoding detection before handing off to the shared registration path.
+      const text = await readSubtitleFile(file);
+      newSubtitles.push(
+        this.registerSubtitle({
+          displayName: `${lang.toUpperCase()} (${file.name})`,
+          lang,
+          format: ext ?? "vtt",
+          text: await this.toVttIfNeeded(text, ext ?? "vtt"),
+          isTimedText: ext !== "ass" && ext !== "ssa",
+        })
+      );
     }
 
     return newSubtitles;
+  }
+
+  /**
+   * Adds a subtitle from raw text rather than a File — used by the online
+   * subtitle search, where the content arrives over the network already
+   * decoded. Behaves identically to a file drop from here on: SRT is converted
+   * to VTT, a track element is attached, and offset/search work as usual.
+   */
+  async addSubtitleFromText(
+    content: string,
+    fileName: string,
+    lang: string,
+    format: "vtt" | "srt" | "ass" | "ssa" = "srt"
+  ): Promise<Subtitle> {
+    const label = lang && lang !== "unknown" ? lang.toUpperCase() : "SUB";
+    return this.registerSubtitle({
+      displayName: `${label} (${fileName})`,
+      lang: lang || "unknown",
+      format,
+      text: await this.toVttIfNeeded(content, format),
+      isTimedText: format !== "ass" && format !== "ssa",
+    });
+  }
+
+  /** Converts SRT source text to VTT; leaves every other format untouched. */
+  private async toVttIfNeeded(text: string, format: string): Promise<string> {
+    return format === "srt" ? SubtitleConverter.convertSrtToVtt(text) : text;
+  }
+
+  /**
+   * Creates the Subtitle record, its blob URL, and (for timed text) the
+   * `<track>` element on the video. Shared by the file and network paths.
+   */
+  private registerSubtitle(input: {
+    displayName: string;
+    lang: string;
+    format: "vtt" | "srt" | "ass" | "ssa";
+    /** Already VTT for timed text; raw ASS/SSA otherwise. */
+    text: string;
+    isTimedText: boolean;
+  }): Subtitle {
+    const { displayName, lang, format, text, isTimedText } = input;
+
+    const subtitle: Subtitle = {
+      id: String(this.nextId++),
+      name: displayName,
+      lang,
+      type: "external",
+      format,
+    };
+
+    let rawVtt: string | undefined;
+    let cues: SubtitleCue[] = [];
+
+    if (isTimedText) {
+      rawVtt = text;
+      cues = parseVttCues(text);
+      subtitle.url = URL.createObjectURL(new Blob([text], { type: "text/vtt" }));
+    } else {
+      // ASS/SSA: keep the raw text addressable so ASSRenderer can fetch it.
+      subtitle.url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+    }
+
+    this.records.push({ subtitle, rawVtt, offset: 0, cues });
+
+    if (this.videoElement && isTimedText && subtitle.url) {
+      const track = document.createElement("track");
+      track.kind = "subtitles";
+      track.label = subtitle.name;
+      track.srclang = subtitle.lang;
+      track.src = subtitle.url;
+      track.setAttribute("data-id", subtitle.id);
+      track.default = false;
+
+      track.addEventListener("error", (e) => {
+        console.error(`Failed to load subtitle track: ${subtitle.name}`, e);
+      });
+
+      this.videoElement.appendChild(track);
+      const textTrack = track.track;
+      textTrack.mode = "hidden";
+      setTimeout(() => {
+        textTrack.mode = "disabled";
+      }, 100);
+    }
+
+    return subtitle;
   }
 
   removeSubtitle(id: string): boolean {

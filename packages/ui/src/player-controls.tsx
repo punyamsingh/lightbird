@@ -13,6 +13,7 @@ import {
   Info, Keyboard, List, PictureInPicture2, Loader2, Gauge
 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "./primitives/radio-group";
+import { SubtitleSearchPanel, type SubtitleSearchPanelProps } from "./subtitle-search-panel";
 import { cn } from "./utils/cn";
 
 interface PlayerControlsProps {
@@ -55,6 +56,8 @@ interface PlayerControlsProps {
   tracksLoading?: boolean;
   onSubtitleUpload?: () => void;
   onSubtitleRemove?: (id: string) => void;
+  /** Online subtitle search state and handlers. Omit to hide the search UI. */
+  subtitleSearch?: SubtitleSearchPanelProps;
   onShowInfo?: () => void;
   onOpenShortcuts?: () => void;
   onGoToChapter?: (index: number) => void;
@@ -92,7 +95,7 @@ export const PlayerControls = React.memo(function PlayerControls({
   onPlayPause, onSeek, onVolumeChange, onMuteToggle, onPlaybackRateChange, onLoopToggle,
   onFullScreenToggle, onFrameStep, onScreenshot, onNext, onPrevious, onFiltersChange,
   onZoomChange, onSubtitleChange, onAudioTrackChange, tracksLoading = false,
-  onSubtitleUpload, onSubtitleRemove,
+  onSubtitleUpload, onSubtitleRemove, subtitleSearch,
   onShowInfo, onOpenShortcuts, onGoToChapter, onTogglePiP, isPiP = false, pipSupported = false,
   onSeekHover, seekPreviewThumbnail = null,
   abLoop = { pointA: null, pointB: null, isLooping: false }, onABLoopCycle,
@@ -245,7 +248,7 @@ export const PlayerControls = React.memo(function PlayerControls({
                 </TooltipTrigger>
                 <TooltipContent><p>Subtitles</p></TooltipContent>
               </Tooltip>
-              <PopoverContent className="w-64">
+              <PopoverContent className={subtitleSearch ? "w-80" : "w-64"}>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label className="text-sm font-medium">Subtitles</Label>
@@ -280,6 +283,7 @@ export const PlayerControls = React.memo(function PlayerControls({
                   ) : (
                     <p className="text-sm text-muted-foreground text-center py-2">No subtitles available</p>
                   )}
+                  {subtitleSearch && <SubtitleSearchPanel {...subtitleSearch} />}
                 </div>
               </PopoverContent>
             </Popover>

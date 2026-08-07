@@ -2,6 +2,14 @@ export { useVideoPlayback } from './use-video-playback'
 export { useVideoFilters } from './use-video-filters'
 export { useSubtitles } from './use-subtitles'
 export type { UseSubtitlesOptions } from './use-subtitles'
+export { useSubtitleSearch } from './use-subtitle-search'
+export type {
+  UseSubtitleSearchOptions,
+  UseSubtitleSearchReturn,
+  SubtitleSearchStatus,
+  SubtitleSearchMode,
+  SubtitleSearchSource,
+} from './use-subtitle-search'
 export { usePlaylist } from './use-playlist'
 export { useKeyboardShortcuts } from './use-keyboard-shortcuts'
 export type { ShortcutHandlers } from './use-keyboard-shortcuts'

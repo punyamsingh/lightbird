@@ -1,7 +1,7 @@
 # LightBird — Project Overview
 
-> **Last updated:** 2026-05-31
-> **Branch context:** Plans 01–12 implemented. Project is now a pnpm monorepo publishing three npm packages: `@lightbird/core` (core), `@lightbird/player-react` (styled React components), and `@lightbird/player` (framework-agnostic Web Component). Docs page refactored into a server component with client islands (issue #35). FFmpeg.wasm lazy loading is now guaranteed zero-cost for HTML5-native playback and protected by a CI bundle-size budget (issue #54). Player UX polish added seek-hover thumbnail previews, A-B loop, and mobile touch gestures (issue #57).
+> **Last updated:** 2026-08-07
+> **Branch context:** Plans 01–12 implemented. Project is now a pnpm monorepo publishing three npm packages: `@lightbird/core` (core), `@lightbird/player-react` (styled React components), and `@lightbird/player` (framework-agnostic Web Component). Docs page refactored into a server component with client islands (issue #35). FFmpeg.wasm lazy loading is now guaranteed zero-cost for HTML5-native playback and protected by a CI bundle-size budget (issue #54). Player UX polish added seek-hover thumbnail previews, A-B loop, and mobile touch gestures (issue #57). Online subtitle download (VLSub-style hash matching) added via a new `@lightbird/core/search` entry point plus the repo's first API routes in `apps/web` (issue #79).
 
 ---
 
@@ -70,6 +70,7 @@ apps/web/src/app/page.tsx
 | `use-seek-preview.ts` | Seek-bar hover thumbnail previews via an offscreen video |
 | `use-ab-loop.ts` | A-B loop: repeat playback between two user-set points |
 | `use-touch-gestures.ts` | Mobile touch gestures: double-tap seek, swipe volume/brightness |
+| `use-subtitle-search.ts` | Online subtitle search: video hash → provider query → download |
 
 ---
 
@@ -146,6 +147,11 @@ The base `@lightbird/core` entry must stay FFmpeg-free and lean:
   on the built artifacts as part of `pnpm turbo test` (turbo builds
   `@lightbird/core` before testing it).
 
+Features that would push the base entry over budget get their own entry point
+instead. `@lightbird/core/search` (online subtitle search) was split out for
+exactly this reason. **Current headroom is ~0.46 KB gzip** — assume the next
+addition to the base entry needs the same treatment.
+
 ---
 
 ## Improvement Plans (Roadmap)
@@ -170,6 +176,7 @@ The base `@lightbird/core` entry must stay FFmpeg-free and lean:
 | CH | Chapters & Cue Points | **DONE** |
 | HLS | HLS/DASH Adaptive Streaming | In progress ([#48](https://github.com/punyamsingh/lightbird/issues/48)) — HLS-01 `HLSPlayer` **DONE**, HLS-02/03 pending |
 | PG | Interactive Playground | **DONE** ([#55](https://github.com/punyamsingh/lightbird/issues/55)) |
+| 14 | Online Subtitle Download (VLSub-style) | **DONE** ([#79](https://github.com/punyamsingh/lightbird/issues/79)) |
 
 ---
 
