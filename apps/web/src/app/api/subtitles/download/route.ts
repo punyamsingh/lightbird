@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
-import { OPENSUBTITLES_API_BASE, providerHeaders, isConfigured } from '../provider';
+import {
+  OPENSUBTITLES_API_BASE,
+  providerHeaders,
+  isConfigured,
+  fetchWithTimeout,
+  isTimeout,
+} from '../provider';
 
 export const runtime = 'nodejs';
 
@@ -12,12 +18,59 @@ const MAX_SUBTITLE_BYTES = 4 * 1024 * 1024;
  * pass is the discriminator: it throws on byte sequences that are not valid
  * UTF-8, which is exactly the case where 1252 is the better guess.
  */
-function decodeSubtitle(buffer: ArrayBuffer): string {
+function decodeSubtitle(buffer: Uint8Array): string {
   try {
     return new TextDecoder('utf-8', { fatal: true }).decode(buffer);
   } catch {
     return new TextDecoder('windows-1252').decode(buffer);
   }
+}
+
+/** Raised when a response exceeds {@link MAX_SUBTITLE_BYTES} mid-read. */
+class SubtitleTooLargeError extends Error {}
+
+/**
+ * Reads a response body, aborting as soon as it exceeds the size limit.
+ *
+ * Checking `arrayBuffer().byteLength` after the fact is too late — by then the
+ * whole payload is already resident, so an oversized or zip-bombed CDN response
+ * could exhaust the route's memory before the check ever runs.
+ */
+async function readBounded(response: Response, maxBytes: number): Promise<Uint8Array> {
+  if (!response.body) {
+    const buffer = new Uint8Array(await response.arrayBuffer());
+    if (buffer.byteLength > maxBytes) throw new SubtitleTooLargeError();
+    return buffer;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel();
+        throw new SubtitleTooLargeError();
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return merged;
 }
 
 /**
@@ -43,13 +96,16 @@ export async function POST(request: Request) {
   // Hop 1 — exchange the file id for a time-limited download link.
   let linkResponse: Response;
   try {
-    linkResponse = await fetch(`${OPENSUBTITLES_API_BASE}/download`, {
+    linkResponse = await fetchWithTimeout(`${OPENSUBTITLES_API_BASE}/download`, {
       method: 'POST',
       headers: { ...providerHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ file_id: Number(fileId) }),
       cache: 'no-store',
     });
-  } catch {
+  } catch (error) {
+    if (isTimeout(error)) {
+      return NextResponse.json({ error: 'Subtitle provider timed out' }, { status: 504 });
+    }
     return NextResponse.json({ error: 'Subtitle provider unreachable' }, { status: 502 });
   }
 
@@ -74,8 +130,11 @@ export async function POST(request: Request) {
   // CDN sets Content-Encoding: gzip.
   let fileResponse: Response;
   try {
-    fileResponse = await fetch(linkPayload.link, { cache: 'no-store' });
-  } catch {
+    fileResponse = await fetchWithTimeout(linkPayload.link, { cache: 'no-store' });
+  } catch (error) {
+    if (isTimeout(error)) {
+      return NextResponse.json({ error: 'Subtitle file timed out' }, { status: 504 });
+    }
     return NextResponse.json({ error: 'Subtitle file unreachable' }, { status: 502 });
   }
 
@@ -83,12 +142,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Subtitle file could not be fetched' }, { status: 502 });
   }
 
-  const buffer = await fileResponse.arrayBuffer();
+  let buffer: Uint8Array;
+  try {
+    buffer = await readBounded(fileResponse, MAX_SUBTITLE_BYTES);
+  } catch (error) {
+    if (error instanceof SubtitleTooLargeError) {
+      return NextResponse.json({ error: 'Subtitle file was unexpectedly large' }, { status: 502 });
+    }
+    return NextResponse.json({ error: 'Subtitle file could not be read' }, { status: 502 });
+  }
+
   if (buffer.byteLength === 0) {
     return NextResponse.json({ error: 'Subtitle file was empty' }, { status: 502 });
-  }
-  if (buffer.byteLength > MAX_SUBTITLE_BYTES) {
-    return NextResponse.json({ error: 'Subtitle file was unexpectedly large' }, { status: 502 });
   }
 
   return NextResponse.json({

@@ -149,7 +149,7 @@ The base `@lightbird/core` entry must stay FFmpeg-free and lean:
 
 Features that would push the base entry over budget get their own entry point
 instead. `@lightbird/core/search` (online subtitle search) was split out for
-exactly this reason. **Current headroom is ~0.46 KB gzip** — assume the next
+exactly this reason. **Current headroom is ~0.30 KB gzip** — assume the next
 addition to the base entry needs the same treatment.
 
 ---

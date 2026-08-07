@@ -89,6 +89,41 @@ describe('UniversalSubtitleManager.addSubtitleFromText', () => {
     expect(videoElement.querySelectorAll('track')).toHaveLength(0);
   });
 
+  it('keeps an activated subtitle enabled once the registration timer fires', async () => {
+    // Regression: registration disables the track 100ms later so it does not
+    // show by default. addSubtitleFromText activates immediately, and an
+    // unconditional timer would switch off the subtitle the user just applied.
+    const subtitle = await manager.addSubtitleFromText(SAMPLE_SRT, 'Movie.srt', 'en', 'srt');
+    manager.switchSubtitle(subtitle.id);
+
+    jest.advanceTimersByTime(200);
+
+    const track = videoElement.querySelector('track') as HTMLTrackElement;
+    expect(track.track.mode).not.toBe('disabled');
+  });
+
+  it('still disables a subtitle that was never activated', async () => {
+    await manager.addSubtitleFromText(SAMPLE_SRT, 'Movie.srt', 'en', 'srt');
+
+    jest.advanceTimersByTime(200);
+
+    const track = videoElement.querySelector('track') as HTMLTrackElement;
+    expect(track.track.mode).toBe('disabled');
+  });
+
+  it('disables a subtitle again once a different one is selected', async () => {
+    const first = await manager.addSubtitleFromText(SAMPLE_SRT, 'A.srt', 'en', 'srt');
+    manager.switchSubtitle(first.id);
+    const second = await manager.addSubtitleFromText(SAMPLE_SRT, 'B.srt', 'fr', 'srt');
+    manager.switchSubtitle(second.id);
+
+    jest.advanceTimersByTime(200);
+
+    const tracks = videoElement.querySelectorAll('track');
+    expect((tracks[0] as HTMLTrackElement).track.mode).toBe('disabled');
+    expect((tracks[1] as HTMLTrackElement).track.mode).not.toBe('disabled');
+  });
+
   it('works without a video element attached', async () => {
     const detached = new UniversalSubtitleManager();
     const subtitle = await detached.addSubtitleFromText(SAMPLE_SRT, 'Movie.srt', 'en', 'srt');

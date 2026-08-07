@@ -665,8 +665,13 @@ const LightBirdPlayer = () => {
 
   const handleSubtitleSearchApply = useCallback(
     async (result: SubtitleSearchResult) => {
+      // The item this subtitle was chosen for. If the user switches videos
+      // while the download is in flight, applying it to whatever is playing
+      // now would attach subtitles for the wrong film.
+      const requestedItemId = playlist.currentItem?.id ?? null;
       try {
         const downloaded = await subtitleSearch.download(result);
+        if ((playlist.currentItem?.id ?? null) !== requestedItemId) return;
         await subtitles.addSubtitleFromText(
           downloaded.content,
           downloaded.fileName,
@@ -674,10 +679,11 @@ const LightBirdPlayer = () => {
           downloaded.format
         );
       } catch {
-        // download() already reported the failure through the error toast.
+        // download() already reported the failure through the error toast,
+        // and a cancelled download is not a failure worth reporting at all.
       }
     },
-    [subtitleSearch, subtitles]
+    [playlist.currentItem, subtitleSearch, subtitles]
   );
 
   const subtitleSearchProps = useMemo(

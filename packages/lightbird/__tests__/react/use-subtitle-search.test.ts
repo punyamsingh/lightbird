@@ -198,6 +198,34 @@ describe('useSubtitleSearch', () => {
     expect(result.current.error).toBeNull();
   });
 
+  it('stays silent when a superseded search fails with a non-abort error', async () => {
+    // A newer search aborts the older controller, but the older request can
+    // still reject on its own afterwards. That stale failure must not overwrite
+    // the newer search's state or fire a toast.
+    const onError = jest.fn();
+    let failFirst: ((e: Error) => void) | undefined;
+    searchSubtitles
+      .mockImplementationOnce(() => new Promise((_, reject) => { failFirst = reject; }))
+      .mockResolvedValue([makeResult()]);
+
+    const { result } = renderHook(() => useSubtitleSearch({ onError }));
+
+    act(() => {
+      void result.current.search({ fileName: 'First.mkv' });
+    });
+    // Second search supersedes the first, aborting its controller.
+    await act(async () => {
+      await result.current.search({ fileName: 'Second.mkv' });
+    });
+    await act(async () => {
+      failFirst?.(new Error('stale network failure'));
+    });
+
+    expect(onError).not.toHaveBeenCalled();
+    expect(result.current.status).toBe('ready');
+    expect(result.current.error).toBeNull();
+  });
+
   it('clears prior results when a new search starts', async () => {
     searchSubtitles.mockResolvedValue([makeResult()]);
     const { result } = renderHook(() => useSubtitleSearch());
@@ -257,6 +285,46 @@ describe('useSubtitleSearch', () => {
 
       expect(onError).toHaveBeenCalledWith('Download failed');
       expect(result.current.downloadingId).toBeNull();
+    });
+
+    it('passes an abort signal so a stale download can be cancelled', async () => {
+      downloadSubtitle.mockResolvedValue({ content: 'x', fileName: 'a.srt', format: 'srt' });
+
+      const { result } = renderHook(() => useSubtitleSearch());
+      await act(async () => {
+        await result.current.download(makeResult());
+      });
+
+      expect(downloadSubtitle.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
+    });
+
+    it('aborts an in-flight download on reset', async () => {
+      let capturedSignal: AbortSignal | undefined;
+      downloadSubtitle.mockImplementation(async (_r, opts) => {
+        capturedSignal = opts?.signal;
+        return new Promise(() => {}) as Promise<never>; // never settles
+      });
+
+      const { result } = renderHook(() => useSubtitleSearch());
+      act(() => {
+        void result.current.download(makeResult()).catch(() => {});
+      });
+      act(() => result.current.reset());
+
+      expect(capturedSignal?.aborted).toBe(true);
+    });
+
+    it('rethrows a cancellation as an AbortError rather than an error toast', async () => {
+      const onError = jest.fn();
+      const abortError = Object.assign(new Error('aborted'), { name: 'AbortError' });
+      downloadSubtitle.mockRejectedValue(abortError);
+
+      const { result } = renderHook(() => useSubtitleSearch({ onError }));
+      await act(async () => {
+        await expect(result.current.download(makeResult())).rejects.toBe(abortError);
+      });
+
+      expect(onError).not.toHaveBeenCalled();
     });
 
     it('passes a custom endpoint through to the download call', async () => {

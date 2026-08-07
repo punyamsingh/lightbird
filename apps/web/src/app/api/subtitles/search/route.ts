@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
-import { OPENSUBTITLES_API_BASE, providerHeaders, isConfigured } from '../provider';
+import {
+  OPENSUBTITLES_API_BASE,
+  providerHeaders,
+  isConfigured,
+  fetchWithTimeout,
+  isTimeout,
+} from '../provider';
 
 /** Search params forwarded verbatim to the provider. Anything else is dropped. */
 const ALLOWED_PARAMS = ['moviehash', 'moviebytesize', 'query', 'languages'] as const;
@@ -38,11 +44,14 @@ export async function GET(request: Request) {
 
   let upstream: Response;
   try {
-    upstream = await fetch(`${OPENSUBTITLES_API_BASE}/subtitles?${forwarded.toString()}`, {
-      headers: providerHeaders(),
-      next: { revalidate: 3600 },
-    });
-  } catch {
+    upstream = await fetchWithTimeout(
+      `${OPENSUBTITLES_API_BASE}/subtitles?${forwarded.toString()}`,
+      { headers: providerHeaders(), next: { revalidate: 3600 } } as RequestInit
+    );
+  } catch (error) {
+    if (isTimeout(error)) {
+      return NextResponse.json({ error: 'Subtitle provider timed out' }, { status: 504 });
+    }
     return NextResponse.json({ error: 'Subtitle provider unreachable' }, { status: 502 });
   }
 

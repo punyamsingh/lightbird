@@ -36,6 +36,9 @@ export class SubtitleSearchError extends Error {
   }
 }
 
+/** Requests that outlive this are treated as a stalled proxy or provider. */
+export const DEFAULT_TIMEOUT_MS = 20_000;
+
 export interface SubtitleSearchOptions {
   /** Proxy prefix. Defaults to {@link DEFAULT_SEARCH_ENDPOINT}. */
   endpoint?: string;
@@ -43,6 +46,8 @@ export interface SubtitleSearchOptions {
   signal?: AbortSignal;
   /** Injectable for tests. */
   fetchImpl?: typeof fetch;
+  /** Abort after this many ms. Defaults to {@link DEFAULT_TIMEOUT_MS}; 0 disables. */
+  timeoutMs?: number;
 }
 
 /** Maps an HTTP status from the proxy onto an error kind. */
@@ -120,18 +125,68 @@ export function buildSearchParams(query: SubtitleSearchQuery): URLSearchParams {
   return params;
 }
 
+/**
+ * Composes a caller signal with a timeout into one signal.
+ *
+ * Deliberately not `AbortSignal.any` / `AbortSignal.timeout`: those need
+ * Chrome 116+, Safari 17.4+ and Node 20+, which is a narrower floor than the
+ * rest of this package requires. A plain controller works everywhere `fetch`
+ * does. Returns a `cleanup` the caller must run to clear the timer.
+ */
+function withTimeout(
+  signal: AbortSignal | undefined,
+  timeoutMs: number
+): { signal: AbortSignal | undefined; timedOut: () => boolean; cleanup: () => void } {
+  if (timeoutMs <= 0) {
+    return { signal, timedOut: () => false, cleanup: () => {} };
+  }
+
+  const controller = new AbortController();
+  let didTimeOut = false;
+
+  const timer = setTimeout(() => {
+    didTimeOut = true;
+    controller.abort();
+  }, timeoutMs);
+
+  const onCallerAbort = () => controller.abort();
+  if (signal) {
+    if (signal.aborted) controller.abort();
+    else signal.addEventListener('abort', onCallerAbort);
+  }
+
+  return {
+    signal: controller.signal,
+    timedOut: () => didTimeOut,
+    cleanup: () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onCallerAbort);
+    },
+  };
+}
+
 async function request(
   url: string,
   init: RequestInit,
-  fetchImpl: typeof fetch
+  fetchImpl: typeof fetch,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS
 ): Promise<unknown> {
+  const timeout = withTimeout(init.signal ?? undefined, timeoutMs);
+
   let response: Response;
   try {
-    response = await fetchImpl(url, init);
+    response = await fetchImpl(url, { ...init, signal: timeout.signal });
   } catch (error) {
-    // Rethrow aborts untouched so callers can distinguish cancellation.
+    // A timeout aborts our own controller, so it surfaces as an AbortError.
+    // Report it as a real failure — the caller never asked to cancel.
+    if (timeout.timedOut()) {
+      throw new SubtitleSearchError('failed', 'Subtitle search timed out');
+    }
+    // Rethrow caller aborts untouched so they can distinguish cancellation.
     if ((error as Error)?.name === 'AbortError') throw error;
     throw new SubtitleSearchError('failed', ERROR_MESSAGES.failed);
+  } finally {
+    timeout.cleanup();
   }
 
   if (!response.ok) {
@@ -156,7 +211,7 @@ export async function searchSubtitles(
   query: SubtitleSearchQuery,
   options: SubtitleSearchOptions = {}
 ): Promise<SubtitleSearchResult[]> {
-  const { endpoint = DEFAULT_SEARCH_ENDPOINT, signal, fetchImpl = fetch } = options;
+  const { endpoint = DEFAULT_SEARCH_ENDPOINT, signal, fetchImpl = fetch, timeoutMs } = options;
 
   if (!query.hash && !query.text) {
     throw new SubtitleSearchError('failed', 'A hash or a search term is required');
@@ -166,7 +221,8 @@ export async function searchSubtitles(
   const payload = await request(
     `${endpoint}/search?${params.toString()}`,
     { method: 'GET', signal },
-    fetchImpl
+    fetchImpl,
+    timeoutMs
   );
 
   return normalizeSearchResults(payload);
@@ -197,7 +253,7 @@ export async function downloadSubtitle(
   result: Pick<SubtitleSearchResult, 'fileId' | 'fileName'>,
   options: SubtitleSearchOptions = {}
 ): Promise<DownloadedSubtitle> {
-  const { endpoint = DEFAULT_SEARCH_ENDPOINT, signal, fetchImpl = fetch } = options;
+  const { endpoint = DEFAULT_SEARCH_ENDPOINT, signal, fetchImpl = fetch, timeoutMs } = options;
 
   const payload = (await request(
     `${endpoint}/download`,
@@ -207,7 +263,8 @@ export async function downloadSubtitle(
       body: JSON.stringify({ fileId: result.fileId }),
       signal,
     },
-    fetchImpl
+    fetchImpl,
+    timeoutMs
   )) as { content?: unknown; fileName?: unknown };
 
   if (typeof payload?.content !== 'string' || payload.content.length === 0) {

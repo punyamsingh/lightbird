@@ -67,6 +67,8 @@ export class UniversalSubtitleManager {
   private records: SubtitleRecord[] = [];
   private videoElement: HTMLVideoElement | null = null;
   private nextId = 0;
+  /** Currently selected subtitle id, or "-1" for none. */
+  private activeId = "-1";
 
   constructor(videoElement?: HTMLVideoElement) {
     this.videoElement = videoElement || null;
@@ -184,9 +186,15 @@ export class UniversalSubtitleManager {
 
       this.videoElement.appendChild(track);
       const textTrack = track.track;
+      // Briefly hidden so the browser fetches and parses the cues, then
+      // disabled — but only if the caller has not activated this subtitle in
+      // the meantime. addSubtitleFromText() selects immediately, and without
+      // this guard the timer would switch off the track the user just got.
       textTrack.mode = "hidden";
       setTimeout(() => {
-        textTrack.mode = "disabled";
+        if (this.activeId !== subtitle.id) {
+          textTrack.mode = "disabled";
+        }
       }, 100);
     }
 
@@ -214,10 +222,14 @@ export class UniversalSubtitleManager {
     }
 
     this.records.splice(index, 1);
+    if (this.activeId === id) this.activeId = "-1";
     return true;
   }
 
   switchSubtitle(id: string): void {
+    // Recorded before the early return so a detached manager still reports the
+    // right selection once a video element is attached.
+    this.activeId = id;
     if (!this.videoElement) return;
 
     const tracks = this.videoElement.textTracks;
@@ -308,6 +320,7 @@ export class UniversalSubtitleManager {
       tracks.forEach((track) => track.remove());
     }
     this.records = [];
+    this.activeId = "-1";
   }
 
   destroy(): void {

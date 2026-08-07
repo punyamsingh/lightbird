@@ -82,6 +82,10 @@ export function useSubtitleSearch(
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
+  // Downloads get their own controller: a download is cancelled by the same
+  // events that cancel a search (video change, unmount), but it must not be
+  // aborted merely because a newer *search* superseded the current one.
+  const downloadAbortRef = useRef<AbortController | null>(null);
   // Guards against setState after unmount, since a search spans several awaits.
   const mountedRef = useRef(true);
 
@@ -90,12 +94,15 @@ export function useSubtitleSearch(
     return () => {
       mountedRef.current = false;
       abortRef.current?.abort();
+      downloadAbortRef.current?.abort();
     };
   }, []);
 
   const reset = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
+    downloadAbortRef.current?.abort();
+    downloadAbortRef.current = null;
     setStatus("idle");
     setResults([]);
     setMode(null);
@@ -163,7 +170,16 @@ export function useSubtitleSearch(
           );
         }
       } catch (err) {
-        if ((err as Error)?.name === "AbortError" || !mountedRef.current) return;
+        // A superseded search must stay silent even when its failure is not an
+        // AbortError — hashing or the request can reject on its own after the
+        // newer search has already aborted this controller.
+        if (
+          controller.signal.aborted ||
+          (err as Error)?.name === "AbortError" ||
+          !mountedRef.current
+        ) {
+          return;
+        }
         const { message, kind } = messageFor(err);
         setError(message);
         setErrorKind(kind);
@@ -176,15 +192,26 @@ export function useSubtitleSearch(
 
   const download = useCallback(
     async (result: SubtitleSearchResult): Promise<DownloadedSubtitle> => {
+      downloadAbortRef.current?.abort();
+      const controller = new AbortController();
+      downloadAbortRef.current = controller;
+
       setDownloadingId(result.fileId);
       try {
-        return await downloadSubtitle(result, { endpoint });
+        return await downloadSubtitle(result, { endpoint, signal: controller.signal });
       } catch (err) {
+        // Cancellation propagates as an AbortError so the caller can tell
+        // "the user moved on" from "the download actually failed", and no
+        // error toast fires for the former.
+        if ((err as Error)?.name === "AbortError") throw err;
         const { message } = messageFor(err);
         onError?.(message);
         throw new Error(message);
       } finally {
-        if (mountedRef.current) setDownloadingId(null);
+        if (mountedRef.current && downloadAbortRef.current === controller) {
+          downloadAbortRef.current = null;
+          setDownloadingId(null);
+        }
       }
     },
     [endpoint, onError]

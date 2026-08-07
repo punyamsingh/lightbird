@@ -41,6 +41,33 @@ describe('computeOpenSubtitlesHash', () => {
     expect(hash).toBe(BigInt(size).toString(16).padStart(16, '0'));
   });
 
+  it('reads the words as little-endian, not big-endian', async () => {
+    // An independent fixed vector rather than a re-derivation of the
+    // implementation's own rules: bytes 1..8 in the head chunk must sum as
+    // 0x0807060504030201. Big-endian would read 0x0102030405060708 instead,
+    // so this fails loudly on an endianness mistake.
+    const size = MIN_HASHABLE_SIZE;
+    const bytes = new Uint8Array(size);
+    bytes.set([1, 2, 3, 4, 5, 6, 7, 8], 0);
+
+    const hash = await computeOpenSubtitlesHash(makeSource(bytes));
+    const expected = (BigInt(size) + 0x0807060504030201n) & ((1n << 64n) - 1n);
+    expect(hash).toBe(expected.toString(16).padStart(16, '0'));
+  });
+
+  it('reads the tail chunk from the end of the file, not an arbitrary offset', async () => {
+    // Distinct markers in head and tail: a wrong tail offset in a file larger
+    // than two chunks would miss the marker entirely and change the hash.
+    const size = MIN_HASHABLE_SIZE * 4;
+    const bytes = new Uint8Array(size);
+    bytes[0] = 0x11;
+    bytes[size - HASH_CHUNK_SIZE] = 0x22;
+
+    const hash = await computeOpenSubtitlesHash(makeSource(bytes));
+    const expected = (BigInt(size) + 0x11n + 0x22n) & ((1n << 64n) - 1n);
+    expect(hash).toBe(expected.toString(16).padStart(16, '0'));
+  });
+
   it('adds every little-endian uint64 from both chunks', async () => {
     const size = MIN_HASHABLE_SIZE;
     const bytes = new Uint8Array(size);

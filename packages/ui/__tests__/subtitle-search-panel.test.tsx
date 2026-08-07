@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { SubtitleSearchResult } from '@lightbird/core';
 import { SubtitleSearchPanel, type SubtitleSearchPanelProps } from '../src/subtitle-search-panel';
@@ -111,12 +111,22 @@ describe('SubtitleSearchPanel', () => {
     expect(screen.getByLabelText(/hearing impaired/i)).toBeInTheDocument();
   });
 
+  it('exposes each result as a button, not inert list text', () => {
+    // The list-item role belongs on a wrapper: assistive tech must announce
+    // these as actions that download a subtitle.
+    renderPanel({ status: 'ready', mode: 'text', results: [makeResult()] });
+
+    const list = screen.getByRole('list');
+    expect(within(list).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(list).getAllByRole('button')).toHaveLength(1);
+  });
+
   it('calls onApply with the clicked result', async () => {
     const user = userEvent.setup();
     const result = makeResult({ fileId: '42' });
     const { props } = renderPanel({ status: 'ready', mode: 'text', results: [result] });
 
-    await user.click(screen.getByRole('listitem'));
+    await user.click(within(screen.getByRole('list')).getByRole('button'));
 
     expect(props.onApply).toHaveBeenCalledWith(result);
   });
@@ -129,7 +139,7 @@ describe('SubtitleSearchPanel', () => {
       downloadingId: '1',
     });
 
-    for (const item of screen.getAllByRole('listitem')) {
+    for (const item of within(screen.getByRole('list')).getAllByRole('button')) {
       expect(item).toBeDisabled();
     }
   });
@@ -141,6 +151,6 @@ describe('SubtitleSearchPanel', () => {
       results: [makeResult({ fileId: '1' }), makeResult({ fileId: '2' }), makeResult({ fileId: '3' })],
     });
 
-    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+    expect(within(screen.getByRole('list')).getAllByRole('listitem')).toHaveLength(3);
   });
 });

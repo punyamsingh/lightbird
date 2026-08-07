@@ -65,17 +65,21 @@ export function useSubtitles(options?: UseSubtitlesOptions) {
       lang: string,
       format: "vtt" | "srt" | "ass" | "ssa" = "srt"
     ) => {
-      if (!managerRef.current) return null;
+      // Captured before the await: loading another video swaps in a new
+      // manager, and an id from the old one means nothing to the new one.
+      const manager = managerRef.current;
+      if (!manager) return null;
       try {
-        const subtitle = await managerRef.current.addSubtitleFromText(
+        const subtitle = await manager.addSubtitleFromText(
           content,
           fileName,
           lang,
           format
         );
-        setSubtitles(managerRef.current.getSubtitles());
+        if (managerRef.current !== manager) return null;
+        setSubtitles(manager.getSubtitles());
         setActiveSubtitle(subtitle.id);
-        managerRef.current.switchSubtitle(subtitle.id);
+        manager.switchSubtitle(subtitle.id);
         options?.onSuccess?.(`Applied ${subtitle.name}`);
         return subtitle;
       } catch (error) {

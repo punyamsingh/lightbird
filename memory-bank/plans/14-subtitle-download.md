@@ -58,10 +58,11 @@ The returned download link is also cross-origin, so hop 2 must be server-side to
 The first cut re-exported the search modules from the base `@lightbird/core`
 entry and pushed it to 17.13 KB gzip against the 16.00 KB budget (issue #54).
 Fixed by giving the feature its own entry point, `@lightbird/core/search`,
-mirroring how `/react` is split. Base entry now measures 15.54 KB.
+mirroring how `/react` is split. Base entry now measures 15.70 KB.
 
-**Headroom is now 0.46 KB.** The next addition to the base entry will likely
-breach the budget — either split it out the same way or revisit the number.
+**Headroom is now 0.30 KB.** The next addition to the base entry will almost
+certainly breach the budget — either split it out the same way or revisit the
+number.
 
 ### Configuration
 
@@ -80,9 +81,35 @@ Modified: `subtitle-manager.ts`, `use-subtitles.ts`, `types/index.ts`,
 `src/index.ts`, `src/react/index.ts`, `tsup.config.ts`, `package.json`,
 `packages/ui/src/{index.ts,player-controls.tsx,lightbird-player.tsx}`
 
-New tests (76): `opensubtitles-hash.test.ts` (15), `subtitle-search.test.ts` (34),
-`react/use-subtitle-search.test.ts` (17), `subtitle-manager-download.test.ts` (10),
-`ui/__tests__/subtitle-search-panel.test.tsx` (16)
+New tests (105): `opensubtitles-hash.test.ts` (17), `subtitle-search.test.ts` (37),
+`react/use-subtitle-search.test.ts` (21), `subtitle-manager-download.test.ts` (13),
+`ui/__tests__/subtitle-search-panel.test.tsx` (17)
+
+### Review hardening (PR #80)
+
+Fixed after review, each with a regression test:
+
+- **Registration timer disabled an activated track.** `registerSubtitle()` hides
+  a new track then disables it 100 ms later so it does not show by default.
+  `addSubtitleFromText()` activates immediately, so the timer switched off the
+  subtitle the user had just applied. The manager now tracks `activeId` and the
+  timer skips a track that has since been selected.
+- **Stale downloads could land on the wrong video.** `reset()` aborted only the
+  search. Downloads now carry their own `AbortController`, aborted on reset and
+  unmount, and the player captures the playlist item id before downloading and
+  discards the result if the user has moved on.
+- **Superseded searches could publish stale errors.** The catch block now checks
+  `controller.signal.aborted`, not just `AbortError`.
+- **Manager swap across an await.** `useSubtitles.addSubtitleFromText()` captures
+  the manager before awaiting and bails if it has been replaced.
+- **Unbounded outbound requests.** Both proxy routes use `fetchWithTimeout`
+  (10 s) and map expiry to 504; the client composes a 20 s timeout with the
+  caller signal, deliberately avoiding `AbortSignal.any` (Chrome 116+/Safari
+  17.4+) to keep the browser floor where the rest of the package sits.
+- **Unbounded CDN read.** The download route streams the body and cancels the
+  reader past 4 MiB instead of buffering first and measuring afterwards.
+- **Result buttons announced as inert list text.** `role="listitem"` moved to a
+  wrapper so each result keeps its native button role.
 
 No new runtime dependencies.
 

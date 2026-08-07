@@ -112,10 +112,12 @@ export function SubtitleSearchPanel({
             {results.map((result) => {
               const isDownloading = downloadingId === result.fileId;
               return (
+                // The list-item role goes on the wrapper so the button keeps
+                // its native role — screen readers must announce this as an
+                // action that downloads a subtitle, not as inert list text.
+                <div key={result.fileId} role="listitem">
                 <button
-                  key={result.fileId}
                   type="button"
-                  role="listitem"
                   onClick={() => onApply(result)}
                   disabled={downloadingId !== null}
                   className={cn(
@@ -147,6 +149,7 @@ export function SubtitleSearchPanel({
                     <span className="shrink-0">{formatCount(result.downloadCount)}</span>
                   </div>
                 </button>
+                </div>
               );
             })}
           </div>

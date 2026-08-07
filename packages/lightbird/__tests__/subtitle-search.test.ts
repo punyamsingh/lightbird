@@ -192,6 +192,53 @@ describe('searchSubtitles', () => {
     await expect(searchSubtitles({ hash: 'abc' }, { fetchImpl })).rejects.toBe(abortError);
   });
 
+  it('aborts a stalled request and reports it as a failure, not a cancellation', async () => {
+    jest.useFakeTimers();
+    try {
+      // Resolves only if the composed signal aborts — i.e. the timeout fired.
+      const fetchImpl = jest.fn(
+        (_url: string, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () =>
+              reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))
+            );
+          })
+      ) as unknown as jest.Mock;
+
+      const promise = searchSubtitles({ hash: 'abc' }, { fetchImpl, timeoutMs: 1000 });
+      const assertion = expect(promise).rejects.toMatchObject({ kind: 'failed' });
+      jest.advanceTimersByTime(1500);
+      await assertion;
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('still surfaces a caller abort as an AbortError when a timeout is armed', async () => {
+    const controller = new AbortController();
+    const fetchImpl = jest.fn(
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () =>
+            reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))
+          );
+        })
+    ) as unknown as jest.Mock;
+
+    const promise = searchSubtitles({ hash: 'abc' }, { fetchImpl, signal: controller.signal });
+    controller.abort();
+
+    await expect(promise).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  it('does not arm a timeout when timeoutMs is 0', async () => {
+    const fetchImpl = jsonFetch({ data: [] });
+    await searchSubtitles({ hash: 'abc' }, { fetchImpl, timeoutMs: 0 });
+
+    // The caller signal passes through untouched — here, none was given.
+    expect(fetchImpl.mock.calls[0][1].signal).toBeUndefined();
+  });
+
   it('treats a malformed JSON body as a failure', async () => {
     const fetchImpl = jest.fn(async () => ({
       ok: true,
