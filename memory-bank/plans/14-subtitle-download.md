@@ -81,9 +81,10 @@ Modified: `subtitle-manager.ts`, `use-subtitles.ts`, `types/index.ts`,
 `src/index.ts`, `src/react/index.ts`, `tsup.config.ts`, `package.json`,
 `packages/ui/src/{index.ts,player-controls.tsx,lightbird-player.tsx}`
 
-New tests (110): `opensubtitles-hash.test.ts` (17), `subtitle-search.test.ts` (38),
+New tests (119): `opensubtitles-hash.test.ts` (17), `subtitle-search.test.ts` (38),
 `react/use-subtitle-search.test.ts` (25), `subtitle-manager-download.test.ts` (13),
-`ui/__tests__/subtitle-search-panel.test.tsx` (17)
+`ui/__tests__/subtitle-search-panel.test.tsx` (17),
+`web/__tests__/subtitles-provider.test.ts` (9)
 
 ### Review hardening (PR #80)
 
@@ -152,6 +153,28 @@ Declined: a suggestion to change "afterwards" to "afterward" in this file.
 CodeRabbit's LanguageTool runs an American-English profile, but the project's
 prose is British (`behaviour` in `language-names.ts`, "Optimisation" in
 CLAUDE.md), so the change would introduce the inconsistency it aims to remove.
+
+### Third review pass
+
+- **Discarded non-ok bodies were never cancelled.** `fetchWithTimeout` returns
+  early on a non-ok response so status mapping does not pay to read a payload it
+  discards — but an unread body holds its connection until the runtime collects
+  it, so a provider answering 429 with a long error page would pin a socket per
+  rejected request, exactly when the route is already under pressure. The helper
+  now cancels the body before returning, inside the still-armed deadline so a
+  stalled cancel cannot outlive the timeout, and swallows a cancel rejection so
+  an already-errored stream cannot turn a mappable 401 into a thrown error.
+
+  This is the third variant of one theme in this PR: the response body outlives
+  the `fetch` promise, so every path that stops caring about a response has to
+  say so explicitly — bound it (`readBounded`), keep the deadline over it
+  (`consume`), or cancel it.
+
+`apps/web` had no coverage for the proxy helper, so this pass adds
+`__tests__/subtitles-provider.test.ts` (9 tests): the cancel-on-non-ok path with
+both a stubbed and a real `ReadableStream` body, cancel-rejection tolerance, a
+null body, `consume` running only for ok responses, the deadline still covering
+a stalled body read, and `isTimeout` classification.
 
 ### Known limitation
 

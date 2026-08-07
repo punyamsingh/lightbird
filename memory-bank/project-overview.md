@@ -133,6 +133,8 @@ Test locations:
 - `packages/lightbird/__tests__/` — library tests (18 files)
 - `packages/lightbird/__tests__/react/` — hook tests (14 files)
 - `packages/ui/__tests__/` — component tests (5 files)
+- `apps/web/__tests__/` — web-app unit tests (2 files), covering framework-agnostic
+  app logic such as the playground snippet generator and the subtitle proxy helper
 
 Shared setup: `jest.setup.ts` (root)
 

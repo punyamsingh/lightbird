@@ -47,8 +47,17 @@ export async function fetchWithTimeout<T>(
   try {
     const response = await fetch(url, { ...init, signal: controller.signal });
     // A non-ok response never has its body read, so callers can map the status
-    // without paying for a payload they are going to discard.
-    if (!response.ok) return { response };
+    // without paying for a payload they are going to discard. Cancel it rather
+    // than abandoning it: an unread body holds its connection until the runtime
+    // collects it, and a provider that returns 429 with a long error page would
+    // pin a socket per rejected request. The deadline is still armed here, so a
+    // stalled cancel cannot outlive the timeout.
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => {
+        // Already errored or closed — the body is gone either way.
+      });
+      return { response };
+    }
     return { response, body: await consume(response) };
   } catch (error) {
     if (timedOut) {
