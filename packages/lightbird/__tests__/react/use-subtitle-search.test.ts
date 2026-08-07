@@ -149,6 +149,49 @@ describe('useSubtitleSearch', () => {
     expect(result.current.error).toMatch(/not available/i);
   });
 
+  it('does not toast when the deployment simply has no search backend', async () => {
+    // The user cannot act on a missing backend and the panel hides itself on
+    // this kind, so a toast would be pure noise.
+    const onError = jest.fn();
+    searchSubtitles.mockRejectedValue(
+      new SubtitleSearchError('unavailable', 'Subtitle search is not available on this deployment')
+    );
+
+    const { result } = renderHook(() => useSubtitleSearch({ onError }));
+    await act(async () => {
+      await result.current.search({ fileName: 'Movie.mkv' });
+    });
+
+    expect(onError).not.toHaveBeenCalled();
+    expect(result.current.errorKind).toBe('unavailable');
+  });
+
+  it('keeps the unavailable verdict across a reset', async () => {
+    // Otherwise the search UI reappears on every video change and the user
+    // rediscovers the same missing backend each time.
+    searchSubtitles.mockRejectedValue(new SubtitleSearchError('unavailable', 'nope'));
+
+    const { result } = renderHook(() => useSubtitleSearch());
+    await act(async () => {
+      await result.current.search({ fileName: 'Movie.mkv' });
+    });
+    act(() => result.current.reset());
+
+    expect(result.current.errorKind).toBe('unavailable');
+  });
+
+  it('clears a recoverable error kind on reset', async () => {
+    searchSubtitles.mockRejectedValue(new SubtitleSearchError('rate-limited', 'slow down'));
+
+    const { result } = renderHook(() => useSubtitleSearch());
+    await act(async () => {
+      await result.current.search({ fileName: 'Movie.mkv' });
+    });
+    act(() => result.current.reset());
+
+    expect(result.current.errorKind).toBeNull();
+  });
+
   it('reports errors through the onError callback', async () => {
     const onError = jest.fn();
     searchSubtitles.mockRejectedValue(new SubtitleSearchError('rate-limited', 'Slow down'));

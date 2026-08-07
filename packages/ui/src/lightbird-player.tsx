@@ -650,8 +650,14 @@ const LightBirdPlayer = () => {
   // Clear stale results when the video changes — subtitles found for the
   // previous file are meaningless for this one.
   const currentItemId = playlist.currentItem?.id ?? null;
+  // Mirrored into a ref because an async callback closes over the `playlist`
+  // object from the render that created it. Reading `playlist.currentItem`
+  // after an await returns that frozen value, never the live one, so a
+  // closure-only comparison would always find itself unchanged.
+  const currentItemIdRef = useRef<string | null>(currentItemId);
   const resetSubtitleSearch = subtitleSearch.reset;
   useEffect(() => {
+    currentItemIdRef.current = currentItemId;
     resetSubtitleSearch();
   }, [currentItemId, resetSubtitleSearch]);
 
@@ -668,10 +674,10 @@ const LightBirdPlayer = () => {
       // The item this subtitle was chosen for. If the user switches videos
       // while the download is in flight, applying it to whatever is playing
       // now would attach subtitles for the wrong film.
-      const requestedItemId = playlist.currentItem?.id ?? null;
+      const requestedItemId = currentItemIdRef.current;
       try {
         const downloaded = await subtitleSearch.download(result);
-        if ((playlist.currentItem?.id ?? null) !== requestedItemId) return;
+        if (currentItemIdRef.current !== requestedItemId) return;
         await subtitles.addSubtitleFromText(
           downloaded.content,
           downloaded.fileName,

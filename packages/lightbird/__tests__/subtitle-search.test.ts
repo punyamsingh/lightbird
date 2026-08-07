@@ -214,6 +214,32 @@ describe('searchSubtitles', () => {
     }
   });
 
+  it('keeps the timeout armed across the body read, not just the headers', async () => {
+    jest.useFakeTimers();
+    try {
+      // Headers arrive immediately; the body never finishes. Clearing the timer
+      // once fetch() resolved would leave this hanging forever.
+      const fetchImpl = jest.fn(async (_url: string, init: RequestInit) => ({
+        ok: true,
+        status: 200,
+        json: () =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () =>
+              reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))
+            );
+          }),
+      })) as unknown as jest.Mock;
+
+      const promise = searchSubtitles({ hash: 'abc' }, { fetchImpl, timeoutMs: 1000 });
+      const assertion = expect(promise).rejects.toThrow(/timed out/i);
+      await Promise.resolve();
+      jest.advanceTimersByTime(1500);
+      await assertion;
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('still surfaces a caller abort as an AbortError when a timeout is armed', async () => {
     const controller = new AbortController();
     const fetchImpl = jest.fn(

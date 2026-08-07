@@ -173,31 +173,40 @@ async function request(
 ): Promise<unknown> {
   const timeout = withTimeout(init.signal ?? undefined, timeoutMs);
 
-  let response: Response;
+  // The timer stays armed across the body read as well as the headers.
+  // Clearing it after fetch() resolves would leave a stalled response stream
+  // unbounded — headers can arrive promptly and the body never finish.
   try {
-    response = await fetchImpl(url, { ...init, signal: timeout.signal });
-  } catch (error) {
-    // A timeout aborts our own controller, so it surfaces as an AbortError.
-    // Report it as a real failure — the caller never asked to cancel.
-    if (timeout.timedOut()) {
-      throw new SubtitleSearchError('failed', 'Subtitle search timed out');
+    let response: Response;
+    try {
+      response = await fetchImpl(url, { ...init, signal: timeout.signal });
+    } catch (error) {
+      // A timeout aborts our own controller, so it surfaces as an AbortError.
+      // Report it as a real failure — the caller never asked to cancel.
+      if (timeout.timedOut()) {
+        throw new SubtitleSearchError('failed', 'Subtitle search timed out');
+      }
+      // Rethrow caller aborts untouched so they can distinguish cancellation.
+      if ((error as Error)?.name === 'AbortError') throw error;
+      throw new SubtitleSearchError('failed', ERROR_MESSAGES.failed);
     }
-    // Rethrow caller aborts untouched so they can distinguish cancellation.
-    if ((error as Error)?.name === 'AbortError') throw error;
-    throw new SubtitleSearchError('failed', ERROR_MESSAGES.failed);
+
+    if (!response.ok) {
+      const kind = kindForStatus(response.status);
+      throw new SubtitleSearchError(kind, ERROR_MESSAGES[kind]);
+    }
+
+    try {
+      return await response.json();
+    } catch (error) {
+      if (timeout.timedOut()) {
+        throw new SubtitleSearchError('failed', 'Subtitle search timed out');
+      }
+      if ((error as Error)?.name === 'AbortError') throw error;
+      throw new SubtitleSearchError('failed', 'Subtitle search returned a malformed response');
+    }
   } finally {
     timeout.cleanup();
-  }
-
-  if (!response.ok) {
-    const kind = kindForStatus(response.status);
-    throw new SubtitleSearchError(kind, ERROR_MESSAGES[kind]);
-  }
-
-  try {
-    return await response.json();
-  } catch {
-    throw new SubtitleSearchError('failed', 'Subtitle search returned a malformed response');
   }
 }
 

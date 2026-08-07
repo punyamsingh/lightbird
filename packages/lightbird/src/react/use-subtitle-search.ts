@@ -107,7 +107,10 @@ export function useSubtitleSearch(
     setResults([]);
     setMode(null);
     setError(null);
-    setErrorKind(null);
+    // "unavailable" describes the deployment, not the video, so it survives a
+    // reset. Clearing it would make the search UI reappear on every video
+    // change and let the user re-discover the same missing backend each time.
+    setErrorKind((prev) => (prev === "unavailable" ? prev : null));
     setDownloadingId(null);
   }, []);
 
@@ -184,7 +187,10 @@ export function useSubtitleSearch(
         setError(message);
         setErrorKind(kind);
         setStatus("error");
-        onError?.(message);
+        // A deployment with no search backend is not a failure the user caused
+        // or can act on. The UI hides the panel on this kind; a toast would
+        // just be noise they cannot do anything about.
+        if (kind !== "unavailable") onError?.(message);
       }
     },
     [endpoint, languages, onError, onSuccess]

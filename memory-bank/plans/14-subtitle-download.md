@@ -81,8 +81,8 @@ Modified: `subtitle-manager.ts`, `use-subtitles.ts`, `types/index.ts`,
 `src/index.ts`, `src/react/index.ts`, `tsup.config.ts`, `package.json`,
 `packages/ui/src/{index.ts,player-controls.tsx,lightbird-player.tsx}`
 
-New tests (105): `opensubtitles-hash.test.ts` (17), `subtitle-search.test.ts` (37),
-`react/use-subtitle-search.test.ts` (21), `subtitle-manager-download.test.ts` (13),
+New tests (109): `opensubtitles-hash.test.ts` (17), `subtitle-search.test.ts` (38),
+`react/use-subtitle-search.test.ts` (24), `subtitle-manager-download.test.ts` (13),
 `ui/__tests__/subtitle-search-panel.test.tsx` (17)
 
 ### Review hardening (PR #80)
@@ -110,6 +110,34 @@ Fixed after review, each with a regression test:
   reader past 4 MiB instead of buffering first and measuring afterwards.
 - **Result buttons announced as inert list text.** `role="listitem"` moved to a
   wrapper so each result keeps its native button role.
+
+### Self-review pass
+
+Three further defects found reading the diff back:
+
+- **The stale-item guard was dead code.** `handleSubtitleSearchApply` compared
+  `playlist.currentItem?.id` before and after the await, but an async callback
+  closes over the `playlist` object from the render that created it — both reads
+  returned the same frozen value, so the comparison could never fail. Replaced
+  with `currentItemIdRef`, updated in the effect that tracks the current item.
+  (The download abort still fired correctly, so the bug was a false sense of
+  safety rather than a live misapplication.)
+- **A deployment with no API key errored before hiding.** The panel keys off
+  `errorKind === 'unavailable'`, which is only set *after* a failed search — so
+  the first click produced an error toast, and `reset()` cleared the verdict on
+  every video change so the user could rediscover it repeatedly. `unavailable`
+  now suppresses the toast and survives `reset()`, since it describes the
+  deployment rather than the video.
+- **The request timeout only covered headers.** `cleanup()` ran in the `finally`
+  of the fetch block, before `response.json()`, so a response whose headers
+  arrived promptly but whose body stalled would hang forever. The timer now
+  stays armed across the body read.
+
+### Known limitation
+
+`normalizeSearchResults` takes `attributes.files[0]` only. A multi-part entry
+(legacy CD1/CD2 releases) therefore yields subtitles for the first part alone.
+Surfacing both parts needs UI to label them, so it is deliberately out of scope.
 
 No new runtime dependencies.
 
