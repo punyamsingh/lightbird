@@ -132,3 +132,96 @@ describe('UniversalSubtitleManager.addSubtitleFromText', () => {
     expect(subtitle.url).toBeDefined();
   });
 });
+
+/**
+ * The delayed disable in registerSubtitle() skips the track matching activeId.
+ * That is only correct while activeId still refers to a live selection, so the
+ * paths that drop every record have to clear it.
+ */
+describe('UniversalSubtitleManager activeId invalidation', () => {
+  let videoElement: HTMLVideoElement;
+  let manager: UniversalSubtitleManager;
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    videoElement = document.createElement('video');
+    document.body.appendChild(videoElement);
+    manager = new UniversalSubtitleManager(videoElement);
+  });
+
+  afterEach(() => {
+    document.body.removeChild(videoElement);
+    jest.useRealTimers();
+  });
+
+  it('clears the selection when the active subtitle is removed', async () => {
+    const active = await manager.addSubtitleFromText(SAMPLE_SRT, 'A.srt', 'en', 'srt');
+    manager.switchSubtitle(active.id);
+    manager.removeSubtitle(active.id);
+
+    // The freed id is not reused by nextId, but the guard must not match it
+    // either way — a cleared selection means every new track gets disabled.
+    const replacement = await manager.addSubtitleFromText(SAMPLE_SRT, 'B.srt', 'fr', 'srt');
+    jest.advanceTimersByTime(200);
+
+    const track = videoElement.querySelector(
+      `track[data-id="${replacement.id}"]`
+    ) as HTMLTrackElement;
+    expect(track.track.mode).toBe('disabled');
+  });
+
+  it('clears the selection when subtitles are imported over the top', async () => {
+    const active = await manager.addSubtitleFromText(SAMPLE_SRT, 'A.srt', 'en', 'srt');
+    manager.switchSubtitle(active.id);
+
+    // Importing replaces every record and rebases nextId, so a stale activeId
+    // can collide with an id handed out afterwards.
+    manager.importSubtitles([
+      { id: '0', name: 'Imported', lang: 'en', type: 'external', format: 'vtt' },
+    ]);
+
+    const registered = await manager.addSubtitleFromText(SAMPLE_VTT, 'C.vtt', 'en', 'vtt');
+    jest.advanceTimersByTime(200);
+
+    const track = videoElement.querySelector(
+      `track[data-id="${registered.id}"]`
+    ) as HTMLTrackElement;
+    expect(track.track.mode).toBe('disabled');
+  });
+});
+
+describe('UniversalSubtitleManager.addSubtitleFiles format detection', () => {
+  let manager: UniversalSubtitleManager;
+
+  beforeEach(() => {
+    manager = new UniversalSubtitleManager(document.createElement('video'));
+  });
+
+  /** Builds a File the manager can read, matching the drop path. */
+  function subtitleFile(name: string, content = SAMPLE_SRT): File {
+    return new File([content], name, { type: 'text/plain' });
+  }
+
+  it.each(['srt', 'vtt', 'ass', 'ssa'])('keeps the recognised .%s extension', async (ext) => {
+    const [subtitle] = await manager.addSubtitleFiles([subtitleFile(`Movie.${ext}`)]);
+    expect(subtitle.format).toBe(ext);
+  });
+
+  it('falls back to vtt for an unrecognised extension', async () => {
+    // Previously the extension was cast rather than checked, so "txt" was
+    // stored as the format — outside the Subtitle union, and treated as timed
+    // text, so the raw file was attached as VTT with no conversion.
+    const [subtitle] = await manager.addSubtitleFiles([subtitleFile('Movie.txt', SAMPLE_VTT)]);
+    expect(subtitle.format).toBe('vtt');
+  });
+
+  it('falls back to vtt for a file with no extension at all', async () => {
+    const [subtitle] = await manager.addSubtitleFiles([subtitleFile('subtitles', SAMPLE_VTT)]);
+    expect(subtitle.format).toBe('vtt');
+  });
+
+  it('is case-insensitive about the extension', async () => {
+    const [subtitle] = await manager.addSubtitleFiles([subtitleFile('Movie.SRT')]);
+    expect(subtitle.format).toBe('srt');
+  });
+});

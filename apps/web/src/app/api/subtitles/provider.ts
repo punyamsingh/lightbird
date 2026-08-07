@@ -73,6 +73,67 @@ export function isTimeout(error: unknown): boolean {
   return (error as Error)?.name === 'TimeoutError';
 }
 
+/** Raised when a provider link, or a redirect from it, is not plain https. */
+export class UnsafeDownloadLinkError extends Error {}
+
+/** Provider CDN links redirect once or twice in practice. */
+export const MAX_DOWNLOAD_REDIRECTS = 5;
+
+/**
+ * Parses a provider-supplied URL, rejecting anything that is not https.
+ *
+ * The link is not client-controlled, so this is not a direct SSRF. It guards
+ * against a provider response that points somewhere internal: the download
+ * route returns the fetched bytes to the caller, so an unchecked hop would make
+ * it a read primitive against whatever the deployment can reach.
+ */
+export function parseHttpsUrl(raw: string, base?: URL): URL | null {
+  let url: URL;
+  try {
+    url = new URL(raw, base);
+  } catch {
+    return null;
+  }
+  return url.protocol === 'https:' ? url : null;
+}
+
+/**
+ * Fetches a URL, following redirects by hand so every hop is scheme-checked.
+ * Validating only the starting URL would not be enough — `fetch` follows
+ * redirects on its own, so a valid https link can still land on an internal
+ * target, and the caller would never see the hop.
+ */
+export async function fetchFollowingHttpsRedirects<T>(
+  start: URL,
+  consume: (response: Response) => Promise<T>,
+  timeoutMs = PROVIDER_TIMEOUT_MS
+): Promise<{ response: Response; body?: T }> {
+  let url = start;
+  for (let hop = 0; hop < MAX_DOWNLOAD_REDIRECTS; hop++) {
+    // A 3xx is not ok, so fetchWithTimeout returns before reading (and cancels)
+    // the body, leaving the headers available for the Location lookup.
+    const result = await fetchWithTimeout(
+      url.toString(),
+      { cache: 'no-store', redirect: 'manual' },
+      consume,
+      timeoutMs
+    );
+
+    const { status, headers } = result.response;
+    if (status < 300 || status >= 400) return result;
+
+    const location = headers.get('location');
+    // A redirect with no Location is malformed; hand it back so the caller maps
+    // the status rather than inventing a different failure.
+    if (!location) return result;
+
+    const next = parseHttpsUrl(location, url);
+    if (!next) throw new UnsafeDownloadLinkError('Redirect left https');
+    url = next;
+  }
+  throw new UnsafeDownloadLinkError('Too many redirects');
+}
+
 export function providerHeaders(): Record<string, string> {
   return {
     'Api-Key': process.env.OPENSUBTITLES_API_KEY as string,

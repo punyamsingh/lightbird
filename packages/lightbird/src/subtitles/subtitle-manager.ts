@@ -63,6 +63,9 @@ interface SubtitleRecord {
   cues: SubtitleCue[];
 }
 
+/** The subtitle formats the manager understands, for runtime narrowing. */
+const SUBTITLE_FORMATS = ["vtt", "srt", "ass", "ssa"] as const;
+
 export class UniversalSubtitleManager {
   private records: SubtitleRecord[] = [];
   private videoElement: HTMLVideoElement | null = null;
@@ -82,12 +85,12 @@ export class UniversalSubtitleManager {
     const newSubtitles: Subtitle[] = [];
 
     for (const file of files) {
-      const ext = file.name.split(".").pop()?.toLowerCase() as
-        | "vtt"
-        | "srt"
-        | "ass"
-        | "ssa"
-        | undefined;
+      // Narrowed rather than cast: a cast would let `movie.txt` through as
+      // format "txt", which is outside the Subtitle union, counts as timed
+      // text, and so gets attached as VTT without conversion. Anything
+      // unrecognised falls back to "vtt" below.
+      const raw = file.name.split(".").pop()?.toLowerCase();
+      const ext = SUBTITLE_FORMATS.find((f) => f === raw);
 
       const langMatch = file.name.match(/\.([a-z]{2,3})\.(?:srt|vtt|ass|ssa)$/i);
       const lang = langMatch ? langMatch[1] : "unknown";
@@ -329,6 +332,12 @@ export class UniversalSubtitleManager {
   }
 
   importSubtitles(subtitles: Subtitle[]): void {
+    // Every record is replaced, so the previous selection no longer refers to
+    // anything. Left stale, it could collide with a later registration's id and
+    // make the delayed disable in registerSubtitle() skip a track the user
+    // never chose. removeSubtitle() and clearSubtitles() reset it for the same
+    // reason.
+    this.activeId = "-1";
     this.records = subtitles.map((s) => ({
       subtitle: s,
       rawVtt: undefined,

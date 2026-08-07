@@ -58,9 +58,9 @@ The returned download link is also cross-origin, so hop 2 must be server-side to
 The first cut re-exported the search modules from the base `@lightbird/core`
 entry and pushed it to 17.13 KB gzip against the 16.00 KB budget (issue #54).
 Fixed by giving the feature its own entry point, `@lightbird/core/search`,
-mirroring how `/react` is split. Base entry now measures 15.70 KB.
+mirroring how `/react` is split. Base entry now measures 15.75 KB.
 
-**Headroom is now 0.30 KB.** The next addition to the base entry will almost
+**Headroom is now 0.25 KB.** The next addition to the base entry will almost
 certainly breach the budget — either split it out the same way or revisit the
 number.
 
@@ -81,10 +81,10 @@ Modified: `subtitle-manager.ts`, `use-subtitles.ts`, `types/index.ts`,
 `src/index.ts`, `src/react/index.ts`, `tsup.config.ts`, `package.json`,
 `packages/ui/src/{index.ts,player-controls.tsx,lightbird-player.tsx}`
 
-New tests (119): `opensubtitles-hash.test.ts` (17), `subtitle-search.test.ts` (38),
-`react/use-subtitle-search.test.ts` (25), `subtitle-manager-download.test.ts` (13),
+New tests (143): `opensubtitles-hash.test.ts` (17), `subtitle-search.test.ts` (38),
+`react/use-subtitle-search.test.ts` (25), `subtitle-manager-download.test.ts` (22),
 `ui/__tests__/subtitle-search-panel.test.tsx` (17),
-`web/__tests__/subtitles-provider.test.ts` (9)
+`web/__tests__/subtitles-provider.test.ts` (24)
 
 ### Review hardening (PR #80)
 
@@ -175,6 +175,59 @@ CLAUDE.md), so the change would introduce the inconsistency it aims to remove.
 both a stubbed and a real `ReadableStream` body, cancel-rejection tolerance, a
 null body, `consume` running only for ok responses, the deadline still covering
 a stalled body read, and `isTimeout` classification.
+
+### Fourth review pass (full re-review)
+
+The incremental reviewer would not re-review the branch, so a `full review` was
+requested; it re-read all 27 files and found four more:
+
+- **The provider's download link was fetched unvalidated.** The `download` route
+  takes a URL out of the provider's JSON and fetches it server-side, returning
+  the bytes to the caller. The link is not client-controlled, so this is not
+  direct SSRF, but an unchecked hop makes the route a read primitive against
+  whatever the deployment can reach. Links are now required to be `https:`, and
+  because `fetch` follows redirects on its own — so a valid link can still land
+  somewhere internal — redirects are followed by hand with `redirect: 'manual'`,
+  each hop re-validated, bounded to 5. The helpers live in `provider.ts` rather
+  than the route: App Router route files cannot export arbitrary functions, and
+  keeping them there would have left the logic untestable.
+- **An unrecognised subtitle extension was cast, not checked.** `addSubtitleFiles`
+  cast the filename extension straight to the format union, so `movie.txt` was
+  stored with `format: "txt"` — outside the declared type — and, because it is
+  not `ass`/`ssa`, treated as timed text and attached as VTT with no conversion.
+  Narrowed against a `SUBTITLE_FORMATS` list so anything unrecognised falls back
+  to `vtt`. Pre-existing rather than introduced here, but in a file this PR
+  reworks.
+- **The stale-item guard was still a step behind.** `currentItemIdRef` was
+  updated inside an effect, so it only caught up after React committed. A
+  download resolving between `selectItem()` and that effect compared two
+  pre-transition ids and passed. Replaced with a transition counter bumped
+  synchronously in `loadVideo()` — the only path that moves between two items;
+  every other `selectItem()` call runs with nothing playing. The effect still
+  bumps it as a net for transitions that bypass `loadVideo()`. This is the third
+  and final revision of this guard: dead code in `c3d4f11`, correct but
+  late in `48660c7`, synchronous now.
+- **`importSubtitles` left `activeId` stale.** It replaces every record and
+  rebases `nextId`, so a leftover selection could collide with an id handed out
+  afterwards and make the delayed disable skip a track the user never chose.
+  `removeSubtitle` and `clearSubtitles` already reset it.
+
+Also corrected the package name in `project-overview.md` — but in the opposite
+direction to the suggestion. The reviewer read line 4's `@lightbird/player-react`
+as the error; `packages/ui/package.json` confirms that is the real published
+name, so the stale entries were the four `@lightbird/ui` references, one of
+which was a `pnpm test --filter` command that could not have worked.
+
+Declined two: forwarding a caller-supplied `AbortSignal` through
+`fetchWithTimeout` (no caller passes one, and the reviewer rated it low value),
+and replacing the result `<button>` with the ShadCN `Button` primitive — that
+primitive is `inline-flex justify-center h-10` with `[&_svg]:size-4`, which
+would collapse these two-row items and resize their `h-3 w-3` icons; six other
+components in `packages/ui` use a raw `<button>` for the same reason.
+
+New tests (+24): 9 `parseHttpsUrl` cases and 6 redirect-following cases in
+`web/__tests__/subtitles-provider.test.ts`, plus 2 `activeId` invalidation and 7
+format-detection cases in `subtitle-manager-download.test.ts`.
 
 ### Known limitation
 

@@ -1,4 +1,12 @@
-import { fetchWithTimeout, isTimeout, PROVIDER_TIMEOUT_MS } from "../src/app/api/subtitles/provider";
+import {
+  fetchWithTimeout,
+  fetchFollowingHttpsRedirects,
+  parseHttpsUrl,
+  isTimeout,
+  UnsafeDownloadLinkError,
+  MAX_DOWNLOAD_REDIRECTS,
+  PROVIDER_TIMEOUT_MS,
+} from "../src/app/api/subtitles/provider";
 
 /**
  * `fetchWithTimeout` is the single choke point for outbound provider calls, so
@@ -104,6 +112,131 @@ describe("fetchWithTimeout — ok responses", () => {
         20
       )
     ).rejects.toMatchObject({ name: "TimeoutError" });
+  });
+});
+
+describe("parseHttpsUrl", () => {
+  it("accepts an https URL", () => {
+    expect(parseHttpsUrl("https://cdn.example/sub.srt")?.host).toBe("cdn.example");
+  });
+
+  it.each([
+    ["http://cdn.example/sub.srt", "plain http"],
+    ["file:///etc/passwd", "file"],
+    ["ftp://cdn.example/sub.srt", "ftp"],
+    ["data:text/plain,hi", "data"],
+    ["not a url", "unparseable"],
+    ["", "empty"],
+  ])("rejects %s (%s)", (raw) => {
+    expect(parseHttpsUrl(raw)).toBeNull();
+  });
+
+  it("resolves a relative Location against the current hop", () => {
+    const base = new URL("https://cdn.example/a/b");
+    expect(parseHttpsUrl("../c/sub.srt", base)?.toString()).toBe("https://cdn.example/c/sub.srt");
+  });
+
+  it("rejects a relative Location that downgrades the scheme", () => {
+    // A protocol-relative //host on an https base stays https, but an explicit
+    // http:// Location must not be accepted just because a base was supplied.
+    const base = new URL("https://cdn.example/a");
+    expect(parseHttpsUrl("http://169.254.169.254/latest/meta-data", base)).toBeNull();
+  });
+});
+
+describe("fetchFollowingHttpsRedirects", () => {
+  /** Queues responses so each hop gets the next one. */
+  function queueFetch(responses: Response[]) {
+    const calls: string[] = [];
+    global.fetch = jest.fn((url: string) => {
+      calls.push(String(url));
+      const next = responses.shift();
+      if (!next) throw new Error("unexpected extra fetch");
+      return Promise.resolve(next);
+    }) as unknown as typeof fetch;
+    return calls;
+  }
+
+  function redirect(status: number, location?: string): Response {
+    const headers = new Headers();
+    if (location) headers.set("location", location);
+    return { ok: false, status, headers, body: null } as unknown as Response;
+  }
+
+  it("returns the first non-redirect response without following further", async () => {
+    const calls = queueFetch([
+      { ok: true, status: 200, headers: new Headers(), body: null } as unknown as Response,
+    ]);
+
+    const { response, body } = await fetchFollowingHttpsRedirects(
+      new URL("https://cdn.example/sub.srt"),
+      async () => "content"
+    );
+
+    expect(response.status).toBe(200);
+    expect(body).toBe("content");
+    expect(calls).toEqual(["https://cdn.example/sub.srt"]);
+  });
+
+  it("follows an https redirect and consumes the final response", async () => {
+    const calls = queueFetch([
+      redirect(302, "https://cdn2.example/real.srt"),
+      { ok: true, status: 200, headers: new Headers(), body: null } as unknown as Response,
+    ]);
+
+    const { body } = await fetchFollowingHttpsRedirects(
+      new URL("https://cdn.example/sub.srt"),
+      async () => "content"
+    );
+
+    expect(body).toBe("content");
+    expect(calls).toEqual(["https://cdn.example/sub.srt", "https://cdn2.example/real.srt"]);
+  });
+
+  it("refuses a redirect that leaves https", async () => {
+    // The whole point of manual redirects: a valid https link can still try to
+    // bounce the server at an internal address.
+    queueFetch([redirect(302, "http://169.254.169.254/latest/meta-data")]);
+
+    await expect(
+      fetchFollowingHttpsRedirects(new URL("https://cdn.example/sub.srt"), async () => "content")
+    ).rejects.toBeInstanceOf(UnsafeDownloadLinkError);
+  });
+
+  it("stops after the redirect limit rather than looping forever", async () => {
+    queueFetch(
+      Array.from({ length: MAX_DOWNLOAD_REDIRECTS }, (_, i) =>
+        redirect(302, `https://cdn.example/hop${i + 1}`)
+      )
+    );
+
+    await expect(
+      fetchFollowingHttpsRedirects(new URL("https://cdn.example/hop0"), async () => "content")
+    ).rejects.toBeInstanceOf(UnsafeDownloadLinkError);
+  });
+
+  it("hands back a malformed redirect that carries no Location", async () => {
+    queueFetch([redirect(302)]);
+
+    const { response } = await fetchFollowingHttpsRedirects(
+      new URL("https://cdn.example/sub.srt"),
+      async () => "content"
+    );
+
+    expect(response.status).toBe(302);
+  });
+
+  it("requests each hop with redirect: manual", async () => {
+    queueFetch([
+      { ok: true, status: 200, headers: new Headers(), body: null } as unknown as Response,
+    ]);
+
+    await fetchFollowingHttpsRedirects(new URL("https://cdn.example/sub.srt"), async () => "x");
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://cdn.example/sub.srt",
+      expect.objectContaining({ redirect: "manual" })
+    );
   });
 });
 

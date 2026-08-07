@@ -190,6 +190,10 @@ const LightBirdPlayer = () => {
     }, 5000);
   };
 
+  // Counts video transitions. Declared here because loadVideo() below bumps it
+  // synchronously; see the effect further down for why a counter and not an id.
+  const selectionRef = useRef(0);
+
   const clearRetryTimer = () => {
     if (retryTimerRef.current) {
       clearTimeout(retryTimerRef.current);
@@ -291,6 +295,10 @@ const LightBirdPlayer = () => {
   const loadVideo = useCallback((index: number) => {
     const item = playlist.playlist[index];
     if (!item) return;
+    // Invalidate before the transition, not after it commits — see the
+    // selectionRef declaration below. This is the only path that moves between
+    // two items; the other selectItem() calls all run with nothing playing.
+    selectionRef.current += 1;
     playlist.selectItem(index);
     setPlayerError(null);
     clearRetryTimer();
@@ -650,14 +658,18 @@ const LightBirdPlayer = () => {
   // Clear stale results when the video changes — subtitles found for the
   // previous file are meaningless for this one.
   const currentItemId = playlist.currentItem?.id ?? null;
-  // Mirrored into a ref because an async callback closes over the `playlist`
-  // object from the render that created it. Reading `playlist.currentItem`
-  // after an await returns that frozen value, never the live one, so a
-  // closure-only comparison would always find itself unchanged.
-  const currentItemIdRef = useRef<string | null>(currentItemId);
+  // selectionRef (declared above) counts transitions rather than tracking the
+  // item id, because the id is only observable through state React has already
+  // committed. loadVideo() bumps it synchronously at the moment of the
+  // transition, so a download resolving between selectItem() and this effect
+  // still sees the change; comparing ids here would compare two
+  // pre-transition values and let the previous film's subtitles attach.
   const resetSubtitleSearch = subtitleSearch.reset;
   useEffect(() => {
-    currentItemIdRef.current = currentItemId;
+    // Also bumped here to cover any transition that does not route through
+    // loadVideo(). Bumping twice for one change is harmless — only inequality
+    // is ever tested.
+    selectionRef.current += 1;
     resetSubtitleSearch();
   }, [currentItemId, resetSubtitleSearch]);
 
@@ -671,13 +683,13 @@ const LightBirdPlayer = () => {
 
   const handleSubtitleSearchApply = useCallback(
     async (result: SubtitleSearchResult) => {
-      // The item this subtitle was chosen for. If the user switches videos
-      // while the download is in flight, applying it to whatever is playing
-      // now would attach subtitles for the wrong film.
-      const requestedItemId = currentItemIdRef.current;
+      // The selection this subtitle was chosen for. If the user switches
+      // videos while the download is in flight, applying it to whatever is
+      // playing now would attach subtitles for the wrong film.
+      const requestedSelection = selectionRef.current;
       try {
         const downloaded = await subtitleSearch.download(result);
-        if (currentItemIdRef.current !== requestedItemId) return;
+        if (selectionRef.current !== requestedSelection) return;
         await subtitles.addSubtitleFromText(
           downloaded.content,
           downloaded.fileName,

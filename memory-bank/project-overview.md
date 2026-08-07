@@ -24,7 +24,7 @@ LightBird is a modern, lightweight, browser-based video player built as a **pnpm
 ```text
 apps/web/          — Next.js app (lightbird.vercel.app)
 packages/lightbird/ — Core library (npm: @lightbird/core)
-packages/ui/        — UI components (npm: @lightbird/ui)
+packages/ui/        — UI components (npm: @lightbird/player-react)
 ```
 
 ### Player System
@@ -41,8 +41,8 @@ The factory function `createVideoPlayer(source)` in `packages/lightbird/src/vide
 
 ```text
 apps/web/src/app/page.tsx
-└── @lightbird/ui: PlayerErrorBoundary
-    └── @lightbird/ui: LightBirdPlayer (coordinator)
+└── @lightbird/player-react: PlayerErrorBoundary
+    └── @lightbird/player-react: LightBirdPlayer (coordinator)
         ├── PlayerControls
         ├── PlaylistPanel
         ├── VideoOverlay
@@ -93,7 +93,7 @@ Magnet links are streamed in-browser via BitTorrent — no server required:
 - `feature-flags.ts` — initialises OpenFeature with the Unleash Web provider
   (`NEXT_PUBLIC_UNLEASH_URL` / `NEXT_PUBLIC_UNLEASH_CLIENT_KEY`). Missing
   credentials warn and fall back to flag defaults.
-- `feature-flags-provider.tsx` (`@lightbird/ui`) — wraps the app so
+- `feature-flags-provider.tsx` (`@lightbird/player-react`) — wraps the app so
   `useBooleanFlagValue` hooks resolve. The magnet UI is hidden when the flag
   is off.
 
@@ -126,7 +126,7 @@ Tests are per-package using ts-jest. Run with:
 ```bash
 pnpm turbo test         # all tests
 pnpm test --filter @lightbird/core  # core only
-pnpm test --filter @lightbird/ui  # UI only
+pnpm test --filter @lightbird/player-react  # UI only
 ```
 
 Test locations:

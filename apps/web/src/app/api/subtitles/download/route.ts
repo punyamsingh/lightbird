@@ -4,6 +4,9 @@ import {
   providerHeaders,
   isConfigured,
   fetchWithTimeout,
+  fetchFollowingHttpsRedirects,
+  parseHttpsUrl,
+  UnsafeDownloadLinkError,
   isTimeout,
 } from '../provider';
 
@@ -28,6 +31,13 @@ function decodeSubtitle(buffer: Uint8Array): string {
 
 /** Raised when a response exceeds {@link MAX_SUBTITLE_BYTES} mid-read. */
 class SubtitleTooLargeError extends Error {}
+
+/** Fetches the subtitle, validating the scheme on the link and every redirect. */
+function fetchSubtitle(start: URL): Promise<{ response: Response; body?: Uint8Array }> {
+  return fetchFollowingHttpsRedirects(start, (response) =>
+    readBounded(response, MAX_SUBTITLE_BYTES)
+  );
+}
 
 /**
  * Reads a response body, aborting as soon as it exceeds the size limit.
@@ -127,21 +137,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Provider returned no download link' }, { status: 502 });
   }
 
+  const downloadUrl = parseHttpsUrl(linkPayload.link);
+  if (!downloadUrl) {
+    return NextResponse.json(
+      { error: 'Provider returned an invalid download link' },
+      { status: 502 }
+    );
+  }
+
   // Hop 2 — fetch the subtitle itself. fetch transparently gunzips when the
   // CDN sets Content-Encoding: gzip.
   // readBounded runs inside the deadline: a CDN that sends headers promptly and
   // then trickles the body is exactly the case a header-only timeout misses.
   let fileResult: { response: Response; body?: Uint8Array };
   try {
-    fileResult = await fetchWithTimeout(linkPayload.link, { cache: 'no-store' }, (response) =>
-      readBounded(response, MAX_SUBTITLE_BYTES)
-    );
+    fileResult = await fetchSubtitle(downloadUrl);
   } catch (error) {
     if (isTimeout(error)) {
       return NextResponse.json({ error: 'Subtitle file timed out' }, { status: 504 });
     }
     if (error instanceof SubtitleTooLargeError) {
       return NextResponse.json({ error: 'Subtitle file was unexpectedly large' }, { status: 502 });
+    }
+    if (error instanceof UnsafeDownloadLinkError) {
+      return NextResponse.json(
+        { error: 'Provider returned an invalid download link' },
+        { status: 502 }
+      );
     }
     return NextResponse.json({ error: 'Subtitle file unreachable' }, { status: 502 });
   }
