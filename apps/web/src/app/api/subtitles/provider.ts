@@ -94,7 +94,41 @@ export function parseHttpsUrl(raw: string, base?: URL): URL | null {
   } catch {
     return null;
   }
-  return url.protocol === 'https:' ? url : null;
+  if (url.protocol !== 'https:') return null;
+  // https alone does not make a host external — https://169.254.169.254/ is a
+  // valid https URL pointing at cloud metadata. A hostname allowlist would be
+  // stronger, but the provider's CDN hostnames are not documented or stable,
+  // so reject literal internal addresses instead.
+  //
+  // This does not stop a hostname that *resolves* to a private address; that
+  // needs resolution-time checks the fetch API does not expose.
+  return isInternalHost(url.hostname) ? null : url;
+}
+
+/** Literal loopback, private, link-local, and unique-local addresses. */
+function isInternalHost(hostname: string): boolean {
+  // URL keeps IPv6 literals bracketed.
+  const host = hostname.replace(/^\[|\]$/g, '').toLowerCase();
+
+  if (host === 'localhost' || host.endsWith('.localhost')) return true;
+  if (host === '::1' || host === '::') return true;
+  // fc00::/7 unique-local, fe80::/10 link-local.
+  if (/^f[cd][0-9a-f]{2}:/.test(host) || /^fe[89ab][0-9a-f]:/.test(host)) return true;
+  // IPv4-mapped IPv6 (::ffff:10.0.0.1) reuses the dotted form below.
+  const mapped = host.startsWith('::ffff:') ? host.slice(7) : host;
+
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(mapped);
+  if (!v4) return false;
+  const [a, b] = v4.slice(1).map(Number);
+  return (
+    a === 0 || // 0.0.0.0/8
+    a === 10 || // private
+    a === 127 || // loopback
+    (a === 169 && b === 254) || // link-local, incl. cloud metadata
+    (a === 172 && b >= 16 && b <= 31) || // private
+    (a === 192 && b === 168) || // private
+    (a === 100 && b >= 64 && b <= 127) // carrier-grade NAT
+  );
 }
 
 /**
@@ -109,14 +143,24 @@ export async function fetchFollowingHttpsRedirects<T>(
   timeoutMs = PROVIDER_TIMEOUT_MS
 ): Promise<{ response: Response; body?: T }> {
   let url = start;
+  // One budget for the whole chain, not per hop: passing the full timeout to
+  // each of 5 hops would let a slow redirect chain hold the invocation open for
+  // 5x the deadline, which is the thing the deadline exists to prevent.
+  const deadline = Date.now() + timeoutMs;
+
   for (let hop = 0; hop < MAX_DOWNLOAD_REDIRECTS; hop++) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) {
+      throw Object.assign(new Error('Provider request timed out'), { name: 'TimeoutError' });
+    }
+
     // A 3xx is not ok, so fetchWithTimeout returns before reading (and cancels)
     // the body, leaving the headers available for the Location lookup.
     const result = await fetchWithTimeout(
       url.toString(),
       { cache: 'no-store', redirect: 'manual' },
       consume,
-      timeoutMs
+      remaining
     );
 
     const { status, headers } = result.response;

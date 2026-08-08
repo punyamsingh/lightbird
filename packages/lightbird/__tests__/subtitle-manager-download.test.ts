@@ -154,33 +154,22 @@ describe('UniversalSubtitleManager activeId invalidation', () => {
     jest.useRealTimers();
   });
 
-  it('clears the selection when the active subtitle is removed', async () => {
-    const active = await manager.addSubtitleFromText(SAMPLE_SRT, 'A.srt', 'en', 'srt');
-    manager.switchSubtitle(active.id);
-    manager.removeSubtitle(active.id);
-
-    // The freed id is not reused by nextId, but the guard must not match it
-    // either way — a cleared selection means every new track gets disabled.
-    const replacement = await manager.addSubtitleFromText(SAMPLE_SRT, 'B.srt', 'fr', 'srt');
-    jest.advanceTimersByTime(200);
-
-    const track = videoElement.querySelector(
-      `track[data-id="${replacement.id}"]`
-    ) as HTMLTrackElement;
-    expect(track.track.mode).toBe('disabled');
-  });
-
   it('clears the selection when subtitles are imported over the top', async () => {
-    const active = await manager.addSubtitleFromText(SAMPLE_SRT, 'A.srt', 'en', 'srt');
+    await manager.addSubtitleFromText(SAMPLE_SRT, 'A.srt', 'en', 'srt');
+    // Activate id "1" specifically: importing one record with id "0" rebases
+    // nextId to 1, so the next registration mints "1" too. Without the reset
+    // the stale activeId matches it and the guard skips a track the user never
+    // chose. Activating "0" instead would pass either way, since nextId only
+    // ever moves forward and could not collide.
+    const active = await manager.addSubtitleFromText(SAMPLE_SRT, 'B.srt', 'en', 'srt');
     manager.switchSubtitle(active.id);
 
-    // Importing replaces every record and rebases nextId, so a stale activeId
-    // can collide with an id handed out afterwards.
     manager.importSubtitles([
       { id: '0', name: 'Imported', lang: 'en', type: 'external', format: 'vtt' },
     ]);
 
     const registered = await manager.addSubtitleFromText(SAMPLE_VTT, 'C.vtt', 'en', 'vtt');
+    expect(registered.id).toBe(active.id); // the collision this guards against
     jest.advanceTimersByTime(200);
 
     const track = videoElement.querySelector(
@@ -188,6 +177,11 @@ describe('UniversalSubtitleManager activeId invalidation', () => {
     ) as HTMLTrackElement;
     expect(track.track.mode).toBe('disabled');
   });
+
+  // No companion test for removeSubtitle's reset: nextId only moves forward, so
+  // a stale id left by a removal can never equal a later one, and the guard
+  // behaves identically with or without it. A test there would pass whether the
+  // reset existed or not. The reset stays as hygiene, untested by design.
 });
 
 describe('UniversalSubtitleManager.addSubtitleFiles format detection', () => {

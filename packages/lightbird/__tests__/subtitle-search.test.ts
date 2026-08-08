@@ -144,7 +144,7 @@ describe('searchSubtitles', () => {
 
   it('returns normalized results', async () => {
     const fetchImpl = jsonFetch({ data: [providerItem()] });
-    const results = await searchSubtitles({ hash: 'abc' }, { fetchImpl });
+    const results = await searchSubtitles({ hash: 'abc', fileSize: 500 }, { fetchImpl });
     expect(results).toHaveLength(1);
     expect(results[0].fileId).toBe('12345');
   });
@@ -155,9 +155,33 @@ describe('searchSubtitles', () => {
     );
   });
 
+  it('rejects a hash query with no file size', async () => {
+    // The provider matches moviehash and moviebytesize together; the hash alone
+    // is malformed, and rejecting here turns an opaque provider error into
+    // something the caller can act on.
+    const fetchImpl = jsonFetch({});
+    await expect(searchSubtitles({ hash: 'abc' }, { fetchImpl })).rejects.toThrow(
+      /file size is required/i
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('accepts a file size of 0 rather than treating it as absent', async () => {
+    // An empty file is a degenerate but well-formed query; only `undefined`
+    // means "not supplied".
+    const fetchImpl = jsonFetch({ data: [] });
+    await expect(searchSubtitles({ hash: 'abc', fileSize: 0 }, { fetchImpl })).resolves.toEqual([]);
+    expect(fetchImpl).toHaveBeenCalled();
+  });
+
+  it('still allows a text query with no file size', async () => {
+    const fetchImpl = jsonFetch({ data: [] });
+    await expect(searchSubtitles({ text: 'Blade Runner' }, { fetchImpl })).resolves.toEqual([]);
+  });
+
   it('classifies a 404 as unavailable, not an error to show', async () => {
     const fetchImpl = jsonFetch({ error: 'nope' }, 404);
-    await expect(searchSubtitles({ hash: 'abc' }, { fetchImpl })).rejects.toMatchObject({
+    await expect(searchSubtitles({ hash: 'abc', fileSize: 500 }, { fetchImpl })).rejects.toMatchObject({
       kind: 'unavailable',
     });
   });
@@ -170,7 +194,7 @@ describe('searchSubtitles', () => {
     [502, 'failed'],
   ])('classifies HTTP %i as %s', async (status, kind) => {
     const fetchImpl = jsonFetch({}, status as number);
-    await expect(searchSubtitles({ hash: 'abc' }, { fetchImpl })).rejects.toMatchObject({ kind });
+    await expect(searchSubtitles({ hash: 'abc', fileSize: 500 }, { fetchImpl })).rejects.toMatchObject({ kind });
   });
 
   it('wraps a network failure as a SubtitleSearchError', async () => {
@@ -178,7 +202,7 @@ describe('searchSubtitles', () => {
       throw new TypeError('Failed to fetch');
     }) as unknown as jest.Mock;
 
-    const error = await searchSubtitles({ hash: 'abc' }, { fetchImpl }).catch((e) => e);
+    const error = await searchSubtitles({ hash: 'abc', fileSize: 500 }, { fetchImpl }).catch((e) => e);
     expect(error).toBeInstanceOf(SubtitleSearchError);
     expect(error.kind).toBe('failed');
   });
@@ -189,7 +213,7 @@ describe('searchSubtitles', () => {
       throw abortError;
     }) as unknown as jest.Mock;
 
-    await expect(searchSubtitles({ hash: 'abc' }, { fetchImpl })).rejects.toBe(abortError);
+    await expect(searchSubtitles({ hash: 'abc', fileSize: 500 }, { fetchImpl })).rejects.toBe(abortError);
   });
 
   it('aborts a stalled request and reports it as a failure, not a cancellation', async () => {
@@ -205,7 +229,7 @@ describe('searchSubtitles', () => {
           })
       ) as unknown as jest.Mock;
 
-      const promise = searchSubtitles({ hash: 'abc' }, { fetchImpl, timeoutMs: 1000 });
+      const promise = searchSubtitles({ hash: 'abc', fileSize: 500 }, { fetchImpl, timeoutMs: 1000 });
       const assertion = expect(promise).rejects.toMatchObject({ kind: 'failed' });
       jest.advanceTimersByTime(1500);
       await assertion;
@@ -230,7 +254,7 @@ describe('searchSubtitles', () => {
           }),
       })) as unknown as jest.Mock;
 
-      const promise = searchSubtitles({ hash: 'abc' }, { fetchImpl, timeoutMs: 1000 });
+      const promise = searchSubtitles({ hash: 'abc', fileSize: 500 }, { fetchImpl, timeoutMs: 1000 });
       const assertion = expect(promise).rejects.toThrow(/timed out/i);
       await Promise.resolve();
       jest.advanceTimersByTime(1500);
@@ -251,7 +275,7 @@ describe('searchSubtitles', () => {
         })
     ) as unknown as jest.Mock;
 
-    const promise = searchSubtitles({ hash: 'abc' }, { fetchImpl, signal: controller.signal });
+    const promise = searchSubtitles({ hash: 'abc', fileSize: 500 }, { fetchImpl, signal: controller.signal });
     controller.abort();
 
     await expect(promise).rejects.toMatchObject({ name: 'AbortError' });
@@ -259,7 +283,7 @@ describe('searchSubtitles', () => {
 
   it('does not arm a timeout when timeoutMs is 0', async () => {
     const fetchImpl = jsonFetch({ data: [] });
-    await searchSubtitles({ hash: 'abc' }, { fetchImpl, timeoutMs: 0 });
+    await searchSubtitles({ hash: 'abc', fileSize: 500 }, { fetchImpl, timeoutMs: 0 });
 
     // The caller signal passes through untouched — here, none was given.
     expect(fetchImpl.mock.calls[0][1].signal).toBeUndefined();
@@ -274,7 +298,7 @@ describe('searchSubtitles', () => {
       },
     })) as unknown as jest.Mock;
 
-    await expect(searchSubtitles({ hash: 'abc' }, { fetchImpl })).rejects.toMatchObject({
+    await expect(searchSubtitles({ hash: 'abc', fileSize: 500 }, { fetchImpl })).rejects.toMatchObject({
       kind: 'failed',
     });
   });

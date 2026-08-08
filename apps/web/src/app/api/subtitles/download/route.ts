@@ -99,7 +99,11 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const fileId = (body as { fileId?: unknown } | null)?.fileId;
 
-  if (typeof fileId !== 'string' || !/^\d+$/.test(fileId)) {
+  // Bounded, not just numeric: an unbounded digit string survives the regex but
+  // becomes Infinity through Number(), which JSON.stringify writes as null. The
+  // provider then rejects a malformed body and the user sees a 502 instead of
+  // the 400 this actually is.
+  if (typeof fileId !== 'string' || !/^\d{1,15}$/.test(fileId)) {
     return NextResponse.json({ error: 'A numeric fileId is required' }, { status: 400 });
   }
 

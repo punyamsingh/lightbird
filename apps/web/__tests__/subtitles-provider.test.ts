@@ -97,8 +97,14 @@ describe("fetchWithTimeout — ok responses", () => {
 
   it("keeps the deadline armed across the body read", async () => {
     // The point of the consume callback: a provider that sends headers fast and
-    // then stalls the body must still hit the deadline.
-    global.fetch = jest.fn().mockResolvedValue(fakeResponse(200, jest.fn()));
+    // then stalls the body must still hit the deadline. The stalled read is
+    // settled only by the helper's own abort signal — on its own timer it would
+    // pass even if fetchWithTimeout never called controller.abort().
+    let signal: AbortSignal | undefined;
+    global.fetch = jest.fn((_url: string, init: RequestInit) => {
+      signal = init.signal ?? undefined;
+      return Promise.resolve(fakeResponse(200, jest.fn()));
+    }) as unknown as typeof fetch;
 
     await expect(
       fetchWithTimeout(
@@ -106,8 +112,9 @@ describe("fetchWithTimeout — ok responses", () => {
         {},
         (): Promise<never> =>
           new Promise((_resolve, reject) => {
-            // Never settles on its own; the helper's abort rejects it.
-            setTimeout(() => reject(Object.assign(new Error("aborted"), { name: "AbortError" })), 50);
+            signal?.addEventListener("abort", () =>
+              reject(Object.assign(new Error("aborted"), { name: "AbortError" }))
+            );
           }),
         20
       )
@@ -134,6 +141,32 @@ describe("parseHttpsUrl", () => {
   it("resolves a relative Location against the current hop", () => {
     const base = new URL("https://cdn.example/a/b");
     expect(parseHttpsUrl("../c/sub.srt", base)?.toString()).toBe("https://cdn.example/c/sub.srt");
+  });
+
+  it.each([
+    ["https://169.254.169.254/latest/meta-data", "cloud metadata"],
+    ["https://127.0.0.1/x", "loopback"],
+    ["https://localhost/x", "localhost"],
+    ["https://10.0.0.5/x", "private 10/8"],
+    ["https://172.16.0.1/x", "private 172.16/12"],
+    ["https://192.168.1.1/x", "private 192.168/16"],
+    ["https://100.64.0.1/x", "carrier-grade NAT"],
+    ["https://0.0.0.0/x", "unspecified"],
+    ["https://[::1]/x", "IPv6 loopback"],
+    ["https://[fd00::1]/x", "IPv6 unique-local"],
+    ["https://[fe80::1]/x", "IPv6 link-local"],
+  ])("rejects %s (%s) even over https", (raw) => {
+    expect(parseHttpsUrl(raw)).toBeNull();
+  });
+
+  it.each([
+    ["https://172.15.0.1/x", "just below the private 172 range"],
+    ["https://172.32.0.1/x", "just above the private 172 range"],
+    ["https://192.169.1.1/x", "adjacent to 192.168/16"],
+    ["https://100.63.0.1/x", "just below CGNAT"],
+    ["https://8.8.8.8/x", "public resolver"],
+  ])("still accepts %s (%s)", (raw) => {
+    expect(parseHttpsUrl(raw)).not.toBeNull();
   });
 
   it("rejects a relative Location that downgrades the scheme", () => {
@@ -213,6 +246,45 @@ describe("fetchFollowingHttpsRedirects", () => {
     await expect(
       fetchFollowingHttpsRedirects(new URL("https://cdn.example/hop0"), async () => "content")
     ).rejects.toBeInstanceOf(UnsafeDownloadLinkError);
+  });
+
+  it("refuses a redirect to an internal address served over https", async () => {
+    queueFetch([redirect(302, "https://169.254.169.254/latest/meta-data")]);
+
+    await expect(
+      fetchFollowingHttpsRedirects(new URL("https://cdn.example/sub.srt"), async () => "content")
+    ).rejects.toBeInstanceOf(UnsafeDownloadLinkError);
+  });
+
+  it("spends one deadline across the whole chain, not one per hop", async () => {
+    // Each hop consumes part of the budget, so a slow chain cannot hold the
+    // route open for MAX_DOWNLOAD_REDIRECTS x the timeout.
+    const timeouts: (number | undefined)[] = [];
+    let clock = 1_000;
+    jest.spyOn(Date, "now").mockImplementation(() => clock);
+
+    global.fetch = jest.fn(() => {
+      clock += 30; // every hop burns 30ms
+      return Promise.resolve(redirect(302, "https://cdn.example/next"));
+    }) as unknown as typeof fetch;
+
+    // Capture the per-hop budget by wrapping the consume callback's caller.
+    const original = global.setTimeout;
+    jest.spyOn(global, "setTimeout").mockImplementation(((fn: () => void, ms?: number) => {
+      timeouts.push(ms);
+      return original(fn, 0);
+    }) as unknown as typeof setTimeout);
+
+    await expect(
+      fetchFollowingHttpsRedirects(new URL("https://cdn.example/a"), async () => "x", 100)
+    ).rejects.toMatchObject({ name: "TimeoutError" });
+
+    // Strictly decreasing: 100, then 70, then 40, then 10 — never a fresh 100.
+    expect(timeouts.length).toBeGreaterThan(1);
+    expect(timeouts.every((ms, i) => i === 0 || (ms as number) < (timeouts[i - 1] as number))).toBe(
+      true
+    );
+    jest.restoreAllMocks();
   });
 
   it("hands back a malformed redirect that carries no Location", async () => {

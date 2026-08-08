@@ -81,10 +81,10 @@ Modified: `subtitle-manager.ts`, `use-subtitles.ts`, `types/index.ts`,
 `src/index.ts`, `src/react/index.ts`, `tsup.config.ts`, `package.json`,
 `packages/ui/src/{index.ts,player-controls.tsx,lightbird-player.tsx}`
 
-New tests (143): `opensubtitles-hash.test.ts` (17), `subtitle-search.test.ts` (38),
-`react/use-subtitle-search.test.ts` (25), `subtitle-manager-download.test.ts` (22),
+New tests (163): `opensubtitles-hash.test.ts` (17), `subtitle-search.test.ts` (41),
+`react/use-subtitle-search.test.ts` (25), `subtitle-manager-download.test.ts` (21),
 `ui/__tests__/subtitle-search-panel.test.tsx` (17),
-`web/__tests__/subtitles-provider.test.ts` (24)
+`web/__tests__/subtitles-provider.test.ts` (42)
 
 ### Review hardening (PR #80)
 
@@ -228,6 +228,61 @@ components in `packages/ui` use a raw `<button>` for the same reason.
 New tests (+24): 9 `parseHttpsUrl` cases and 6 redirect-following cases in
 `web/__tests__/subtitles-provider.test.ts`, plus 2 `activeId` invalidation and 7
 format-detection cases in `subtitle-manager-download.test.ts`.
+
+### Fifth review pass
+
+One finding plus five nitpicks, two of which were aimed at the previous pass's
+tests rather than its code — and were right:
+
+- **A hash search could omit the file size.** `SubtitleSearchQuery` documents
+  that the provider matches `moviehash` and `moviebytesize` together, but
+  `searchSubtitles` only checked that a hash *or* text was present, so a
+  hash-only query was forwarded as a malformed request and came back as an
+  opaque provider error. Rejected up front instead. `useSubtitleSearch` always
+  supplies both, so this only reachable through the public
+  `@lightbird/core/search` entry — which is exactly why it is worth guarding.
+- **The redirect deadline was per hop.** `fetchFollowingHttpsRedirects` passed
+  the full `timeoutMs` to each of up to 5 hops, so a slow chain could hold the
+  invocation open for 50 s — five times the bound the deadline exists to
+  enforce. Now one budget computed once, with the remaining time passed to each
+  hop and exhaustion raising `TimeoutError`.
+- **`https:` alone did not mean external.** `parseHttpsUrl` accepted
+  `https://169.254.169.254/`, so the scheme check did not actually achieve what
+  its own comment claimed. Literal loopback, private, link-local, unique-local,
+  and CGNAT addresses are now rejected, v4 and v6. A hostname allowlist would be
+  stronger, but the provider's CDN hostnames are neither documented nor stable.
+  **This does not stop a hostname that resolves to a private address** — that
+  needs resolution-time checks the fetch API does not expose. Recorded rather
+  than papered over.
+- **An unbounded `fileId` produced the wrong status.** `/^\d+$/` accepts an
+  arbitrarily long digit string, which `Number()` turns into `Infinity` and
+  `JSON.stringify` writes as `null`; the provider then rejected it and the user
+  saw a 502 for what is a 400. Bounded to 15 digits.
+
+Two test corrections, both cases of a test that would have passed without the
+code it claimed to cover:
+
+- **The deadline test never observed the abort.** Its stalled `consume` callback
+  rejected on its own 50 ms timer, so it passed on the `timedOut` flag alone and
+  would have kept passing if `controller.abort()` were deleted. It now rejects
+  only from the signal the helper arms.
+- **The `activeId` import test could not fail.** Activating id `"0"` then
+  importing a record with id `"0"` rebases `nextId` to 1, so the next
+  registration mints `"1"` and the guard disables the track either way. The test
+  now activates `"1"` so the post-import registration collides with the stale
+  selection, and asserts the collision directly.
+
+  Its companion for `removeSubtitle` was deleted rather than repaired: `nextId`
+  only moves forward, so an id freed by a removal can never equal a later one,
+  and no test can distinguish that reset being present from absent. The reset
+  stays as hygiene, deliberately untested — better than a test asserting
+  something it cannot observe, which is the same false confidence caught in
+  `48660c7`.
+
+New tests (+20): 11 internal-host rejections and 5 public-address acceptances in
+`parseHttpsUrl`, an internal-redirect refusal, a shared-deadline assertion, and 3
+`searchSubtitles` file-size cases. Net −1 in the manager suite from the deleted
+test.
 
 ### Known limitation
 

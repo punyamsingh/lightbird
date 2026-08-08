@@ -225,6 +225,12 @@ export async function searchSubtitles(
   if (!query.hash && !query.text) {
     throw new SubtitleSearchError('failed', 'A hash or a search term is required');
   }
+  // The provider matches on moviehash and moviebytesize together. Sending the
+  // hash alone is not a narrower search, it is a malformed one — and it fails
+  // as an opaque provider error rather than something the caller can act on.
+  if (query.hash && query.fileSize === undefined) {
+    throw new SubtitleSearchError('failed', 'A file size is required when searching by hash');
+  }
 
   const params = buildSearchParams(query);
   const payload = await request(
