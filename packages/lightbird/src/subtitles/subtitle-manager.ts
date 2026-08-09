@@ -63,10 +63,15 @@ interface SubtitleRecord {
   cues: SubtitleCue[];
 }
 
+/** The subtitle formats the manager understands, for runtime narrowing. */
+const SUBTITLE_FORMATS = ["vtt", "srt", "ass", "ssa"] as const;
+
 export class UniversalSubtitleManager {
   private records: SubtitleRecord[] = [];
   private videoElement: HTMLVideoElement | null = null;
   private nextId = 0;
+  /** Currently selected subtitle id, or "-1" for none. */
+  private activeId = "-1";
 
   constructor(videoElement?: HTMLVideoElement) {
     this.videoElement = videoElement || null;
@@ -80,80 +85,123 @@ export class UniversalSubtitleManager {
     const newSubtitles: Subtitle[] = [];
 
     for (const file of files) {
-      const ext = file.name.split(".").pop()?.toLowerCase() as
-        | "vtt"
-        | "srt"
-        | "ass"
-        | "ssa"
-        | undefined;
+      // Narrowed rather than cast: a cast would let `movie.txt` through as
+      // format "txt", which is outside the Subtitle union, counts as timed
+      // text, and so gets attached as VTT without conversion. Anything
+      // unrecognised falls back to "vtt" below.
+      const raw = file.name.split(".").pop()?.toLowerCase();
+      const ext = SUBTITLE_FORMATS.find((f) => f === raw);
 
       const langMatch = file.name.match(/\.([a-z]{2,3})\.(?:srt|vtt|ass|ssa)$/i);
       const lang = langMatch ? langMatch[1] : "unknown";
 
-      const subtitle: Subtitle = {
-        id: String(this.nextId++),
-        name: `${lang.toUpperCase()} (${file.name})`,
-        lang,
-        type: "external",
-        format: ext ?? "vtt",
-      };
-
-      let rawVtt: string | undefined;
-      let cues: SubtitleCue[] = [];
-
-      if (ext === "ass" || ext === "ssa") {
-        // ASS/SSA: store raw text, mark url as undefined (handled by ASSRenderer in player)
-        const rawText = await readSubtitleFile(file);
-        subtitle.url = undefined;
-        // Store the raw ASS text in a data URL so the player can retrieve it
-        const blob = new Blob([rawText], { type: "text/plain" });
-        subtitle.url = URL.createObjectURL(blob);
-        rawVtt = undefined;
-      } else {
-        // VTT/SRT: read with encoding detection, then convert to VTT
-        const fileText = await readSubtitleFile(file);
-        let vttText: string;
-        if (ext === "srt") {
-          vttText = await SubtitleConverter.convertSrtToVtt(fileText);
-        } else {
-          vttText = fileText;
-        }
-        rawVtt = vttText;
-        cues = parseVttCues(vttText);
-        const blob = new Blob([vttText], { type: "text/vtt" });
-        subtitle.url = URL.createObjectURL(blob);
-      }
-
-      newSubtitles.push(subtitle);
-      this.records.push({ subtitle, rawVtt, offset: 0, cues });
-
-      // Add track element for VTT/SRT subtitles
-      if (this.videoElement && ext !== "ass" && ext !== "ssa" && subtitle.url) {
-        const track = document.createElement("track");
-        track.kind = "subtitles";
-        track.label = subtitle.name;
-        track.srclang = subtitle.lang;
-        track.src = subtitle.url;
-        track.setAttribute("data-id", subtitle.id);
-        track.default = false;
-
-        track.addEventListener("load", () => {
-          console.log(`Subtitle track loaded: ${subtitle.name}`);
-        });
-        track.addEventListener("error", (e) => {
-          console.error(`Failed to load subtitle track: ${subtitle.name}`, e);
-        });
-
-        this.videoElement.appendChild(track);
-        const textTrack = track.track;
-        textTrack.mode = "hidden";
-        setTimeout(() => {
-          textTrack.mode = "disabled";
-        }, 100);
-      }
+      // Read with encoding detection before handing off to the shared registration path.
+      const text = await readSubtitleFile(file);
+      newSubtitles.push(
+        this.registerSubtitle({
+          displayName: `${lang.toUpperCase()} (${file.name})`,
+          lang,
+          format: ext ?? "vtt",
+          text: await this.toVttIfNeeded(text, ext ?? "vtt"),
+          isTimedText: ext !== "ass" && ext !== "ssa",
+        })
+      );
     }
 
     return newSubtitles;
+  }
+
+  /**
+   * Adds a subtitle from raw text rather than a File — used by the online
+   * subtitle search, where the content arrives over the network already
+   * decoded. Behaves identically to a file drop from here on: SRT is converted
+   * to VTT, a track element is attached, and offset/search work as usual.
+   */
+  async addSubtitleFromText(
+    content: string,
+    fileName: string,
+    lang: string,
+    format: "vtt" | "srt" | "ass" | "ssa" = "srt"
+  ): Promise<Subtitle> {
+    const label = lang && lang !== "unknown" ? lang.toUpperCase() : "SUB";
+    return this.registerSubtitle({
+      displayName: `${label} (${fileName})`,
+      lang: lang || "unknown",
+      format,
+      text: await this.toVttIfNeeded(content, format),
+      isTimedText: format !== "ass" && format !== "ssa",
+    });
+  }
+
+  /** Converts SRT source text to VTT; leaves every other format untouched. */
+  private async toVttIfNeeded(text: string, format: string): Promise<string> {
+    return format === "srt" ? SubtitleConverter.convertSrtToVtt(text) : text;
+  }
+
+  /**
+   * Creates the Subtitle record, its blob URL, and (for timed text) the
+   * `<track>` element on the video. Shared by the file and network paths.
+   */
+  private registerSubtitle(input: {
+    displayName: string;
+    lang: string;
+    format: "vtt" | "srt" | "ass" | "ssa";
+    /** Already VTT for timed text; raw ASS/SSA otherwise. */
+    text: string;
+    isTimedText: boolean;
+  }): Subtitle {
+    const { displayName, lang, format, text, isTimedText } = input;
+
+    const subtitle: Subtitle = {
+      id: String(this.nextId++),
+      name: displayName,
+      lang,
+      type: "external",
+      format,
+    };
+
+    let rawVtt: string | undefined;
+    let cues: SubtitleCue[] = [];
+
+    if (isTimedText) {
+      rawVtt = text;
+      cues = parseVttCues(text);
+      subtitle.url = URL.createObjectURL(new Blob([text], { type: "text/vtt" }));
+    } else {
+      // ASS/SSA: keep the raw text addressable so ASSRenderer can fetch it.
+      subtitle.url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+    }
+
+    this.records.push({ subtitle, rawVtt, offset: 0, cues });
+
+    if (this.videoElement && isTimedText && subtitle.url) {
+      const track = document.createElement("track");
+      track.kind = "subtitles";
+      track.label = subtitle.name;
+      track.srclang = subtitle.lang;
+      track.src = subtitle.url;
+      track.setAttribute("data-id", subtitle.id);
+      track.default = false;
+
+      track.addEventListener("error", (e) => {
+        console.error(`Failed to load subtitle track: ${subtitle.name}`, e);
+      });
+
+      this.videoElement.appendChild(track);
+      const textTrack = track.track;
+      // Briefly hidden so the browser fetches and parses the cues, then
+      // disabled — but only if the caller has not activated this subtitle in
+      // the meantime. addSubtitleFromText() selects immediately, and without
+      // this guard the timer would switch off the track the user just got.
+      textTrack.mode = "hidden";
+      setTimeout(() => {
+        if (this.activeId !== subtitle.id) {
+          textTrack.mode = "disabled";
+        }
+      }, 100);
+    }
+
+    return subtitle;
   }
 
   removeSubtitle(id: string): boolean {
@@ -177,10 +225,14 @@ export class UniversalSubtitleManager {
     }
 
     this.records.splice(index, 1);
+    if (this.activeId === id) this.activeId = "-1";
     return true;
   }
 
   switchSubtitle(id: string): void {
+    // Recorded before the early return so a detached manager still reports the
+    // right selection once a video element is attached.
+    this.activeId = id;
     if (!this.videoElement) return;
 
     const tracks = this.videoElement.textTracks;
@@ -271,6 +323,7 @@ export class UniversalSubtitleManager {
       tracks.forEach((track) => track.remove());
     }
     this.records = [];
+    this.activeId = "-1";
   }
 
   destroy(): void {
@@ -279,6 +332,12 @@ export class UniversalSubtitleManager {
   }
 
   importSubtitles(subtitles: Subtitle[]): void {
+    // Every record is replaced, so the previous selection no longer refers to
+    // anything. Left stale, it could collide with a later registration's id and
+    // make the delayed disable in registerSubtitle() skip a track the user
+    // never chose. removeSubtitle() and clearSubtitles() reset it for the same
+    // reason.
+    this.activeId = "-1";
     this.records = subtitles.map((s) => ({
       subtitle: s,
       rawVtt: undefined,

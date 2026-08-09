@@ -1,7 +1,7 @@
 # LightBird — Project Overview
 
-> **Last updated:** 2026-05-31
-> **Branch context:** Plans 01–12 implemented. Project is now a pnpm monorepo publishing three npm packages: `@lightbird/core` (core), `@lightbird/player-react` (styled React components), and `@lightbird/player` (framework-agnostic Web Component). Docs page refactored into a server component with client islands (issue #35). FFmpeg.wasm lazy loading is now guaranteed zero-cost for HTML5-native playback and protected by a CI bundle-size budget (issue #54). Player UX polish added seek-hover thumbnail previews, A-B loop, and mobile touch gestures (issue #57).
+> **Last updated:** 2026-08-07
+> **Branch context:** Plans 01–12 implemented. Project is now a pnpm monorepo publishing three npm packages: `@lightbird/core` (core), `@lightbird/player-react` (styled React components), and `@lightbird/player` (framework-agnostic Web Component). Docs page refactored into a server component with client islands (issue #35). FFmpeg.wasm lazy loading is now guaranteed zero-cost for HTML5-native playback and protected by a CI bundle-size budget (issue #54). Player UX polish added seek-hover thumbnail previews, A-B loop, and mobile touch gestures (issue #57). Online subtitle download (VLSub-style hash matching) added via a new `@lightbird/core/search` entry point plus the repo's first API routes in `apps/web` (issue #79).
 
 ---
 
@@ -24,7 +24,7 @@ LightBird is a modern, lightweight, browser-based video player built as a **pnpm
 ```text
 apps/web/          — Next.js app (lightbird.vercel.app)
 packages/lightbird/ — Core library (npm: @lightbird/core)
-packages/ui/        — UI components (npm: @lightbird/ui)
+packages/ui/        — UI components (npm: @lightbird/player-react)
 ```
 
 ### Player System
@@ -41,8 +41,8 @@ The factory function `createVideoPlayer(source)` in `packages/lightbird/src/vide
 
 ```text
 apps/web/src/app/page.tsx
-└── @lightbird/ui: PlayerErrorBoundary
-    └── @lightbird/ui: LightBirdPlayer (coordinator)
+└── @lightbird/player-react: PlayerErrorBoundary
+    └── @lightbird/player-react: LightBirdPlayer (coordinator)
         ├── PlayerControls
         ├── PlaylistPanel
         ├── VideoOverlay
@@ -70,6 +70,7 @@ apps/web/src/app/page.tsx
 | `use-seek-preview.ts` | Seek-bar hover thumbnail previews via an offscreen video |
 | `use-ab-loop.ts` | A-B loop: repeat playback between two user-set points |
 | `use-touch-gestures.ts` | Mobile touch gestures: double-tap seek, swipe volume/brightness |
+| `use-subtitle-search.ts` | Online subtitle search: video hash → provider query → download |
 
 ---
 
@@ -92,7 +93,7 @@ Magnet links are streamed in-browser via BitTorrent — no server required:
 - `feature-flags.ts` — initialises OpenFeature with the Unleash Web provider
   (`NEXT_PUBLIC_UNLEASH_URL` / `NEXT_PUBLIC_UNLEASH_CLIENT_KEY`). Missing
   credentials warn and fall back to flag defaults.
-- `feature-flags-provider.tsx` (`@lightbird/ui`) — wraps the app so
+- `feature-flags-provider.tsx` (`@lightbird/player-react`) — wraps the app so
   `useBooleanFlagValue` hooks resolve. The magnet UI is hidden when the flag
   is off.
 
@@ -125,13 +126,15 @@ Tests are per-package using ts-jest. Run with:
 ```bash
 pnpm turbo test         # all tests
 pnpm test --filter @lightbird/core  # core only
-pnpm test --filter @lightbird/ui  # UI only
+pnpm test --filter @lightbird/player-react  # UI only
 ```
 
 Test locations:
 - `packages/lightbird/__tests__/` — library tests (18 files)
 - `packages/lightbird/__tests__/react/` — hook tests (14 files)
 - `packages/ui/__tests__/` — component tests (5 files)
+- `apps/web/__tests__/` — web-app unit tests (2 files), covering framework-agnostic
+  app logic such as the playground snippet generator and the subtitle proxy helper
 
 Shared setup: `jest.setup.ts` (root)
 
@@ -145,6 +148,11 @@ The base `@lightbird/core` entry must stay FFmpeg-free and lean:
 - `packages/lightbird/__tests__/bundle-budget.test.ts` asserts the same guarantee
   on the built artifacts as part of `pnpm turbo test` (turbo builds
   `@lightbird/core` before testing it).
+
+Features that would push the base entry over budget get their own entry point
+instead. `@lightbird/core/search` (online subtitle search) was split out for
+exactly this reason. **Current headroom is ~0.30 KB gzip** — assume the next
+addition to the base entry needs the same treatment.
 
 ---
 
@@ -170,6 +178,7 @@ The base `@lightbird/core` entry must stay FFmpeg-free and lean:
 | CH | Chapters & Cue Points | **DONE** |
 | HLS | HLS/DASH Adaptive Streaming | In progress ([#48](https://github.com/punyamsingh/lightbird/issues/48)) — HLS-01 `HLSPlayer` **DONE**, HLS-02/03 pending |
 | PG | Interactive Playground | **DONE** ([#55](https://github.com/punyamsingh/lightbird/issues/55)) |
+| 14 | Online Subtitle Download (VLSub-style) | **DONE** ([#79](https://github.com/punyamsingh/lightbird/issues/79)) |
 
 ---
 

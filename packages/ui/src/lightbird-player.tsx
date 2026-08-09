@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import type { PlaylistItem, AudioTrack } from "@lightbird/core";
+import type { PlaylistItem, AudioTrack, SubtitleSearchResult } from "@lightbird/core";
 import { cn } from "./utils/cn";
 import PlayerControls from "./player-controls";
 import PlaylistPanel, { type PlaylistSize } from "./playlist-panel";
@@ -28,6 +28,7 @@ import {
   useABLoop,
   useTouchGestures,
   useHlsQuality,
+  useSubtitleSearch,
 } from "@lightbird/core/react";
 import { captureVideoThumbnail, exportVideoFrame, downloadDataUrl, frameExportFilename, parseMediaError, validateFile, type ParsedMediaError, loadShortcuts, type ShortcutBinding, ProgressEstimator, hasAcceptedDisclaimer, acceptDisclaimer, FLAG_MAGNET_LINK } from "@lightbird/core";
 import { useBooleanFlagValue } from "@openfeature/react-sdk";
@@ -63,6 +64,10 @@ const LightBirdPlayer = () => {
   const playback = useVideoPlayback(videoRef);
   const filters = useVideoFilters(videoRef);
   const subtitles = useSubtitles({
+    onError: (msg) => toast({ title: msg, variant: "destructive" }),
+    onSuccess: (msg) => toast({ title: msg }),
+  });
+  const subtitleSearch = useSubtitleSearch({
     onError: (msg) => toast({ title: msg, variant: "destructive" }),
     onSuccess: (msg) => toast({ title: msg }),
   });
@@ -185,6 +190,10 @@ const LightBirdPlayer = () => {
     }, 5000);
   };
 
+  // Counts video transitions. Declared here because loadVideo() below bumps it
+  // synchronously; see the effect further down for why a counter and not an id.
+  const selectionRef = useRef(0);
+
   const clearRetryTimer = () => {
     if (retryTimerRef.current) {
       clearTimeout(retryTimerRef.current);
@@ -286,6 +295,10 @@ const LightBirdPlayer = () => {
   const loadVideo = useCallback((index: number) => {
     const item = playlist.playlist[index];
     if (!item) return;
+    // Invalidate before the transition, not after it commits — see the
+    // selectionRef declaration below. This is the only path that moves between
+    // two items; the other selectItem() calls all run with nothing playing.
+    selectionRef.current += 1;
     playlist.selectItem(index);
     setPlayerError(null);
     clearRetryTimer();
@@ -642,6 +655,80 @@ const LightBirdPlayer = () => {
     subtitleInputRef.current?.click();
   }, []);
 
+  // Clear stale results when the video changes — subtitles found for the
+  // previous file are meaningless for this one.
+  const currentItemId = playlist.currentItem?.id ?? null;
+  // selectionRef (declared above) counts transitions rather than tracking the
+  // item id, because the id is only observable through state React has already
+  // committed. loadVideo() bumps it synchronously at the moment of the
+  // transition, so a download resolving between selectItem() and this effect
+  // still sees the change; comparing ids here would compare two
+  // pre-transition values and let the previous film's subtitles attach.
+  const resetSubtitleSearch = subtitleSearch.reset;
+  useEffect(() => {
+    // Also bumped here to cover any transition that does not route through
+    // loadVideo(). Bumping twice for one change is harmless — only inequality
+    // is ever tested.
+    selectionRef.current += 1;
+    resetSubtitleSearch();
+  }, [currentItemId, resetSubtitleSearch]);
+
+  const handleSubtitleSearch = useCallback(() => {
+    const item = playlist.currentItem;
+    if (!item) return;
+    // Remote and torrent-backed items have no File to hash, so the search
+    // falls back to the filename on its own.
+    void subtitleSearch.search({ file: item.file, fileName: item.name });
+  }, [playlist.currentItem, subtitleSearch]);
+
+  const handleSubtitleSearchApply = useCallback(
+    async (result: SubtitleSearchResult) => {
+      // The selection this subtitle was chosen for. If the user switches
+      // videos while the download is in flight, applying it to whatever is
+      // playing now would attach subtitles for the wrong film.
+      const requestedSelection = selectionRef.current;
+      try {
+        const downloaded = await subtitleSearch.download(result);
+        if (selectionRef.current !== requestedSelection) return;
+        await subtitles.addSubtitleFromText(
+          downloaded.content,
+          downloaded.fileName,
+          result.language,
+          downloaded.format
+        );
+      } catch {
+        // download() already reported the failure through the error toast,
+        // and a cancelled download is not a failure worth reporting at all.
+      }
+    },
+    [playlist.currentItem, subtitleSearch, subtitles]
+  );
+
+  const subtitleSearchProps = useMemo(
+    () => ({
+      status: subtitleSearch.status,
+      results: subtitleSearch.results,
+      mode: subtitleSearch.mode,
+      error: subtitleSearch.error,
+      unavailable: subtitleSearch.errorKind === "unavailable",
+      downloadingId: subtitleSearch.downloadingId,
+      canSearch: Boolean(playlist.currentItem),
+      onSearch: handleSubtitleSearch,
+      onApply: handleSubtitleSearchApply,
+    }),
+    [
+      subtitleSearch.status,
+      subtitleSearch.results,
+      subtitleSearch.mode,
+      subtitleSearch.error,
+      subtitleSearch.errorKind,
+      subtitleSearch.downloadingId,
+      playlist.currentItem,
+      handleSubtitleSearch,
+      handleSubtitleSearchApply,
+    ]
+  );
+
   const handleSelectVideo = useCallback((index: number) => {
     loadVideo(index);
   }, [loadVideo]);
@@ -796,6 +883,7 @@ const LightBirdPlayer = () => {
             onAudioTrackChange={handleAudioTrackChange}
             onSubtitleUpload={handleSubtitleUpload}
             onSubtitleRemove={subtitles.removeSubtitle}
+            subtitleSearch={subtitleSearchProps}
             onShowInfo={() => setShowInfo((v: boolean) => !v)}
             onOpenShortcuts={() => setShowShortcutsDialog(true)}
             chapters={chapters}

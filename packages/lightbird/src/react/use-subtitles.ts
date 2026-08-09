@@ -53,6 +53,44 @@ export function useSubtitles(options?: UseSubtitlesOptions) {
     [options]
   );
 
+  /**
+   * Adds a subtitle from raw text (used by the online search) and switches to
+   * it immediately — a downloaded subtitle you have to then go and enable is a
+   * worse experience than one that just appears.
+   */
+  const addSubtitleFromText = useCallback(
+    async (
+      content: string,
+      fileName: string,
+      lang: string,
+      format: "vtt" | "srt" | "ass" | "ssa" = "srt"
+    ) => {
+      // Captured before the await: loading another video swaps in a new
+      // manager, and an id from the old one means nothing to the new one.
+      const manager = managerRef.current;
+      if (!manager) return null;
+      try {
+        const subtitle = await manager.addSubtitleFromText(
+          content,
+          fileName,
+          lang,
+          format
+        );
+        if (managerRef.current !== manager) return null;
+        setSubtitles(manager.getSubtitles());
+        setActiveSubtitle(subtitle.id);
+        manager.switchSubtitle(subtitle.id);
+        options?.onSuccess?.(`Applied ${subtitle.name}`);
+        return subtitle;
+      } catch (error) {
+        console.error("Failed to add downloaded subtitle:", error);
+        options?.onError?.("Failed to apply subtitle");
+        return null;
+      }
+    },
+    [options]
+  );
+
   const removeSubtitle = useCallback(
     (id: string) => {
       if (!managerRef.current) return;
@@ -82,6 +120,7 @@ export function useSubtitles(options?: UseSubtitlesOptions) {
     importSubtitles,
     reset,
     addSubtitleFiles,
+    addSubtitleFromText,
     removeSubtitle,
     switchSubtitle,
   };

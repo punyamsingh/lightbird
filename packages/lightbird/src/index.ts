@@ -19,6 +19,10 @@ export { SubtitleConverter } from './subtitles/subtitle-converter'
 export { applyOffsetToVtt, createOffsetVttUrl } from './subtitles/subtitle-offset'
 export { ASSRenderer } from './subtitles/ass-renderer'
 
+// Online subtitle search (VLSub-style hash matching) ships as its own entry
+// point, `@lightbird/core/search`, to keep it off the budgeted base bundle.
+// Only its types are re-exported here, and types cost nothing at runtime.
+
 // Parsers
 export { parseChaptersFromFFmpegLog, parseChaptersFromVtt } from './parsers/chapter-parser'
 export { exportPlaylist, parseM3U8 } from './parsers/m3u-parser'
@@ -62,6 +66,8 @@ export type {
   PlaylistItem,
   Subtitle,
   SubtitleCue,
+  SubtitleSearchResult,
+  SubtitleSearchQuery,
   AudioTrack,
   VideoFilters,
   VideoMetadata,

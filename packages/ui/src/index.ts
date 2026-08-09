@@ -11,6 +11,8 @@ export { SubtitleOverlay } from './subtitle-overlay'
 export { PlayerErrorDisplay } from './player-error-display'
 export { PlayerErrorBoundary } from './player-error-boundary'
 export { VideoInfoPanel } from './video-info-panel'
+export { SubtitleSearchPanel } from './subtitle-search-panel'
+export type { SubtitleSearchPanelProps } from './subtitle-search-panel'
 export { ShortcutSettingsDialog } from './shortcut-settings-dialog'
 
 // Toaster (user adds to app root for toast notifications)

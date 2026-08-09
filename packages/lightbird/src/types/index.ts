@@ -43,6 +43,35 @@ export interface Subtitle {
   format?: 'vtt' | 'srt' | 'ass' | 'ssa';
 }
 
+/** A single subtitle offered by the online search provider. */
+export interface SubtitleSearchResult {
+  /** Provider-side file identifier used to request the download. */
+  fileId: string;
+  fileName: string;
+  /** ISO 639 language code, lowercased. */
+  language: string;
+  /** Release name the subtitle was timed against, e.g. "Movie.2019.1080p.BluRay". */
+  release: string;
+  downloadCount: number;
+  rating: number;
+  hearingImpaired: boolean;
+  /** True when matched by video hash — these are the ones that will be in sync. */
+  hashMatch: boolean;
+  uploadDate?: string;
+}
+
+/** Search criteria. At least one of `hash` or `text` must be present. */
+export interface SubtitleSearchQuery {
+  /** OpenSubtitles video hash, 16 hex characters. */
+  hash?: string;
+  /** File size in bytes; the provider requires it alongside a hash. */
+  fileSize?: number;
+  /** Free-text fallback, usually derived from the filename. */
+  text?: string;
+  /** ISO 639-1 codes to filter by. Empty means all languages. */
+  languages?: string[];
+}
+
 export interface AudioTrack {
   id: string;
   name: string;
