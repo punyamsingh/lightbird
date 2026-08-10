@@ -8,6 +8,7 @@ export type {
   UseSubtitleSearchReturn,
   SubtitleSearchStatus,
   SubtitleSearchMode,
+  SubtitleSearchRequest,
   SubtitleSearchSource,
 } from './use-subtitle-search'
 export { usePlaylist } from './use-playlist'

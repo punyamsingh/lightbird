@@ -26,10 +26,26 @@ export type SubtitleSearchStatus =
 /** Which query produced the current results. */
 export type SubtitleSearchMode = "hash" | "text";
 
+/**
+ * Which search to run, mirroring VLSub's two buttons.
+ *
+ * - `auto` — hash first, filename only if the hash finds nothing.
+ * - `hash` — fingerprint only; no silent fallback, so an empty result is
+ *   information ("this release is not indexed") rather than a mystery.
+ * - `text` — filename or a caller-supplied title only; never reads the file.
+ */
+export type SubtitleSearchRequest = "auto" | "hash" | "text";
+
 export interface SubtitleSearchSource {
-  /** The video itself. Omit for remote sources — the search falls back to text. */
+  /** The video itself. Omit for remote sources — only a text search is possible. */
   file?: Blob;
   fileName: string;
+  /**
+   * Title to search for, overriding the one derived from `fileName`. Release
+   * filenames are often a poor query ("Blade.Runner.2049.2160p.HDR.x265"), so
+   * the UI lets the user correct it — the same as VLSub's editable title.
+   */
+  query?: string;
 }
 
 export interface UseSubtitleSearchOptions {
@@ -50,8 +66,11 @@ export interface UseSubtitleSearchReturn {
   errorKind: SubtitleSearchErrorKind | null;
   /** fileId currently being downloaded, or null. */
   downloadingId: string | null;
-  /** Hashes the source when possible, then searches. Text is the fallback. */
-  search: (source: SubtitleSearchSource) => Promise<void>;
+  /**
+   * Runs a search. Defaults to `auto` (hash, then filename); pass `hash` or
+   * `text` to run exactly one, as VLSub's two buttons do.
+   */
+  search: (source: SubtitleSearchSource, request?: SubtitleSearchRequest) => Promise<void>;
   /** Fetches a result's subtitle text. Throws with a user-facing message. */
   download: (result: SubtitleSearchResult) => Promise<DownloadedSubtitle>;
   reset: () => void;
@@ -115,7 +134,7 @@ export function useSubtitleSearch(
   }, []);
 
   const search = useCallback(
-    async (source: SubtitleSearchSource) => {
+    async (source: SubtitleSearchSource, request: SubtitleSearchRequest = "auto") => {
       // Supersede any in-flight search.
       abortRef.current?.abort();
       const controller = new AbortController();
@@ -127,15 +146,26 @@ export function useSubtitleSearch(
       setMode(null);
 
       const requestOptions = { endpoint, signal: controller.signal };
+      const hashable = Boolean(source.file && isHashable(source.file));
 
       try {
+        // Asking for a hash match on something that cannot be fingerprinted is
+        // a dead end, and silently searching by name instead would misrepresent
+        // the results as release-matched. Say so and let the user choose.
+        if (request === "hash" && !hashable) {
+          throw new SubtitleSearchError(
+            "failed",
+            "This source can't be fingerprinted — search by name instead"
+          );
+        }
+
         let hash: string | undefined;
         let fileSize: number | undefined;
 
-        if (source.file && isHashable(source.file)) {
+        if (request !== "text" && hashable) {
           setStatus("hashing");
-          hash = await computeOpenSubtitlesHash(source.file);
-          fileSize = source.file.size;
+          hash = await computeOpenSubtitlesHash(source.file as Blob);
+          fileSize = (source.file as Blob).size;
         }
 
         if (controller.signal.aborted) return;
@@ -150,9 +180,10 @@ export function useSubtitleSearch(
           if (found.length > 0) usedMode = "hash";
         }
 
-        // Nothing (or nothing to hash) — fall back to the filename.
-        if (found.length === 0) {
-          const text = fileNameToSearchQuery(source.fileName);
+        // Fall back to the title — but only when the caller left the choice
+        // open. An explicit hash search reports "nothing indexed" instead.
+        if (found.length === 0 && request !== "hash") {
+          const text = (source.query ?? fileNameToSearchQuery(source.fileName)).trim();
           if (text) {
             found = await searchSubtitles({ text, languages }, requestOptions);
             usedMode = "text";
@@ -162,14 +193,17 @@ export function useSubtitleSearch(
         if (controller.signal.aborted || !mountedRef.current) return;
 
         setResults(found);
-        setMode(found.length > 0 ? usedMode : null);
+        // Report the mode that was *attempted*, not just the one that found
+        // something: an empty hash search still needs to be labelled a hash
+        // search so the UI can suggest searching by name.
+        setMode(found.length > 0 ? usedMode : request === "hash" ? "hash" : null);
         setStatus("ready");
 
         if (found.length > 0) {
           onSuccess?.(
             usedMode === "hash"
               ? `Found ${found.length} subtitle(s) matching this exact release`
-              : `Found ${found.length} subtitle(s) by filename — check sync`
+              : `Found ${found.length} subtitle(s) by name — check sync`
           );
         }
       } catch (err) {

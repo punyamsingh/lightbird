@@ -407,3 +407,101 @@ describe('useSubtitleSearch', () => {
     });
   });
 });
+
+/**
+ * VLSub gives the user two buttons rather than one search with a hidden
+ * fallback, because a hash match and a name match are different promises about
+ * sync. These cover choosing one explicitly.
+ */
+describe('useSubtitleSearch — explicit search modes', () => {
+  it('searches by hash only, without falling back to the name', async () => {
+    searchSubtitles.mockResolvedValue([]);
+
+    const { result } = renderHook(() => useSubtitleSearch());
+    await act(async () => {
+      await result.current.search(
+        { file: hashableFile(), fileName: 'Movie.2019.mkv' },
+        'hash'
+      );
+    });
+
+    // One call, and it carried a hash — no second, text-only call.
+    expect(searchSubtitles).toHaveBeenCalledTimes(1);
+    expect(searchSubtitles.mock.calls[0][0]).toMatchObject({ hash: expect.any(String) });
+    expect(result.current.results).toEqual([]);
+  });
+
+  it('reports the mode of an empty hash search so the UI can suggest a name search', async () => {
+    searchSubtitles.mockResolvedValue([]);
+
+    const { result } = renderHook(() => useSubtitleSearch());
+    await act(async () => {
+      await result.current.search({ file: hashableFile(), fileName: 'M.mkv' }, 'hash');
+    });
+
+    expect(result.current.status).toBe('ready');
+    expect(result.current.mode).toBe('hash');
+  });
+
+  it('refuses a hash search on a source that cannot be fingerprinted', async () => {
+    const onError = jest.fn();
+
+    const { result } = renderHook(() => useSubtitleSearch({ onError }));
+    await act(async () => {
+      // A stream or torrent item: no local File to read.
+      await result.current.search({ fileName: 'Movie.2019.mkv' }, 'hash');
+    });
+
+    expect(searchSubtitles).not.toHaveBeenCalled();
+    expect(result.current.status).toBe('error');
+    expect(result.current.error).toMatch(/can't be fingerprinted/i);
+    expect(onError).toHaveBeenCalled();
+  });
+
+  it('searches by name only, never reading the file', async () => {
+    searchSubtitles.mockResolvedValue([makeResult()]);
+    const hashSpy = jest.spyOn(hashModule, 'computeOpenSubtitlesHash');
+
+    const { result } = renderHook(() => useSubtitleSearch());
+    await act(async () => {
+      await result.current.search(
+        { file: hashableFile(), fileName: 'Movie.2019.mkv' },
+        'text'
+      );
+    });
+
+    expect(hashSpy).not.toHaveBeenCalled();
+    expect(searchSubtitles).toHaveBeenCalledTimes(1);
+    expect(searchSubtitles.mock.calls[0][0]).not.toHaveProperty('hash');
+    expect(result.current.mode).toBe('text');
+    hashSpy.mockRestore();
+  });
+
+  it('prefers a caller-supplied title over the one derived from the filename', async () => {
+    searchSubtitles.mockResolvedValue([makeResult()]);
+
+    const { result } = renderHook(() => useSubtitleSearch());
+    await act(async () => {
+      await result.current.search(
+        { fileName: 'Blade.Runner.2049.2160p.HDR.x265.mkv', query: 'Blade Runner 2049' },
+        'text'
+      );
+    });
+
+    expect(searchSubtitles.mock.calls[0][0]).toMatchObject({ text: 'Blade Runner 2049' });
+  });
+
+  it('still falls back from hash to name when the mode is left to auto', async () => {
+    // The default must keep behaving as before for existing callers.
+    searchSubtitles.mockResolvedValueOnce([]).mockResolvedValueOnce([makeResult()]);
+
+    const { result } = renderHook(() => useSubtitleSearch());
+    await act(async () => {
+      await result.current.search({ file: hashableFile(), fileName: 'Movie.2019.mkv' });
+    });
+
+    expect(searchSubtitles).toHaveBeenCalledTimes(2);
+    expect(result.current.mode).toBe('text');
+    expect(result.current.results).toHaveLength(1);
+  });
+});
