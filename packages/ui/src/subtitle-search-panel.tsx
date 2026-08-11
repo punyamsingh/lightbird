@@ -32,6 +32,13 @@ export interface SubtitleSearchPanelProps {
   /** Title to prefill the query box with, usually derived from the filename. */
   defaultQuery?: string;
   /**
+   * Identity of the video the query belongs to — the playlist item id. The box
+   * reseeds when this changes and keeps the user's edits while it doesn't.
+   * Defaults to `defaultQuery`, which is ambiguous when two videos derive the
+   * same title ("video.mkv" twice), so pass a real id where one exists.
+   */
+  queryKey?: string | null;
+  /**
    * Receives the chosen mode and the current query text. Declared with
    * parameters so a handler that ignores them stays assignable.
    */
@@ -68,18 +75,21 @@ export function SubtitleSearchPanel({
   canSearch,
   canHash = true,
   defaultQuery = "",
+  queryKey,
   onSearch,
   onApply,
 }: SubtitleSearchPanelProps) {
-  // Re-keyed on defaultQuery so switching videos reseeds the box, while edits
-  // within one video survive re-renders.
+  // Re-keyed on the video's identity so switching videos reseeds the box, while
+  // edits within one video survive re-renders.
   const [query, setQuery] = React.useState(defaultQuery);
   const [requested, setRequested] = React.useState<SubtitleSearchRequest | null>(null);
-  const seededFor = React.useRef(defaultQuery);
-  if (seededFor.current !== defaultQuery) {
-    seededFor.current = defaultQuery;
+  const seedKey = queryKey ?? defaultQuery;
+  const seededFor = React.useRef(seedKey);
+  if (seededFor.current !== seedKey) {
+    seededFor.current = seedKey;
     setQuery(defaultQuery);
   }
+  const wasBusy = React.useRef(false);
 
   // Nothing to offer when the deployment has no search backend configured.
   if (unavailable) return null;
@@ -92,6 +102,13 @@ export function SubtitleSearchPanel({
   // the spinner onto the name button mid-request. The panel handled the click,
   // so it knows. A search started elsewhere leaves this null, and both buttons
   // then show neutral progress rather than pointing at the wrong one.
+  // Forgotten once the search ends, so a finished one cannot colour the next:
+  // otherwise a search started elsewhere would still point at whichever button
+  // this panel last used. Cleared on the falling edge rather than whenever idle
+  // — the click lands a render before the status it triggers.
+  if (wasBusy.current && !busy && requested !== null) setRequested(null);
+  wasBusy.current = busy;
+
   const running = busy ? requested : null;
   const hashBusy = busy && running !== "text";
   const nameBusy = busy && running !== "hash";

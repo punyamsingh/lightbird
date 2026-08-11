@@ -115,6 +115,33 @@ describe('SubtitleSearchPanel — choosing a search', () => {
     expect(screen.getByRole('textbox', { name: /title/i })).toHaveValue('Second Film');
   });
 
+  it('reseeds the box when the video changes but the derived title does not', async () => {
+    // Two files both named "video.mkv" derive the same query, so the title
+    // alone cannot tell the videos apart — the correction typed for the first
+    // one would otherwise be searched for the second.
+    const user = userEvent.setup();
+    const box = () => screen.getByRole('textbox', { name: /title/i });
+    const { rerender, props } = renderPanel({ queryKey: 'item-1', defaultQuery: 'video' });
+
+    await user.clear(box());
+    await user.type(box(), 'Inception');
+    rerender(<SubtitleSearchPanel {...props} queryKey="item-2" defaultQuery="video" />);
+
+    expect(box()).toHaveValue('video');
+  });
+
+  it('keeps the edited title while the same video is playing', async () => {
+    const user = userEvent.setup();
+    const box = () => screen.getByRole('textbox', { name: /title/i });
+    const { rerender, props } = renderPanel({ queryKey: 'item-1', defaultQuery: 'video' });
+
+    await user.clear(box());
+    await user.type(box(), 'Inception');
+    rerender(<SubtitleSearchPanel {...props} queryKey="item-1" status="searching" />);
+
+    expect(box()).toHaveValue('Inception');
+  });
+
   it('disables only the hash search when the source cannot be fingerprinted', () => {
     // Streams and torrent-backed items have no local File to read.
     renderPanel({ canHash: false });
@@ -258,6 +285,21 @@ describe('SubtitleSearchPanel — progress lands on the button you pressed', () 
 
     expect(spinning(byName())).toBe(true);
     expect(spinning(byHash())).toBe(false);
+  });
+
+  it('forgets which button it pressed once that search finishes', async () => {
+    // Otherwise the next search — started elsewhere — would still point at the
+    // button used by the previous one.
+    const user = userEvent.setup();
+    const { rerender, props } = renderPanel();
+    await user.click(byHash());
+
+    rerender(<SubtitleSearchPanel {...props} status="searching" />);
+    rerender(<SubtitleSearchPanel {...props} status="ready" />);
+    rerender(<SubtitleSearchPanel {...props} status="searching" />);
+
+    expect(spinning(byHash())).toBe(true);
+    expect(spinning(byName())).toBe(true);
   });
 
   it('shows neutral progress for a search it did not start', () => {

@@ -329,11 +329,24 @@ Bundle unchanged at 15.75 KB — all of this lives in `@lightbird/core/react`,
 entry. `fileNameToSearchQuery` is imported into the player from
 `@lightbird/core/search` for that reason.
 
-New tests (+13): 6 hook cases covering hash-only, the non-hashable refusal,
+Two pieces of panel state needed care, both about not carrying one search into
+the next:
+
+- The spinner sits on the button the user pressed, tracked by the panel rather
+  than derived from `status` — a hash search passes through `searching` once
+  fingerprinting is done, which would otherwise move the spinner onto the name
+  button mid-request. That memory is cleared when the search ends, so a search
+  started elsewhere falls back to neutral progress on both buttons.
+- The query box reseeds on the playlist item id, not the derived title. Two
+  files can derive the same title (`video.mkv` twice) while being different
+  films, and a correction typed for the first is wrong for the second.
+
+New tests (+18): 6 hook cases covering hash-only, the non-hashable refusal,
 name-only skipping the hash, the query override, and auto still falling back;
-7 panel cases covering both buttons, the prefilled and edited query box, Enter
-to search, reseeding on video change, the hash button disabled without a file,
-and the empty-hash-result guidance.
+12 panel cases covering both buttons, the prefilled and edited query box, Enter
+to search, reseeding on video change and on a same-title video change, edits
+surviving re-renders of the same video, the hash button disabled without a
+file, the empty-hash-result guidance, and where the spinner lands.
 
 ---
 

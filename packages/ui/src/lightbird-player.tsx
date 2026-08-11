@@ -731,6 +731,10 @@ const LightBirdPlayer = () => {
       // Only a local File can be fingerprinted; streams and torrents cannot.
       canHash: Boolean(playlist.currentItem?.file),
       defaultQuery: subtitleSearchQuery,
+      // The item id, not the derived title: two files can share a title
+      // ("video.mkv" twice) and a correction typed for one is wrong for the
+      // other.
+      queryKey: currentItemId,
       onSearch: handleSubtitleSearch,
       onApply: handleSubtitleSearchApply,
     }),
@@ -743,6 +747,7 @@ const LightBirdPlayer = () => {
       subtitleSearch.downloadingId,
       playlist.currentItem,
       subtitleSearchQuery,
+      currentItemId,
       handleSubtitleSearch,
       handleSubtitleSearchApply,
     ]
