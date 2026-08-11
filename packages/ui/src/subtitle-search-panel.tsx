@@ -5,8 +5,10 @@ import { getLanguageName, type SubtitleSearchResult } from "@lightbird/core";
 import type {
   SubtitleSearchStatus,
   SubtitleSearchMode,
+  SubtitleSearchRequest,
 } from "@lightbird/core/react";
 import { Button } from "./primitives/button";
+import { Input } from "./primitives/input";
 import { Label } from "./primitives/label";
 import { Search, Loader2, Download, Ear, Hash, AlertCircle } from "lucide-react";
 import { cn } from "./utils/cn";
@@ -20,9 +22,27 @@ export interface SubtitleSearchPanelProps {
   unavailable?: boolean;
   /** fileId currently downloading, or null. */
   downloadingId: string | null;
-  /** False when no video is loaded, which disables the search button. */
+  /** False when no video is loaded, which disables the search buttons. */
   canSearch: boolean;
-  onSearch: () => void;
+  /**
+   * False when the source has no local file to fingerprint — remote URLs and
+   * torrent-backed items. Disables the hash button rather than letting it fail.
+   */
+  canHash?: boolean;
+  /** Title to prefill the query box with, usually derived from the filename. */
+  defaultQuery?: string;
+  /**
+   * Identity of the video the query belongs to — the playlist item id. The box
+   * reseeds when this changes and keeps the user's edits while it doesn't.
+   * Defaults to `defaultQuery`, which is ambiguous when two videos derive the
+   * same title ("video.mkv" twice), so pass a real id where one exists.
+   */
+  queryKey?: string | null;
+  /**
+   * Receives the chosen mode and the current query text. Declared with
+   * parameters so a handler that ignores them stays assignable.
+   */
+  onSearch: (request: SubtitleSearchRequest, query: string) => void;
   onApply: (result: SubtitleSearchResult) => void;
 }
 
@@ -53,31 +73,107 @@ export function SubtitleSearchPanel({
   unavailable = false,
   downloadingId,
   canSearch,
+  canHash = true,
+  defaultQuery = "",
+  queryKey,
   onSearch,
   onApply,
 }: SubtitleSearchPanelProps) {
+  // Re-keyed on the video's identity so switching videos reseeds the box, while
+  // edits within one video survive re-renders.
+  const [query, setQuery] = React.useState(defaultQuery);
+  const [requested, setRequested] = React.useState<SubtitleSearchRequest | null>(null);
+  const seedKey = queryKey ?? defaultQuery;
+  const seededFor = React.useRef(seedKey);
+  if (seededFor.current !== seedKey) {
+    seededFor.current = seedKey;
+    setQuery(defaultQuery);
+  }
+  const wasBusy = React.useRef(false);
+
   // Nothing to offer when the deployment has no search backend configured.
   if (unavailable) return null;
 
   const busy = status === "hashing" || status === "searching";
+  const trimmed = query.trim();
+
+  // Which button is spinning. `status` alone can't answer this: a hash search
+  // passes through "searching" once fingerprinting is done, which would move
+  // the spinner onto the name button mid-request. The panel handled the click,
+  // so it knows. A search started elsewhere leaves this null, and both buttons
+  // then show neutral progress rather than pointing at the wrong one.
+  // Forgotten once the search ends, so a finished one cannot colour the next:
+  // otherwise a search started elsewhere would still point at whichever button
+  // this panel last used. Cleared on the falling edge rather than whenever idle
+  // — the click lands a render before the status it triggers.
+  if (wasBusy.current && !busy && requested !== null) setRequested(null);
+  wasBusy.current = busy;
+
+  const running = busy ? requested : null;
+  const hashBusy = busy && running !== "text";
+  const nameBusy = busy && running !== "hash";
+
+  const run = (request: SubtitleSearchRequest) => {
+    setRequested(request);
+    onSearch(request, trimmed);
+  };
 
   return (
     <div className="space-y-2 border-t border-border pt-3">
-      <div className="flex items-center justify-between">
-        <Label className="text-sm font-medium">Find online</Label>
+      <Label className="text-sm font-medium">Find online</Label>
+
+      <Input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !busy && canSearch && trimmed) {
+            e.preventDefault();
+            run("text");
+          }
+        }}
+        placeholder="Title to search for"
+        aria-label="Title to search for"
+        disabled={!canSearch}
+        className="h-8 text-xs"
+      />
+
+      {/* Two explicit searches rather than one button with hidden fallback
+          behaviour: a hash match and a name match are different promises about
+          sync, so the user picks which one they are asking for. */}
+      <div className="flex gap-2">
         <Button
           variant="outline"
           size="sm"
-          onClick={onSearch}
-          disabled={busy || !canSearch}
-          className="h-7 px-2"
+          onClick={() => run("hash")}
+          disabled={busy || !canSearch || !canHash}
+          title={
+            canHash
+              ? "Match this exact release by video fingerprint"
+              : "Only local files can be fingerprinted"
+          }
+          className="h-7 px-2 flex-1"
         >
-          {busy ? (
+          {hashBusy ? (
+            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+          ) : (
+            <Hash className="h-3 w-3 mr-1" />
+          )}
+          By hash
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => run("text")}
+          disabled={busy || !canSearch || !trimmed}
+          title="Search by title — results may need a sync offset"
+          className="h-7 px-2 flex-1"
+        >
+          {nameBusy ? (
             <Loader2 className="h-3 w-3 mr-1 animate-spin" />
           ) : (
             <Search className="h-3 w-3 mr-1" />
           )}
-          Search
+          By name
         </Button>
       </div>
 
@@ -94,7 +190,9 @@ export function SubtitleSearchPanel({
 
       {status === "ready" && results.length === 0 && (
         <p className="text-xs text-muted-foreground py-1">
-          No subtitles found for this video.
+          {mode === "hash"
+            ? "No subtitles indexed for this exact release. Try searching by name."
+            : "No subtitles found for this video."}
         </p>
       )}
 
@@ -103,7 +201,7 @@ export function SubtitleSearchPanel({
           <p className="text-xs text-muted-foreground">
             {mode === "hash"
               ? "Matched by video hash — should be in sync."
-              : "Matched by filename — may need a sync offset."}
+              : "Matched by name — may need a sync offset."}
           </p>
           <div
             className="max-h-48 overflow-y-auto overscroll-contain pr-1 space-y-1"

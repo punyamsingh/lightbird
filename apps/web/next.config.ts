@@ -31,9 +31,14 @@ const nextConfig: NextConfig = {
 
     // Resolve workspace packages to source code so webpack can handle
     // Worker bundling (new URL(..., import.meta.url)) and "use client" directives
+    // Subpaths must come before the bare specifier: webpack matches these keys
+    // by prefix, so '@lightbird/core' alone would send '@lightbird/core/search'
+    // to src/index.ts/search. Every subpath in the package's exports map needs
+    // an entry here.
     config.resolve.alias = {
       ...config.resolve.alias,
       '@lightbird/core/react': path.resolve(__dirname, '../../packages/lightbird/src/react/index.ts'),
+      '@lightbird/core/search': path.resolve(__dirname, '../../packages/lightbird/src/search.ts'),
       '@lightbird/core': path.resolve(__dirname, '../../packages/lightbird/src/index.ts'),
       '@lightbird/player-react': path.resolve(__dirname, '../../packages/ui/src/index.ts'),
     };

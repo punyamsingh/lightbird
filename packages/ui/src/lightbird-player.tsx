@@ -29,7 +29,11 @@ import {
   useTouchGestures,
   useHlsQuality,
   useSubtitleSearch,
+  type SubtitleSearchRequest,
 } from "@lightbird/core/react";
+// From the /search entry, not the base one: the base bundle has a size budget
+// (issue #54) and this helper is only needed where search is used.
+import { fileNameToSearchQuery } from "@lightbird/core/search";
 import { captureVideoThumbnail, exportVideoFrame, downloadDataUrl, frameExportFilename, parseMediaError, validateFile, type ParsedMediaError, loadShortcuts, type ShortcutBinding, ProgressEstimator, hasAcceptedDisclaimer, acceptDisclaimer, FLAG_MAGNET_LINK } from "@lightbird/core";
 import { useBooleanFlagValue } from "@openfeature/react-sdk";
 import { SubtitleOverlay } from "./subtitle-overlay";
@@ -673,13 +677,24 @@ const LightBirdPlayer = () => {
     resetSubtitleSearch();
   }, [currentItemId, resetSubtitleSearch]);
 
-  const handleSubtitleSearch = useCallback(() => {
-    const item = playlist.currentItem;
-    if (!item) return;
-    // Remote and torrent-backed items have no File to hash, so the search
-    // falls back to the filename on its own.
-    void subtitleSearch.search({ file: item.file, fileName: item.name });
-  }, [playlist.currentItem, subtitleSearch]);
+  const handleSubtitleSearch = useCallback(
+    (request: SubtitleSearchRequest, query: string) => {
+      const item = playlist.currentItem;
+      if (!item) return;
+      void subtitleSearch.search(
+        { file: item.file, fileName: item.name, query },
+        request
+      );
+    },
+    [playlist.currentItem, subtitleSearch]
+  );
+
+  // Seeds the panel's title box. Release filenames make poor queries, so the
+  // user gets a cleaned-up starting point they can edit.
+  const subtitleSearchQuery = useMemo(
+    () => (playlist.currentItem ? fileNameToSearchQuery(playlist.currentItem.name) : ""),
+    [playlist.currentItem]
+  );
 
   const handleSubtitleSearchApply = useCallback(
     async (result: SubtitleSearchResult) => {
@@ -713,6 +728,13 @@ const LightBirdPlayer = () => {
       unavailable: subtitleSearch.errorKind === "unavailable",
       downloadingId: subtitleSearch.downloadingId,
       canSearch: Boolean(playlist.currentItem),
+      // Only a local File can be fingerprinted; streams and torrents cannot.
+      canHash: Boolean(playlist.currentItem?.file),
+      defaultQuery: subtitleSearchQuery,
+      // The item id, not the derived title: two files can share a title
+      // ("video.mkv" twice) and a correction typed for one is wrong for the
+      // other.
+      queryKey: currentItemId,
       onSearch: handleSubtitleSearch,
       onApply: handleSubtitleSearchApply,
     }),
@@ -724,6 +746,8 @@ const LightBirdPlayer = () => {
       subtitleSearch.errorKind,
       subtitleSearch.downloadingId,
       playlist.currentItem,
+      subtitleSearchQuery,
+      currentItemId,
       handleSubtitleSearch,
       handleSubtitleSearchApply,
     ]

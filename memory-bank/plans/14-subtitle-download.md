@@ -294,6 +294,62 @@ No new runtime dependencies.
 
 ---
 
+## Follow-up: explicit search modes (post-merge)
+
+The first cut treated the filename as a silent fallback — hash first, name only
+if the hash found nothing. That hides the choice VLSub deliberately exposes: its
+panel has an editable title and two buttons, because a hash match and a name
+match make different promises about sync, and a user who knows the release is
+obscure should be able to skip straight to the name. It also left no way to
+correct a bad query: `Blade.Runner.2049.2160p.HDR.x265` is a poor search term,
+and the derived text was never shown, let alone editable.
+
+**Hook.** `search(source, request)` takes `"auto" | "hash" | "text"`, defaulting
+to `"auto"` so existing callers are unaffected.
+
+- `hash` never falls back. An empty result is reported *as* a hash search
+  (`mode: "hash"` with no results), which is information — "this release is not
+  indexed" — rather than a mystery. Asking for a hash search on a source with no
+  local file is an error, not a silent name search, because quietly substituting
+  one would misrepresent the results as release-matched.
+- `text` never reads the file, so there is no fingerprinting delay.
+- `SubtitleSearchSource.query` overrides the filename-derived term.
+
+**UI.** The panel gained the editable title box and the two buttons. The hash
+button disables itself for streams and torrent items rather than offering a
+search that cannot work, and an empty hash search now says "No subtitles indexed
+for this exact release. Try searching by name."
+
+Additive throughout: the hook's new parameter is optional, and widening the
+panel's `onSearch` from `() => void` to `(request, query) => void` leaves any
+existing handler assignable. A minor release, not a breaking one.
+
+Bundle unchanged at 15.75 KB — all of this lives in `@lightbird/core/react`,
+`@lightbird/core/search` and `packages/ui`, none of which are the budgeted base
+entry. `fileNameToSearchQuery` is imported into the player from
+`@lightbird/core/search` for that reason.
+
+Two pieces of panel state needed care, both about not carrying one search into
+the next:
+
+- The spinner sits on the button the user pressed, tracked by the panel rather
+  than derived from `status` — a hash search passes through `searching` once
+  fingerprinting is done, which would otherwise move the spinner onto the name
+  button mid-request. That memory is cleared when the search ends, so a search
+  started elsewhere falls back to neutral progress on both buttons.
+- The query box reseeds on the playlist item id, not the derived title. Two
+  files can derive the same title (`video.mkv` twice) while being different
+  films, and a correction typed for the first is wrong for the second.
+
+New tests (+18): 6 hook cases covering hash-only, the non-hashable refusal,
+name-only skipping the hash, the query override, and auto still falling back;
+12 panel cases covering both buttons, the prefilled and edited query box, Enter
+to search, reseeding on video change and on a same-title video change, edits
+surviving re-renders of the same video, the hash button disabled without a
+file, the empty-hash-result guidance, and where the spinner lands.
+
+---
+
 ## Not in scope (deferred)
 
 - **Remote and torrent sources.** Neither exposes a `File`, so both degrade to
