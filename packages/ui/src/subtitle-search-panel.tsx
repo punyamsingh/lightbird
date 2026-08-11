@@ -74,6 +74,7 @@ export function SubtitleSearchPanel({
   // Re-keyed on defaultQuery so switching videos reseeds the box, while edits
   // within one video survive re-renders.
   const [query, setQuery] = React.useState(defaultQuery);
+  const [requested, setRequested] = React.useState<SubtitleSearchRequest | null>(null);
   const seededFor = React.useRef(defaultQuery);
   if (seededFor.current !== defaultQuery) {
     seededFor.current = defaultQuery;
@@ -86,6 +87,20 @@ export function SubtitleSearchPanel({
   const busy = status === "hashing" || status === "searching";
   const trimmed = query.trim();
 
+  // Which button is spinning. `status` alone can't answer this: a hash search
+  // passes through "searching" once fingerprinting is done, which would move
+  // the spinner onto the name button mid-request. The panel handled the click,
+  // so it knows. A search started elsewhere leaves this null, and both buttons
+  // then show neutral progress rather than pointing at the wrong one.
+  const running = busy ? requested : null;
+  const hashBusy = busy && running !== "text";
+  const nameBusy = busy && running !== "hash";
+
+  const run = (request: SubtitleSearchRequest) => {
+    setRequested(request);
+    onSearch(request, trimmed);
+  };
+
   return (
     <div className="space-y-2 border-t border-border pt-3">
       <Label className="text-sm font-medium">Find online</Label>
@@ -96,7 +111,7 @@ export function SubtitleSearchPanel({
         onKeyDown={(e) => {
           if (e.key === "Enter" && !busy && canSearch && trimmed) {
             e.preventDefault();
-            onSearch("text", trimmed);
+            run("text");
           }
         }}
         placeholder="Title to search for"
@@ -112,7 +127,7 @@ export function SubtitleSearchPanel({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => onSearch("hash", trimmed)}
+          onClick={() => run("hash")}
           disabled={busy || !canSearch || !canHash}
           title={
             canHash
@@ -121,7 +136,7 @@ export function SubtitleSearchPanel({
           }
           className="h-7 px-2 flex-1"
         >
-          {busy && status === "hashing" ? (
+          {hashBusy ? (
             <Loader2 className="h-3 w-3 mr-1 animate-spin" />
           ) : (
             <Hash className="h-3 w-3 mr-1" />
@@ -131,12 +146,12 @@ export function SubtitleSearchPanel({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => onSearch("text", trimmed)}
+          onClick={() => run("text")}
           disabled={busy || !canSearch || !trimmed}
           title="Search by title — results may need a sync offset"
           className="h-7 px-2 flex-1"
         >
-          {busy && status === "searching" ? (
+          {nameBusy ? (
             <Loader2 className="h-3 w-3 mr-1 animate-spin" />
           ) : (
             <Search className="h-3 w-3 mr-1" />

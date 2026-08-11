@@ -228,3 +228,43 @@ describe('SubtitleSearchPanel — choosing a search', () => {
     expect(within(screen.getByRole('list')).getAllByRole('listitem')).toHaveLength(3);
   });
 });
+
+describe('SubtitleSearchPanel — progress lands on the button you pressed', () => {
+  const spinning = (el: HTMLElement) => Boolean(el.querySelector('.animate-spin'));
+
+  it('keeps the spinner on the hash button through the network phase', async () => {
+    // A hash search passes through "searching" once fingerprinting finishes.
+    // Keying off status alone would move the spinner onto the name button
+    // mid-request and imply a search the user never asked for.
+    const user = userEvent.setup();
+    const { rerender, props } = renderPanel();
+    await user.click(byHash());
+
+    rerender(<SubtitleSearchPanel {...props} status="hashing" />);
+    expect(spinning(byHash())).toBe(true);
+    expect(spinning(byName())).toBe(false);
+
+    rerender(<SubtitleSearchPanel {...props} status="searching" />);
+    expect(spinning(byHash())).toBe(true);
+    expect(spinning(byName())).toBe(false);
+  });
+
+  it('keeps the spinner on the name button during a name search', async () => {
+    const user = userEvent.setup();
+    const { rerender, props } = renderPanel();
+    await user.click(byName());
+
+    rerender(<SubtitleSearchPanel {...props} status="searching" />);
+
+    expect(spinning(byName())).toBe(true);
+    expect(spinning(byHash())).toBe(false);
+  });
+
+  it('shows neutral progress for a search it did not start', () => {
+    // e.g. a search kicked off elsewhere in the app: better to show both busy
+    // than to point confidently at the wrong one.
+    renderPanel({ status: 'searching' });
+    expect(spinning(byHash())).toBe(true);
+    expect(spinning(byName())).toBe(true);
+  });
+});
