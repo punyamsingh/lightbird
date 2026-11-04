@@ -1,16 +1,17 @@
 "use client";
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import type { PlaylistItem } from "@lightbird/core";
 import {
   DndContext,
   closestCenter,
   type DragEndEvent,
+  PointerSensor, KeyboardSensor, useSensor, useSensors,
 } from "@dnd-kit/core";
 import {
   SortableContext,
   verticalListSortingStrategy,
   useSortable,
-  arrayMove,
+  arrayMove, sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ScrollArea } from "./primitives/scroll-area";
@@ -29,6 +30,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "./primitives/tooltip";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "./primitives/dialog";
 import { cn } from "./utils/cn";
 import {
   FilePlus,
@@ -120,7 +122,7 @@ function SortablePlaylistItem({ item, index, isActive, downloadReady, onSelect, 
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex items-center gap-1 p-1.5 rounded-md text-xs group",
+        "lb-playlist-item flex items-center gap-1 p-1.5 rounded-md text-xs group",
         "hover:bg-muted transition-colors",
         isActive ? "bg-primary/20 text-primary-foreground" : ""
       )}
@@ -131,7 +133,7 @@ function SortablePlaylistItem({ item, index, isActive, downloadReady, onSelect, 
         {...listeners}
         className="shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground p-0.5"
         aria-label="Drag to reorder"
-        tabIndex={-1}
+        style={{ touchAction: "none" }}
       >
         <GripVertical className="w-3 h-3" />
       </button>
@@ -161,7 +163,7 @@ function SortablePlaylistItem({ item, index, isActive, downloadReady, onSelect, 
           href={item.url}
           download={item.name}
           onClick={(e) => e.stopPropagation()}
-          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
+          className="shrink-0 lb-item-action opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 transition-opacity p-0.5"
           aria-label={`Download ${item.name}`}
           title="Download"
         >
@@ -172,7 +174,7 @@ function SortablePlaylistItem({ item, index, isActive, downloadReady, onSelect, 
       {/* Remove button */}
       <button
         onClick={(e) => { e.stopPropagation(); onRemove(index); }}
-        className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
+        className="shrink-0 lb-item-action opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 transition-opacity p-0.5"
         aria-label="Remove from playlist"
       >
         <X className="w-3 h-3 text-muted-foreground hover:text-destructive" />
@@ -199,6 +201,11 @@ interface PlaylistPanelProps {
   isOpen: boolean;
   isPinned: boolean;
   size: PlaylistSize;
+  compact?: boolean;
+  sideSheet?: boolean;
+  focusUrl?: boolean;
+  /** Element that opened the compact dialog; focus returns here on dismissal. */
+  triggerRef?: React.RefObject<HTMLElement | null>;
   onToggle: () => void;
   onTogglePin: () => void;
   onSizeChange: (size: PlaylistSize) => void;
@@ -222,8 +229,16 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
   size,
   onToggle,
   onTogglePin,
-  onSizeChange,
+  onSizeChange, compact = false, sideSheet = false, focusUrl = false, triggerRef,
 }) => {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const streamInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (isOpen && focusUrl) streamInputRef.current?.focus();
+  }, [isOpen, focusUrl, compact]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const m3uInputRef = useRef<HTMLInputElement>(null);
@@ -306,16 +321,15 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
     onReorder(sorted);
   };
 
-  return (
-    <TooltipProvider>
+  const panel = (
       <div
         className={cn(
-          "h-full flex flex-col bg-card border-l border-border shrink-0 overflow-hidden",
+          "lb-playlist h-full min-h-0 flex flex-col bg-card border-l border-border shrink-0 overflow-hidden",
           "transition-[width] duration-300 ease-in-out motion-reduce:transition-none",
-          isOpen ? SIZE_WIDTHS[size] : "w-11",
+          compact ? "w-full" : isOpen ? SIZE_WIDTHS[size] : "w-11",
         )}
       >
-      {!isOpen ? (
+      {!isOpen && !compact ? (
         /* ── Collapsed drawer strip ── */
         <div className="flex flex-col items-center w-11 h-full shrink-0">
           <Tooltip>
@@ -324,7 +338,7 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
                 variant="ghost"
                 size="icon"
                 className="h-9 w-9 mt-2 shrink-0"
-                onClick={onToggle}
+                onClick={onToggle} hidden={compact}
                 aria-label="Expand Playlist"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -350,10 +364,10 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
         </div>
       ) : (
         /* ── Full panel ── */
-        <div className={cn("h-full flex flex-col shrink-0 transition-[width] duration-200", SIZE_WIDTHS[size])}>
+        <div className={cn("h-full min-h-0 flex flex-col shrink-0 transition-[width] duration-200", compact ? "w-full" : SIZE_WIDTHS[size])}>
 
           {/* Header */}
-          <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
+          <div className={cn("flex items-center justify-between px-3 py-2 border-b border-border shrink-0", compact && "pr-14")}>
             <div className="flex items-center gap-2 min-w-0">
               <ListVideo className="h-4 w-4 text-primary shrink-0" />
               <span className="font-semibold text-sm truncate">Playlist</span>
@@ -402,8 +416,8 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={cn("h-7 w-7", isPinned && "text-primary bg-primary/10")}
-                    onClick={onTogglePin}
+                    className={cn(compact && "hidden", "h-7 w-7", isPinned && "text-primary bg-primary/10")}
+                    onClick={onTogglePin} hidden={compact}
                     aria-label={isPinned ? "Unpin Playlist" : "Pin Playlist"}
                   >
                     {isPinned ? <Pin className="h-3.5 w-3.5" /> : <PinOff className="h-3.5 w-3.5" />}
@@ -420,7 +434,7 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7"
-                    onClick={() => onSizeChange(NEXT_SIZE[size])}
+                    onClick={() => onSizeChange(NEXT_SIZE[size])} hidden={compact}
                     aria-label="Resize Playlist"
                   >
                     {size === "lg" ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
@@ -437,7 +451,7 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7"
-                    onClick={onToggle}
+                    onClick={onToggle} hidden={compact}
                     aria-label="Collapse Playlist"
                   >
                     <ChevronRight className="h-4 w-4" />
@@ -500,11 +514,15 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
               <Input
                 type="url"
                 placeholder="Enter stream URL"
+                ref={streamInputRef}
+                aria-label="Video URL"
+                inputMode="url"
+                autoComplete="url"
                 value={streamUrl}
                 onChange={(e) => setStreamUrl(e.target.value)}
                 className="h-8 text-xs"
               />
-              <Button type="submit" size="icon" variant="secondary" className="h-8 w-8 shrink-0">
+              <Button type="submit" size="icon" aria-label="Add video URL" variant="secondary" className="h-8 w-8 shrink-0">
                 <Link className="h-3.5 w-3.5" />
               </Button>
               {showMagnet && (
@@ -531,6 +549,7 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
                 <div className="flex gap-1.5">
                   <Input
                     placeholder="magnet:?xt=urn:btih:…"
+                    aria-label="Magnet link"
                     value={magnetUri}
                     onChange={(e) => { setMagnetUri(e.target.value); setMagnetError(null); }}
                     className="h-8 text-xs font-mono"
@@ -603,7 +622,7 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
           </div>
 
           {/* Playlist items */}
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 min-h-0">
             <div className="p-2 space-y-0.5">
               {playlist.length === 0 ? (
                 <div className="text-center text-xs text-muted-foreground py-10 px-2">
@@ -611,7 +630,7 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
                   <p>Add files or a stream URL to get started.</p>
                 </div>
               ) : (
-                <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                   <SortableContext
                     items={playlist.map((i) => i.id)}
                     strategy={verticalListSortingStrategy}
@@ -635,6 +654,22 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
         </div>
       )}
       </div>
+  );
+  return (
+    <TooltipProvider>
+      {compact ? (
+        <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onToggle(); }}>
+          <DialogContent data-side={sideSheet} className="lb-playlist-sheet p-0 gap-0" onOpenAutoFocus={(event) => {
+            if (focusUrl) { event.preventDefault(); streamInputRef.current?.focus(); }
+          }} onCloseAutoFocus={(event) => {
+            if (triggerRef?.current?.isConnected) { event.preventDefault(); triggerRef.current.focus(); }
+          }}>
+            <DialogTitle className="sr-only">Playlist</DialogTitle>
+            <DialogDescription className="sr-only">Add videos or select a video to play.</DialogDescription>
+            {panel}
+          </DialogContent>
+        </Dialog>
+      ) : panel}
     </TooltipProvider>
   );
 };

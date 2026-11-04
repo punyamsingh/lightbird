@@ -33,7 +33,14 @@ content: [
 ]
 ```
 
-Or use the pre-compiled stylesheet:
+Also import the shared responsive rules (container layouts, touch targets, and
+bounded overlays):
+
+```tsx
+import '@lightbird/player-react/responsive.css'
+```
+
+Or use the pre-compiled stylesheet, which already includes these rules:
 
 ```tsx
 import '@lightbird/player-react/styles.css'

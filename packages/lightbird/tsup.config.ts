@@ -8,7 +8,8 @@ export default defineConfig([
     dts: true,
     splitting: true,
     treeshake: true,
-    clean: true,
+    // Output is cleaned once by the package script, before parallel entries.
+    clean: false,
     outDir: 'dist',
     external: [
       'react',

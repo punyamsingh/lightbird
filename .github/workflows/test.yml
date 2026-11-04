@@ -33,3 +33,20 @@ jobs:
 
       - name: Test
         run: pnpm turbo test --verbosity=2
+
+      - name: Build web application
+        run: pnpm --filter web build
+
+      - name: Install browser for responsive checks
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Responsive browser checks
+        run: |
+          pnpm --filter web exec next start -p 9002 > /tmp/lightbird-browser.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          pnpm test:responsive
+
+      - name: Browser server logs
+        if: failure()
+        run: cat /tmp/lightbird-browser.log 2>/dev/null || true

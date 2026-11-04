@@ -12,7 +12,7 @@ interface SliderProps extends React.ComponentPropsWithoutRef<typeof SliderPrimit
 const Slider = React.forwardRef<
   React.ElementRef<typeof SliderPrimitive.Root>,
   SliderProps
->(({ className, trackClassName, rangeClassName, thumbClassName, ...props }, ref) => (
+>(({ className, trackClassName, rangeClassName, thumbClassName, "aria-label": ariaLabel, "aria-labelledby": ariaLabelledBy, ...props }, ref) => (
   <SliderPrimitive.Root
     ref={ref}
     className={cn(
@@ -35,6 +35,8 @@ const Slider = React.forwardRef<
       />
     </SliderPrimitive.Track>
     <SliderPrimitive.Thumb
+      aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy}
       className={cn(
         "block h-5 w-5 rounded-full border-2 border-primary bg-background ring-offset-background transition-[transform,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
         thumbClassName

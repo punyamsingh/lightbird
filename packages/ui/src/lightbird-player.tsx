@@ -47,13 +47,52 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "./primitives/alert-dialog";
-import { Film } from "lucide-react";
+import { Button } from "./primitives/button";
+import { useCompactLayout } from "./hooks/use-compact-layout";
+import { OverlayContainer } from "./primitives/overlay-container";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "./primitives/dialog";
+import { Film, ListVideo, FilePlus, Link as LinkIcon } from "lucide-react";
 
 const MAX_RETRIES = 3;
 
 const LightBirdPlayer = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const compact = useCompactLayout(containerRef);
+  const phone = useCompactLayout(containerRef, 640);
+  const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(null);
+  const attachContainer = useCallback((element: HTMLDivElement | null) => {
+    (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = element;
+    setPortalContainer(element);
+  }, []);
+  const openFileRef = useRef<HTMLInputElement>(null);
+  const playlistTriggerRef = useRef<HTMLButtonElement>(null);
+  const playlistOpenerRef = useRef<HTMLElement | null>(null);
+  const surfacePointerType = useRef("");
+  const [mobilePlaylistOpen, setMobilePlaylistOpen] = useState(false);
+  const [focusUrl, setFocusUrl] = useState(false);
+  /** Remember the actual opening control so modal dismissal restores its focus. */
+  const openMobilePlaylist = (url = false) => {
+    playlistOpenerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setFocusUrl(url);
+    setMobilePlaylistOpen(true);
+  };
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    const update = () => {
+      document.documentElement.style.setProperty("--lb-viewport-height", `${viewport?.height ?? window.innerHeight}px`);
+      document.documentElement.style.setProperty("--lb-viewport-top", `${viewport?.offsetTop ?? 0}px`);
+    };
+    update();
+    viewport?.addEventListener("resize", update);
+    viewport?.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
+    return () => {
+      viewport?.removeEventListener("resize", update);
+      viewport?.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
   const subtitleInputRef = useRef<HTMLInputElement>(null);
   const playerRef = useRef<VideoPlayer | null>(null);
   // Companion map: preserves external subtitle files for re-loading playlist items
@@ -444,6 +483,7 @@ const LightBirdPlayer = () => {
 
   // Auto-hide the playlist sidebar when playing (unless pinned); restore when paused
   useEffect(() => {
+    if (compact) return;
     if (playback.isPlaying) {
       if (!playlistPinned) {
         setPlaylistOpen((current: boolean) => {
@@ -455,7 +495,7 @@ const LightBirdPlayer = () => {
       setPlaylistOpen(true);
       wasAutoHiddenRef.current = false;
     }
-  }, [playback.isPlaying, playlistPinned]);
+  }, [playback.isPlaying, playlistPinned, compact]);
 
   const handleFileChange = async (files: FileList) => {
     const { videoFiles, subtitleFiles } = playlist.parseFiles(files);
@@ -577,12 +617,13 @@ const LightBirdPlayer = () => {
     setDisclaimerPendingUri(null);
     if (uri) {
       try {
-        await handleAddMagnet(uri);
+        const added = await handleAddMagnet(uri);
+        if (added && compact) setMobilePlaylistOpen(false);
       } catch (err) {
         toast({ title: "Magnet link failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
       }
     }
-  }, [disclaimerPendingUri, handleAddMagnet, toast]);
+  }, [compact, disclaimerPendingUri, handleAddMagnet, toast]);
 
   const handleSubtitleChange = useCallback(async (id: string) => {
     subtitles.switchSubtitle(id);
@@ -794,16 +835,26 @@ const LightBirdPlayer = () => {
   });
 
   return (
-    <div className="flex flex-1 w-full h-full">
+    <OverlayContainer.Provider value={fullscreen.isFullscreen ? portalContainer : null}>
+    <div ref={attachContainer} className="lb-player flex flex-1 min-w-0 min-h-0 w-full h-full relative bg-black" data-compact={compact}>
+      <Button ref={playlistTriggerRef} variant="secondary" className="lb-playlist-trigger absolute top-3 right-3 z-20" aria-haspopup={compact ? "dialog" : undefined} aria-expanded={compact ? mobilePlaylistOpen : playlistOpen} onClick={() => {
+        setFocusUrl(false);
+        if (compact) openMobilePlaylist(); else handlePlaylistToggle();
+      }}><ListVideo /> Playlist ({playlist.playlist.length})</Button>
+      <input ref={openFileRef} type="file" multiple accept="video/*,.mkv,.avi,.mov,.m4v" className="hidden" aria-label="Open video files" onChange={(event) => {
+        if (event.target.files) void handleFileChange(event.target.files);
+        event.target.value = "";
+      }} />
       <div
-        ref={containerRef}
-        className="flex-1 flex flex-col items-center justify-center bg-black relative group"
+        className="lb-video-surface flex-1 min-w-0 min-h-0 flex flex-col items-center justify-center bg-black relative group overflow-hidden"
       >
         <video
           ref={videoRef}
-          className={cn("w-full h-full object-contain transition-all duration-300", isLoading && "invisible")}
+          playsInline
+          onPointerDown={(event) => { surfacePointerType.current = event.pointerType; }}
+          className={cn("absolute inset-0 w-full h-full object-contain transition-all duration-300", isLoading && "invisible")}
           loop={playback.loop}
-          onClick={playback.togglePlay}
+          onClick={() => { if (surfacePointerType.current !== "touch") playback.togglePlay(); }}
           crossOrigin="anonymous"
         />
         <SubtitleOverlay videoRef={videoRef} activeSubtitle={subtitles.activeSubtitle} />
@@ -835,15 +886,10 @@ const LightBirdPlayer = () => {
         )}
 
         {showShortcutsHelp && (
-          <div
-            className="absolute inset-0 bg-black/90 z-50 flex items-center justify-center"
-            onClick={() => setShowShortcutsHelp(false)}
-          >
-            <div
-              className="bg-card rounded-lg p-6 max-w-sm w-full"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h2 className="text-lg font-semibold mb-4">Keyboard Shortcuts</h2>
+          <Dialog open onOpenChange={(open) => { if (!open) setShowShortcutsHelp(false); }}>
+            <DialogContent>
+              <DialogTitle>Keyboard Shortcuts</DialogTitle>
+              <DialogDescription>Playback keyboard bindings</DialogDescription>
               <div className="space-y-1 max-h-80 overflow-y-auto">
                 {shortcuts.map((b: import("@lightbird/core").ShortcutBinding) => {
                   const mods: string[] = [];
@@ -860,13 +906,15 @@ const LightBirdPlayer = () => {
                   );
                 })}
               </div>
-              <p className="text-xs text-muted-foreground mt-4">Press ? or click outside to close</p>
-            </div>
-          </div>
+              <p className="text-xs text-muted-foreground mt-4">Press Escape or click outside to close</p>
+            </DialogContent>
+          </Dialog>
         )}
 
         <PlayerControls
             isDisabled={!playlist.currentItem}
+            onTogglePlaylist={compact ? () => openMobilePlaylist() : undefined}
+            playlistCount={playlist.playlist.length}
             videoRef={videoRef}
             isPlaying={playback.isPlaying}
             progress={playback.progress}
@@ -876,6 +924,7 @@ const LightBirdPlayer = () => {
             playbackRate={playback.playbackRate}
             loop={playback.loop}
             isFullScreen={fullscreen.isFullscreen}
+            fullscreenSupported={fullscreen.isSupported}
             filters={filters.filters}
             zoom={filters.zoom}
             subtitles={subtitles.subtitles}
@@ -939,7 +988,7 @@ const LightBirdPlayer = () => {
         />
 
         {!playlist.currentItem && !isLoading && !loadingMessage && (
-          <div className="absolute inset-0 flex items-center justify-center px-6">
+          <div className="lb-empty-state absolute inset-0 flex items-center justify-center px-4 py-16 overflow-y-auto">
             <div className="flex flex-col items-center text-center max-w-sm">
               <div
                 aria-hidden
@@ -949,8 +998,16 @@ const LightBirdPlayer = () => {
               </div>
               <p className="mt-5 text-lg font-medium text-foreground">No video loaded</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Drop files anywhere, or pick a source from the playlist panel.
+                Open a video from your device or paste a stream URL.
               </p>
+              <div className="mt-6 flex flex-wrap justify-center gap-3">
+                <Button onClick={() => openFileRef.current?.click()} className="min-h-11"><FilePlus /> Open video</Button>
+                <Button variant="outline" className="min-h-11" onClick={() => {
+                  setFocusUrl(true);
+                  if (compact) openMobilePlaylist(true); else setPlaylistOpen(true);
+                }}><LinkIcon /> Open URL</Button>
+              </div>
+              <p className="mt-4 text-xs text-muted-foreground hidden sm:block">You can also drop video and subtitle files here.</p>
             </div>
           </div>
         )}
@@ -959,20 +1016,24 @@ const LightBirdPlayer = () => {
       <PlaylistPanel
         playlist={playlist.playlist}
         currentVideoIndex={playlist.currentIndex}
-        onSelectVideo={handleSelectVideo}
-        onFilesAdded={handleFileChange}
-        onFolderFilesAdded={handleFolderFilesAdded}
-        onAddStream={handleAddStream}
-        onAddMagnet={handleAddMagnet}
+        onSelectVideo={(index) => { handleSelectVideo(index); if (compact) setMobilePlaylistOpen(false); }}
+        onFilesAdded={(files) => { void handleFileChange(files); if (compact) setMobilePlaylistOpen(false); }}
+        onFolderFilesAdded={async (files) => { await handleFolderFilesAdded(files); if (compact) setMobilePlaylistOpen(false); }}
+        onAddStream={(url, name) => { handleAddStream(url, name); if (compact) setMobilePlaylistOpen(false); }}
+        onAddMagnet={async (uri) => { const added = await handleAddMagnet(uri); if (added && compact) setMobilePlaylistOpen(false); return added; }}
         torrentStatus={magnet.torrentStatus}
         showMagnet={magnetLinkEnabled}
         onRemoveItem={handleRemoveItem}
         onReorder={handleReorder}
-        onImportM3U={handleImportM3U}
-        isOpen={playlistOpen}
+        onImportM3U={(items) => { handleImportM3U(items); if (compact && items.length > 0) setMobilePlaylistOpen(false); }}
+        compact={compact}
+        sideSheet={!phone}
+        focusUrl={focusUrl}
+        triggerRef={playlistOpenerRef}
+        isOpen={compact ? mobilePlaylistOpen : playlistOpen}
         isPinned={playlistPinned}
         size={playlistSize}
-        onToggle={handlePlaylistToggle}
+        onToggle={() => { if (compact) setMobilePlaylistOpen(false); else handlePlaylistToggle(); }}
         onTogglePin={() => setPlaylistPinned((v: boolean) => !v)}
         onSizeChange={setPlaylistSize}
       />
@@ -1002,6 +1063,7 @@ const LightBirdPlayer = () => {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </OverlayContainer.Provider>
   );
 };
 

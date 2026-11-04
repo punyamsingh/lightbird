@@ -1,7 +1,7 @@
 {
   "name": "@lightbird/player-react",
   "version": "0.12.0",
-  "description": "Drop-in React video player component powered by LightBird. Full controls, playlist, subtitles, chapters — one import.",
+  "description": "Drop-in React video player component powered by LightBird. Full controls, playlist, subtitles, chapters \u2014 one import.",
   "license": "MIT",
   "author": "Punyam Singh",
   "homepage": "https://lightbird.vercel.app/docs",
@@ -34,7 +34,8 @@
         "default": "./dist/index.cjs"
       }
     },
-    "./styles.css": "./dist/styles.css"
+    "./styles.css": "./dist/styles.css",
+    "./responsive.css": "./dist/responsive.css"
   },
   "files": [
     "dist",
@@ -46,7 +47,7 @@
   ],
   "scripts": {
     "build": "tsup && pnpm run build:css",
-    "build:css": "tailwindcss -i ./src/styles/input.css -o ./dist/styles.css --minify",
+    "build:css": "tailwindcss -i ./src/styles/input.css -o ./dist/styles.css --minify && node scripts/finalize-styles.cjs",
     "dev": "tsup --watch",
     "test": "jest",
     "typecheck": "tsc --noEmit",

@@ -1,6 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "../../../../packages/ui/src/styles/responsive.css";
 import { Toaster, FeatureFlagsProvider } from "@lightbird/player-react";
+
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", interactiveWidget: "resizes-content" };
 
 export const metadata: Metadata = {
   title: "LightBird",

@@ -81,17 +81,17 @@ export const SeekBar = React.memo(function SeekBar({
       {seekHover && (
         <div
           data-testid="seek-preview"
-          className="absolute bottom-full mb-3 -translate-x-1/2 pointer-events-none flex flex-col items-center z-20"
-          style={{ left: `${seekHover.ratio * 100}%` }}
+          className="absolute bottom-full mb-3 -translate-x-1/2 pointer-events-none flex flex-col items-center z-20 w-40 max-w-full"
+          style={{ left: `clamp(min(5rem, 50%), ${seekHover.ratio * 100}%, max(50%, calc(100% - 5rem)))` }}
         >
           {seekPreviewThumbnail ? (
             <img
               src={seekPreviewThumbnail}
               alt=""
-              className="w-40 h-[90px] rounded border border-white/20 bg-black object-cover shadow-lg"
+              className="w-full aspect-video rounded border border-white/20 bg-black object-cover shadow-lg"
             />
           ) : (
-            <div className="w-40 h-[90px] rounded border border-white/20 bg-black/80 shadow-lg" />
+            <div className="w-full aspect-video rounded border border-white/20 bg-black/80 shadow-lg" />
           )}
           <span className="mt-1 rounded bg-black/80 px-1.5 py-0.5 font-mono text-xs text-white">
             {formatTime(seekHover.time)}
@@ -99,6 +99,7 @@ export const SeekBar = React.memo(function SeekBar({
         </div>
       )}
       <Slider
+        aria-label="Seek"
         value={[displayProgress]}
         max={duration || 0}
         step={0.05}
@@ -106,6 +107,7 @@ export const SeekBar = React.memo(function SeekBar({
         onPointerDown={() => setIsScrubbing(true)}
         onPointerUp={() => setIsScrubbing(false)}
         onLostPointerCapture={() => setIsScrubbing(false)}
+        onPointerCancel={() => setIsScrubbing(false)}
         className="w-full"
         trackClassName={cn(
           "rounded-none transition-all duration-150 ease-out",
