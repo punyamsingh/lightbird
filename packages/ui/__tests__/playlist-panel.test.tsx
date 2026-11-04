@@ -7,6 +7,8 @@ import type { PlaylistItem } from '@lightbird/core';
 jest.mock('@dnd-kit/core', () => ({
   DndContext: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   closestCenter: jest.fn(),
+  PointerSensor: jest.fn(), KeyboardSensor: jest.fn(),
+  useSensor: jest.fn(), useSensors: jest.fn(() => []),
 }));
 jest.mock('@dnd-kit/sortable', () => ({
   SortableContext: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -338,5 +340,28 @@ describe('PlaylistPanel', () => {
   it('does not show progress bar when progress is 1 (complete)', () => {
     render(<PlaylistPanel {...defaultProps} torrentStatus={{ ...idleTorrentStatus, status: 'ready', progress: 1, numPeers: 3, downloadSpeed: 0, uploadSpeed: 0, torrentName: 'Test', error: null }} />);
     expect(screen.queryByText(/%/)).not.toBeInTheDocument();
+  });
+});
+
+
+describe('mobile playlist', () => {
+  it('opens as a labelled dialog and focuses the URL field on request', async () => {
+    render(<PlaylistPanel {...defaultProps} compact focusUrl />);
+    expect(screen.getByRole('dialog', { name: 'Playlist' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Video URL' })).toHaveFocus());
+    expect(screen.queryByRole('button', { name: /Pin Playlist/ })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Video URL' }), { target: { value: 'https://example.com/movie.webm' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add video URL' }));
+    expect(defaultProps.onAddStream).toHaveBeenCalledWith('https://example.com/movie.webm');
+  });
+  it('dismisses using the accessible close button', () => {
+    render(<PlaylistPanel {...defaultProps} compact />);
+    fireEvent.click(screen.getByRole('button', { name: 'Close', exact: true }));
+    expect(defaultProps.onToggle).toHaveBeenCalled();
+  });
+  it('does not leave a closed sheet in the tab order', () => {
+    render(<PlaylistPanel {...defaultProps} compact isOpen={false} />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
 });

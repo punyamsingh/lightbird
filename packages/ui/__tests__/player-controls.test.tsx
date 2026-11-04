@@ -1,5 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { useCompactLayout } from "../src/hooks/use-compact-layout";
+jest.mock("../src/hooks/use-compact-layout", () => ({ useCompactLayout: jest.fn(() => false) }));
 import PlayerControls from '../src/player-controls';
 import type { VideoFilters, Chapter, QualityLevel } from '@lightbird/core';
 
@@ -45,6 +47,7 @@ const defaultProps = {
 describe('PlayerControls', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(useCompactLayout).mockReturnValue(false);
   });
 
   it('renders without crashing', () => {
@@ -163,6 +166,7 @@ const mockChapters: Chapter[] = [
 describe('PlayerControls — chapters', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(useCompactLayout).mockReturnValue(false);
   });
 
   it('renders no chapter tick marks when chapters prop is empty', () => {
@@ -223,6 +227,7 @@ function mockSeekBarRect(el: HTMLElement) {
 describe('PlayerControls — seek-hover preview', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(useCompactLayout).mockReturnValue(false);
   });
 
   it('calls onSeekHover with the hovered timestamp on mouse move over the seek bar', () => {
@@ -291,6 +296,7 @@ describe('PlayerControls — seek-hover preview', () => {
 describe('PlayerControls — A-B loop', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(useCompactLayout).mockReturnValue(false);
   });
 
   // A-B loop has no visible button anymore — it is keyboard-only.
@@ -342,6 +348,7 @@ const mockQualityLevels: QualityLevel[] = [
 describe('PlayerControls — quality selector', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(useCompactLayout).mockReturnValue(false);
   });
 
   it('does not render the quality button when there are no levels', () => {
@@ -412,5 +419,28 @@ describe('PlayerControls — quality selector', () => {
     fireEvent.click(screen.getByRole('button', { name: /quality/i }));
     fireEvent.click(screen.getByText('Auto'));
     expect(onSetQualityLevel).toHaveBeenCalledWith(-1);
+  });
+});
+
+
+describe("compact controls", () => {
+  beforeEach(() => jest.mocked(useCompactLayout).mockReturnValue(true));
+  it("keeps advanced options available from a labelled menu", () => {
+    render(<PlayerControls {...defaultProps} />);
+    expect(screen.queryByRole("button", { name: "Playback speed" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "More controls" }));
+    fireEvent.click(screen.getByRole("button", { name: "Playback speed" }));
+    fireEvent.click(screen.getByLabelText("2x"));
+    expect(defaultProps.onPlaybackRateChange).toHaveBeenCalledWith(2);
+  });
+  it("exposes the playlist action and count", () => {
+    const onTogglePlaylist = jest.fn();
+    render(<PlayerControls {...defaultProps} playlistCount={3} onTogglePlaylist={onTogglePlaylist} />);
+    fireEvent.click(screen.getByRole("button", { name: "Playlist (3 items)" }));
+    expect(onTogglePlaylist).toHaveBeenCalledTimes(1);
+  });
+  it("does not offer unsupported fullscreen", () => {
+    render(<PlayerControls {...defaultProps} fullscreenSupported={false} />);
+    expect(screen.getByRole("button", { name: "Fullscreen" })).toBeDisabled();
   });
 });

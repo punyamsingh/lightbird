@@ -1,6 +1,6 @@
 import React from "react";
 import type { VideoMetadata } from "@lightbird/core";
-import { X } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "./primitives/dialog";
 
 interface VideoInfoPanelProps {
   metadata: VideoMetadata | null;
@@ -61,17 +61,10 @@ export function VideoInfoPanel({ metadata, onClose }: VideoInfoPanelProps) {
   ];
 
   return (
-    <div className="absolute top-4 right-4 z-40 bg-black/85 text-white rounded-lg p-4 text-xs w-72">
-      <div className="flex justify-between mb-3">
-        <h3 className="font-semibold text-sm">Video Information</h3>
-        <button
-          onClick={onClose}
-          className="text-muted-foreground hover:text-white"
-          aria-label="Close"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="text-xs">
+        <DialogTitle>Video Information</DialogTitle>
+        <DialogDescription className="sr-only">Details about the current video.</DialogDescription>
       <table className="w-full">
         <tbody>
           {rows.map(([label, value]) => (
@@ -82,6 +75,7 @@ export function VideoInfoPanel({ metadata, onClose }: VideoInfoPanelProps) {
           ))}
         </tbody>
       </table>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

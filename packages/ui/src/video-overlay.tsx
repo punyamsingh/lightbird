@@ -13,14 +13,14 @@ export function VideoOverlay({ isLoading, loadingMessage, processingProgress = 0
   if (!isLoading && !loadingMessage) return null;
 
   return (
-    <div className="absolute inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center text-white z-10">
-      <div className="w-16 h-16 border-4 border-t-transparent border-primary rounded-full animate-spin" />
+    <div className="absolute inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center text-white z-10 p-4 overflow-y-auto">
+      <div className="w-10 h-10 sm:w-16 sm:h-16 shrink-0 border-4 border-t-transparent border-primary rounded-full animate-spin" />
       <p className="mt-4 text-lg max-w-sm text-center">
         {loadingMessage || "Processing video..."}
       </p>
       {processingProgress > 0 && processingProgress < 1 && (
         <>
-          <div className="mt-4 w-64 bg-gray-700 rounded-full h-2">
+          <div className="mt-4 w-full max-w-64 bg-gray-700 rounded-full h-2">
             <div
               className="bg-primary h-2 rounded-full transition-all duration-300"
               style={{ width: `${Math.round(processingProgress * 100)}%` }}
@@ -37,7 +37,7 @@ export function VideoOverlay({ isLoading, loadingMessage, processingProgress = 0
       {onCancel && (
         <button
           onClick={onCancel}
-          className="mt-3 px-4 py-1.5 text-sm rounded border border-white/30 text-white/80 hover:bg-white/10 transition-colors"
+          className="mt-3 min-h-11 px-4 py-1.5 text-sm rounded border border-white/30 text-white/80 hover:bg-white/10 transition-colors"
         >
           Cancel
         </button>

@@ -3,10 +3,10 @@ import { LightBirdPlayer, PlayerErrorBoundary } from "@lightbird/player-react";
 
 export default function Home() {
   return (
-    <main className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
-      <header className="px-6 py-3 border-b border-border flex items-center justify-between shrink-0">
-        <h1 className="text-xl font-headline font-black tracking-widest" style={{color: 'hsl(var(--accent))'}}>LIGHTBIRD</h1>
-        <nav className="flex items-center gap-5">
+    <main className="flex flex-col h-[100dvh] bg-background text-foreground overflow-hidden">
+      <header style={{ paddingTop: "max(.375rem, env(safe-area-inset-top))", paddingLeft: "max(.75rem, env(safe-area-inset-left))", paddingRight: "max(.75rem, env(safe-area-inset-right))" }} className="relative z-30 px-3 sm:px-6 py-1.5 sm:py-3 border-b border-border flex items-center justify-between shrink-0">
+        <h1 className="text-base sm:text-xl font-headline font-black tracking-widest" style={{color: 'hsl(var(--accent))'}}>LIGHTBIRD</h1>
+        <nav aria-label="Main navigation" className="hidden sm:flex items-center gap-5 [&_a]:min-h-11 [&_a]:inline-flex [&_a]:items-center">
           <Link
             href="/playground"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -31,8 +31,16 @@ export default function Home() {
             </svg>
           </a>
         </nav>
+        <details className="relative sm:hidden">
+          <summary className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md border border-border px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">Menu</summary>
+          <nav aria-label="Mobile navigation" className="absolute right-0 top-full mt-2 w-48 rounded-lg border border-border bg-card p-2 shadow-xl [&_a]:flex [&_a]:min-h-11 [&_a]:items-center [&_a]:rounded [&_a]:px-3 [&_a:hover]:bg-muted">
+            <Link href="/playground">Playground</Link>
+            <Link href="/docs">Docs</Link>
+            <a href="https://github.com/punyamsingh/lightbird" target="_blank" rel="noopener noreferrer">GitHub</a>
+          </nav>
+        </details>
       </header>
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 min-h-0 min-w-0 flex overflow-hidden">
         <PlayerErrorBoundary>
           <LightBirdPlayer />
         </PlayerErrorBoundary>

@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useState, type RefObject } from "react";
+import React, { useMemo, useState, useRef, useEffect, type RefObject } from "react";
 import type { Subtitle, VideoFilters, AudioTrack, Chapter, QualityLevel } from "@lightbird/core";
 import { Slider } from "./primitives/slider";
 import { Button } from "./primitives/button";
@@ -10,10 +10,11 @@ import { SeekBar } from "./seek-bar";
 import {
   Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward,
   Settings2, Subtitles, Camera, AudioLines, Plus, X,
-  Info, Keyboard, List, PictureInPicture2, Loader2, Gauge
+  Info, Keyboard, List, PictureInPicture2, Loader2, Gauge, MoreHorizontal, ListVideo
 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "./primitives/radio-group";
 import { SubtitleSearchPanel, type SubtitleSearchPanelProps } from "./subtitle-search-panel";
+import { useCompactLayout } from "./hooks/use-compact-layout";
 import { cn } from "./utils/cn";
 
 interface PlayerControlsProps {
@@ -25,6 +26,7 @@ interface PlayerControlsProps {
   playbackRate: number;
   loop: boolean;
   isFullScreen: boolean;
+  fullscreenSupported?: boolean;
   filters: VideoFilters;
   zoom: number;
   subtitles: Subtitle[];
@@ -71,6 +73,8 @@ interface PlayerControlsProps {
   videoRef?: RefObject<HTMLVideoElement | null>;
   /** When true, the bar still renders but every control is non-interactive. */
   isDisabled?: boolean;
+  onTogglePlaylist?: () => void;
+  playlistCount?: number;
 }
 
 const formatTime = (time: number) => {
@@ -100,80 +104,49 @@ export const PlayerControls = React.memo(function PlayerControls({
   onSeekHover, seekPreviewThumbnail = null,
   abLoop = { pointA: null, pointB: null, isLooping: false }, onABLoopCycle,
   videoRef,
-  isDisabled = false,
+  fullscreenSupported = true, isDisabled = false, onTogglePlaylist, playlistCount = 0,
 }: PlayerControlsProps) {
   const formattedProgress = useMemo(() => formatTime(progress), [progress]);
   const formattedDuration = useMemo(() => formatTime(duration), [duration]);
   const [chaptersMenuOpen, setChaptersMenuOpen] = useState(false);
 
-  return (
-    <TooltipProvider>
-      <div
-        aria-disabled={isDisabled || undefined}
-        className={cn(
-          "absolute bottom-0 left-0 right-0 px-4 pb-3 pt-10 flex flex-col gap-1.5",
-          "bg-gradient-to-t from-black/80 via-black/40 to-transparent transition-opacity duration-300 ease-in-out",
-          isDisabled
-            ? "opacity-60 pointer-events-none"
-            : "opacity-0 group-hover:opacity-100",
-        )}
-      >
-        <SeekBar
-          progress={progress}
-          duration={duration}
-          isPlaying={isPlaying}
-          onSeek={onSeek}
-          videoRef={videoRef}
-          chapters={chapters}
-          abLoop={abLoop}
-          onSeekHover={onSeekHover}
-          seekPreviewThumbnail={seekPreviewThumbnail}
-        />
-
-        {currentChapter && (
-          <span className="text-xs text-muted-foreground -mt-0.5">{currentChapter.title}</span>
-        )}
-
-        <div className="flex items-center justify-between text-white">
-          {/* ── Left: transport + volume + time ─────────────────── */}
-          <div className="flex items-center gap-1">
-            <Tooltip>
-              <TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={onPrevious}><SkipBack /></Button></TooltipTrigger>
-              <TooltipContent><p>Previous (N)</p></TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={onPlayPause}>{isPlaying ? <Pause /> : <Play />}</Button></TooltipTrigger>
-              <TooltipContent><p>{isPlaying ? 'Pause' : 'Play'} (Space)</p></TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={onNext}><SkipForward /></Button></TooltipTrigger>
-              <TooltipContent><p>Next (P)</p></TooltipContent>
-            </Tooltip>
-            <div className="flex items-center gap-2 ml-1">
-              <Tooltip>
-                <TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={onMuteToggle}>{isMuted || volume === 0 ? <VolumeX /> : <Volume2 />}</Button></TooltipTrigger>
-                <TooltipContent><p>Mute (M)</p></TooltipContent>
-              </Tooltip>
-              <Slider
-                value={[isMuted ? 0 : volume]}
-                max={1}
-                step={0.05}
-                onValueChange={([val]) => onVolumeChange(val)}
-                aria-label="Volume"
-                className="w-24"
-                trackClassName="h-[3px]"
-                thumbClassName="h-3 w-3 border"
-              />
-            </div>
-            <span className="font-mono text-xs tabular-nums ml-2 text-white/90">
-              {formattedProgress} <span className="text-white/50">/ {formattedDuration}</span>
-            </span>
-          </div>
-
-          {/* ── Right: audio + subs + speed + gear + chapters + fullscreen ─── */}
-          <div className="flex items-center gap-1">
+  const controlsRef = useRef<HTMLDivElement>(null);
+  const compact = useCompactLayout(controlsRef, 1050);
+  const [interacting, setInteracting] = useState(false);
+  const [visible, setVisible] = useState(true);
+  const [openMenus, setOpenMenus] = useState<Set<string>>(() => new Set());
+  useEffect(() => { setOpenMenus(new Set()); setChaptersMenuOpen(false); }, [compact]);
+  const setMenuOpen = (name: string, open: boolean) => setOpenMenus((previous) => {
+    const next = new Set(previous);
+    if (open) next.add(name); else next.delete(name);
+    return next;
+  });
+  useEffect(() => {
+    const surface = videoRef?.current?.parentElement;
+    if (!surface) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const wake = () => {
+      setVisible(true);
+      clearTimeout(timer);
+      if (isPlaying && openMenus.size === 0 && !interacting) timer = setTimeout(() => setVisible(false), 3000);
+    };
+    const onPointerUp = (event: PointerEvent) => {
+      if (event.pointerType === "touch" && event.target === videoRef?.current) wake();
+    };
+    wake();
+    surface.addEventListener("pointermove", wake);
+    surface.addEventListener("pointerup", onPointerUp);
+    surface.addEventListener("focusin", wake);
+    return () => {
+      clearTimeout(timer);
+      surface.removeEventListener("pointermove", wake);
+      surface.removeEventListener("pointerup", onPointerUp);
+      surface.removeEventListener("focusin", wake);
+    };
+  }, [videoRef, isPlaying, openMenus, interacting]);
+  const secondaryControls = (<>
             {audioTracks.length > 0 && (
-              <Popover>
+              <Popover onOpenChange={(open) => setMenuOpen("secondary-0", open)}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <PopoverTrigger asChild>
@@ -200,7 +173,7 @@ export const PlayerControls = React.memo(function PlayerControls({
               </Popover>
             )}
             {qualityLevels.length > 1 && (
-              <Popover>
+              <Popover onOpenChange={(open) => setMenuOpen("secondary-1", open)}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <PopoverTrigger asChild>
@@ -234,7 +207,7 @@ export const PlayerControls = React.memo(function PlayerControls({
                 </PopoverContent>
               </Popover>
             )}
-            <Popover>
+            <Popover onOpenChange={(open) => setMenuOpen("secondary-2", open)}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <PopoverTrigger asChild>
@@ -288,11 +261,11 @@ export const PlayerControls = React.memo(function PlayerControls({
               </PopoverContent>
             </Popover>
 
-            <Popover>
+            <Popover onOpenChange={(open) => setMenuOpen("secondary-3", open)}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <PopoverTrigger asChild>
-                    <Button variant="ghost" className="font-mono w-12 h-9 px-2 text-xs">{playbackRate}x</Button>
+                    <Button aria-label="Playback speed" variant="ghost" className="font-mono w-12 h-9 px-2 text-xs">{playbackRate}x</Button>
                   </PopoverTrigger>
                 </TooltipTrigger>
                 <TooltipContent><p>Playback speed</p></TooltipContent>
@@ -310,7 +283,7 @@ export const PlayerControls = React.memo(function PlayerControls({
             </Popover>
 
             {/* Settings gear — consolidates everything secondary */}
-            <Popover>
+            <Popover onOpenChange={(open) => setMenuOpen("secondary-4", open)}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <PopoverTrigger asChild>
@@ -358,23 +331,23 @@ export const PlayerControls = React.memo(function PlayerControls({
                   <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Display</Label>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Brightness: {filters.brightness}%</Label>
-                    <Slider value={[filters.brightness]} max={200} onValueChange={([val]) => onFiltersChange({...filters, brightness: val})} trackClassName="h-[3px]" thumbClassName="h-3 w-3 border" />
+                    <Slider aria-label="Brightness" value={[filters.brightness]} max={200} onValueChange={([val]) => onFiltersChange({...filters, brightness: val})} trackClassName="h-[3px]" thumbClassName="h-3 w-3 border" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Contrast: {filters.contrast}%</Label>
-                    <Slider value={[filters.contrast]} max={200} onValueChange={([val]) => onFiltersChange({...filters, contrast: val})} trackClassName="h-[3px]" thumbClassName="h-3 w-3 border" />
+                    <Slider aria-label="Contrast" value={[filters.contrast]} max={200} onValueChange={([val]) => onFiltersChange({...filters, contrast: val})} trackClassName="h-[3px]" thumbClassName="h-3 w-3 border" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Saturation: {filters.saturate}%</Label>
-                    <Slider value={[filters.saturate]} max={200} onValueChange={([val]) => onFiltersChange({...filters, saturate: val})} trackClassName="h-[3px]" thumbClassName="h-3 w-3 border" />
+                    <Slider aria-label="Saturation" value={[filters.saturate]} max={200} onValueChange={([val]) => onFiltersChange({...filters, saturate: val})} trackClassName="h-[3px]" thumbClassName="h-3 w-3 border" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Hue: {filters.hue}°</Label>
-                    <Slider value={[filters.hue]} max={360} onValueChange={([val]) => onFiltersChange({...filters, hue: val})} trackClassName="h-[3px]" thumbClassName="h-3 w-3 border" />
+                    <Slider aria-label="Hue" value={[filters.hue]} max={360} onValueChange={([val]) => onFiltersChange({...filters, hue: val})} trackClassName="h-[3px]" thumbClassName="h-3 w-3 border" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Zoom: {Math.round(zoom * 100)}%</Label>
-                    <Slider value={[zoom]} min={1} max={3} step={0.1} onValueChange={([val]) => onZoomChange(val)} trackClassName="h-[3px]" thumbClassName="h-3 w-3 border" />
+                    <Slider aria-label="Zoom" value={[zoom]} min={1} max={3} step={0.1} onValueChange={([val]) => onZoomChange(val)} trackClassName="h-[3px]" thumbClassName="h-3 w-3 border" />
                   </div>
                 </div>
               </PopoverContent>
@@ -382,7 +355,7 @@ export const PlayerControls = React.memo(function PlayerControls({
 
             {/* Chapters (conditional, kept visible since users want quick jumps) */}
             {chapters.length > 0 && (
-              <Popover open={chaptersMenuOpen} onOpenChange={setChaptersMenuOpen}>
+              <Popover open={chaptersMenuOpen} onOpenChange={(open) => { setChaptersMenuOpen(open); setMenuOpen("chapters", open); }}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <PopoverTrigger asChild>
@@ -418,8 +391,99 @@ export const PlayerControls = React.memo(function PlayerControls({
               </Popover>
             )}
 
+  </>);
+
+  return (
+    <TooltipProvider>
+      <div
+        ref={controlsRef}
+        onPointerDown={() => setInteracting(true)}
+        onPointerUp={() => setInteracting(false)}
+        onPointerCancel={() => setInteracting(false)}
+        onLostPointerCapture={() => setInteracting(false)}
+        data-visible={!isPlaying || visible || openMenus.size > 0 || interacting}
+        {...(isDisabled ? { inert: "" } : {})}
+        aria-disabled={isDisabled || undefined}
+        className={cn(
+          "lb-controls absolute bottom-0 left-0 right-0 px-2 sm:px-4 pb-3 pt-10 flex flex-col gap-1.5",
+          "bg-gradient-to-t from-black/80 via-black/40 to-transparent transition-opacity duration-300 ease-in-out",
+          isDisabled
+            ? "opacity-60 pointer-events-none"
+            : "opacity-0 data-[visible=true]:opacity-100 focus-within:opacity-100",
+        )}
+      >
+        <SeekBar
+          progress={progress}
+          duration={duration}
+          isPlaying={isPlaying}
+          onSeek={onSeek}
+          videoRef={videoRef}
+          chapters={chapters}
+          abLoop={abLoop}
+          onSeekHover={onSeekHover}
+          seekPreviewThumbnail={seekPreviewThumbnail}
+        />
+
+        {currentChapter && (
+          <span className="text-xs text-muted-foreground -mt-0.5">{currentChapter.title}</span>
+        )}
+
+        <div className="flex flex-wrap items-center justify-between gap-x-1 text-white">
+          {/* ── Left: transport + volume + time ─────────────────── */}
+          <div className="flex min-w-0 items-center">
             <Tooltip>
-              <TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={onFullScreenToggle}>{isFullScreen ? <Minimize /> : <Maximize />}</Button></TooltipTrigger>
+              <TooltipTrigger asChild><Button variant="ghost" size="icon" aria-label="Previous video" onClick={onPrevious}><SkipBack /></Button></TooltipTrigger>
+              <TooltipContent><p>Previous (N)</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild><Button variant="ghost" size="icon" aria-label={isPlaying ? "Pause" : "Play"} onClick={onPlayPause}>{isPlaying ? <Pause /> : <Play />}</Button></TooltipTrigger>
+              <TooltipContent><p>{isPlaying ? 'Pause' : 'Play'} (Space)</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild><Button variant="ghost" size="icon" aria-label="Next video" onClick={onNext}><SkipForward /></Button></TooltipTrigger>
+              <TooltipContent><p>Next (P)</p></TooltipContent>
+            </Tooltip>
+            <div className="lb-volume flex items-center gap-2 ml-1">
+              <Tooltip>
+                <TooltipTrigger asChild><Button variant="ghost" size="icon" aria-label={isMuted ? "Unmute" : "Mute"} onClick={onMuteToggle}>{isMuted || volume === 0 ? <VolumeX /> : <Volume2 />}</Button></TooltipTrigger>
+                <TooltipContent><p>Mute (M)</p></TooltipContent>
+              </Tooltip>
+              <Slider
+                value={[isMuted ? 0 : volume]}
+                max={1}
+                step={0.05}
+                onValueChange={([val]) => onVolumeChange(val)}
+                aria-label="Volume"
+                className="lb-volume-slider w-24"
+                trackClassName="h-[3px]"
+                thumbClassName="h-3 w-3 border"
+              />
+            </div>
+            <span className="lb-time font-mono text-xs tabular-nums ml-1 text-white/90 whitespace-nowrap">
+              {formattedProgress} <span className="text-white/50">/ {formattedDuration}</span>
+            </span>
+          </div>
+
+          {/* ── Right: audio + subs + speed + gear + chapters + fullscreen ─── */}
+          <div className="flex min-w-0 items-center">
+            {compact ? (
+              <Popover onOpenChange={(open) => setMenuOpen("more", open)}>
+                <PopoverTrigger asChild><Button variant="ghost" size="icon" aria-label="More controls"><MoreHorizontal /></Button></PopoverTrigger>
+                <PopoverContent className="lb-more-controls w-72" align="end">
+                  <p className="mb-2 text-sm font-semibold">Playback options</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="ghost" onClick={onPrevious}>Previous video</Button>
+                    <Button variant="ghost" onClick={onNext}>Next video</Button>
+                    <Button variant="ghost" onClick={onMuteToggle}>{isMuted ? "Unmute video" : "Mute video"}</Button>
+                    {secondaryControls}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            ) : secondaryControls}
+            {onTogglePlaylist && <Button variant="ghost" size="icon" onClick={onTogglePlaylist} aria-label={`Playlist (${playlistCount} items)`}><ListVideo /></Button>}
+
+            <Tooltip>
+              <TooltipTrigger asChild><Button variant="ghost" size="icon" disabled={!fullscreenSupported} aria-label={isFullScreen ? "Exit fullscreen" : "Fullscreen"} onClick={onFullScreenToggle}>{isFullScreen ? <Minimize /> : <Maximize />}</Button></TooltipTrigger>
               <TooltipContent><p>Fullscreen (F)</p></TooltipContent>
             </Tooltip>
           </div>

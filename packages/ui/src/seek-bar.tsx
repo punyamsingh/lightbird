@@ -82,7 +82,7 @@ export const SeekBar = React.memo(function SeekBar({
         <div
           data-testid="seek-preview"
           className="absolute bottom-full mb-3 -translate-x-1/2 pointer-events-none flex flex-col items-center z-20"
-          style={{ left: `${seekHover.ratio * 100}%` }}
+          style={{ left: `clamp(5rem, ${seekHover.ratio * 100}%, calc(100% - 5rem))` }}
         >
           {seekPreviewThumbnail ? (
             <img
@@ -99,6 +99,7 @@ export const SeekBar = React.memo(function SeekBar({
         </div>
       )}
       <Slider
+        aria-label="Seek"
         value={[displayProgress]}
         max={duration || 0}
         step={0.05}
@@ -106,6 +107,7 @@ export const SeekBar = React.memo(function SeekBar({
         onPointerDown={() => setIsScrubbing(true)}
         onPointerUp={() => setIsScrubbing(false)}
         onLostPointerCapture={() => setIsScrubbing(false)}
+        onPointerCancel={() => setIsScrubbing(false)}
         className="w-full"
         trackClassName={cn(
           "rounded-none transition-all duration-150 ease-out",
