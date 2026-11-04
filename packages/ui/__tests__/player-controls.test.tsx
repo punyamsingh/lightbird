@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { useCompactLayout } from "../src/hooks/use-compact-layout";
 jest.mock("../src/hooks/use-compact-layout", () => ({ useCompactLayout: jest.fn(() => false) }));
 import PlayerControls from '../src/player-controls';
@@ -442,5 +442,35 @@ describe("compact controls", () => {
   it("does not offer unsupported fullscreen", () => {
     render(<PlayerControls {...defaultProps} fullscreenSupported={false} />);
     expect(screen.getByRole("button", { name: "Fullscreen" })).toBeDisabled();
+  });
+});
+
+
+describe('controls auto-hide', () => {
+  beforeEach(() => { jest.useFakeTimers(); jest.mocked(useCompactLayout).mockReturnValue(false); });
+  afterEach(() => { jest.runOnlyPendingTimers(); jest.useRealTimers(); });
+  function setup(chapters: Chapter[] = []) {
+    const surface = document.createElement('div');
+    const video = document.createElement('video');
+    surface.append(video);
+    const result = render(<PlayerControls {...defaultProps} isPlaying videoRef={{ current: video }} chapters={chapters} />);
+    const controls = screen.getByRole('button', { name: 'Pause' }).closest('[data-visible]')!;
+    return { ...result, controls };
+  }
+  it.each(['pointerup', 'pointercancel'])('auto-hides after a %s outside the controls', (type) => {
+    const { controls } = setup();
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Pause' }));
+    act(() => { jest.advanceTimersByTime(3100); });
+    expect(controls).toHaveAttribute('data-visible', 'true');
+    fireEvent(window, new Event(type));
+    act(() => { jest.advanceTimersByTime(3100); });
+    expect(controls).toHaveAttribute('data-visible', 'false');
+  });
+  it('auto-hides after selecting a chapter closes the controlled menu', () => {
+    const { controls } = setup([{ index: 0, title: 'Opening', startTime: 0, endTime: 60 }]);
+    fireEvent.click(screen.getByRole('button', { name: 'Chapters' }));
+    fireEvent.click(screen.getByRole('button', { name: /Opening/ }));
+    act(() => { jest.advanceTimersByTime(3100); });
+    expect(controls).toHaveAttribute('data-visible', 'false');
   });
 });

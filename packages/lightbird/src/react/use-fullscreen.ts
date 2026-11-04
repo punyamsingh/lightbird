@@ -6,6 +6,7 @@ type SafariVideo = HTMLVideoElement & {
   webkitDisplayingFullscreen?: boolean;
 };
 
+/** Track and toggle fullscreen for this player, including native Safari video. */
 export function useFullscreen(containerRef: RefObject<HTMLDivElement | null>) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
@@ -14,7 +15,7 @@ export function useFullscreen(containerRef: RefObject<HTMLDivElement | null>) {
     const container = containerRef.current;
     const video = container?.querySelector<SafariVideo>("video");
     const update = () => {
-      setIsFullscreen(!!document.fullscreenElement || !!video?.webkitDisplayingFullscreen);
+      setIsFullscreen((!!container && document.fullscreenElement === container) || !!video?.webkitDisplayingFullscreen);
       setIsSupported(!!container?.requestFullscreen || !!video?.webkitEnterFullscreen);
     };
     update();
@@ -33,12 +34,18 @@ export function useFullscreen(containerRef: RefObject<HTMLDivElement | null>) {
     if (!container) return;
     const video = container.querySelector<SafariVideo>("video");
     try {
-      if (document.fullscreenElement) {
+      if (document.fullscreenElement === container) {
         void document.exitFullscreen?.().catch((error) => console.error("Fullscreen unavailable", error));
       } else if (video?.webkitDisplayingFullscreen) {
         video.webkitExitFullscreen?.();
       } else if (container.requestFullscreen) {
-        void container.requestFullscreen().catch((error) => console.error("Fullscreen unavailable", error));
+        void container.requestFullscreen().catch((error) => {
+          if (video?.webkitEnterFullscreen) {
+            try { video.webkitEnterFullscreen(); } catch (fallbackError) { console.error("Fullscreen unavailable", fallbackError); }
+          } else {
+            console.error("Fullscreen unavailable", error);
+          }
+        });
       } else {
         // iPhone Safari offers native video fullscreen rather than element fullscreen.
         video?.webkitEnterFullscreen?.();

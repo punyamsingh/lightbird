@@ -144,6 +144,18 @@ export const PlayerControls = React.memo(function PlayerControls({
       surface.removeEventListener("focusin", wake);
     };
   }, [videoRef, isPlaying, openMenus, interacting]);
+  useEffect(() => {
+    if (!interacting) return;
+    const release = () => setInteracting(false);
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
+    window.addEventListener("blur", release);
+    return () => {
+      window.removeEventListener("pointerup", release);
+      window.removeEventListener("pointercancel", release);
+      window.removeEventListener("blur", release);
+    };
+  }, [interacting]);
   const secondaryControls = (<>
             {audioTracks.length > 0 && (
               <Popover onOpenChange={(open) => setMenuOpen("secondary-0", open)}>
@@ -378,6 +390,7 @@ export const PlayerControls = React.memo(function PlayerControls({
                         onClick={() => {
                           onGoToChapter?.(chapter.index);
                           setChaptersMenuOpen(false);
+                          setMenuOpen("chapters", false);
                         }}
                       >
                         <span className="flex-1 truncate">{chapter.title}</span>

@@ -67,9 +67,16 @@ const LightBirdPlayer = () => {
   }, []);
   const openFileRef = useRef<HTMLInputElement>(null);
   const playlistTriggerRef = useRef<HTMLButtonElement>(null);
+  const playlistOpenerRef = useRef<HTMLElement | null>(null);
   const surfacePointerType = useRef("");
   const [mobilePlaylistOpen, setMobilePlaylistOpen] = useState(false);
   const [focusUrl, setFocusUrl] = useState(false);
+  /** Remember the actual opening control so modal dismissal restores its focus. */
+  const openMobilePlaylist = (url = false) => {
+    playlistOpenerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setFocusUrl(url);
+    setMobilePlaylistOpen(true);
+  };
   useEffect(() => {
     const viewport = window.visualViewport;
     const update = () => {
@@ -476,7 +483,7 @@ const LightBirdPlayer = () => {
 
   // Auto-hide the playlist sidebar when playing (unless pinned); restore when paused
   useEffect(() => {
-    if (compact) { wasAutoHiddenRef.current = false; return; }
+    if (compact) return;
     if (playback.isPlaying) {
       if (!playlistPinned) {
         setPlaylistOpen((current: boolean) => {
@@ -610,12 +617,13 @@ const LightBirdPlayer = () => {
     setDisclaimerPendingUri(null);
     if (uri) {
       try {
-        await handleAddMagnet(uri);
+        const added = await handleAddMagnet(uri);
+        if (added && compact) setMobilePlaylistOpen(false);
       } catch (err) {
         toast({ title: "Magnet link failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
       }
     }
-  }, [disclaimerPendingUri, handleAddMagnet, toast]);
+  }, [compact, disclaimerPendingUri, handleAddMagnet, toast]);
 
   const handleSubtitleChange = useCallback(async (id: string) => {
     subtitles.switchSubtitle(id);
@@ -831,7 +839,7 @@ const LightBirdPlayer = () => {
     <div ref={attachContainer} className="lb-player flex flex-1 min-w-0 min-h-0 w-full h-full relative bg-black" data-compact={compact}>
       <Button ref={playlistTriggerRef} variant="secondary" className="lb-playlist-trigger absolute top-3 right-3 z-20" aria-haspopup={compact ? "dialog" : undefined} aria-expanded={compact ? mobilePlaylistOpen : playlistOpen} onClick={() => {
         setFocusUrl(false);
-        if (compact) setMobilePlaylistOpen((open) => !open); else handlePlaylistToggle();
+        if (compact) openMobilePlaylist(); else handlePlaylistToggle();
       }}><ListVideo /> Playlist ({playlist.playlist.length})</Button>
       <input ref={openFileRef} type="file" multiple accept="video/*,.mkv,.avi,.mov,.m4v" className="hidden" aria-label="Open video files" onChange={(event) => {
         if (event.target.files) void handleFileChange(event.target.files);
@@ -905,7 +913,7 @@ const LightBirdPlayer = () => {
 
         <PlayerControls
             isDisabled={!playlist.currentItem}
-            onTogglePlaylist={compact ? () => { setFocusUrl(false); setMobilePlaylistOpen(true); } : undefined}
+            onTogglePlaylist={compact ? () => openMobilePlaylist() : undefined}
             playlistCount={playlist.playlist.length}
             videoRef={videoRef}
             isPlaying={playback.isPlaying}
@@ -996,7 +1004,7 @@ const LightBirdPlayer = () => {
                 <Button onClick={() => openFileRef.current?.click()} className="min-h-11"><FilePlus /> Open video</Button>
                 <Button variant="outline" className="min-h-11" onClick={() => {
                   setFocusUrl(true);
-                  if (compact) setMobilePlaylistOpen(true); else setPlaylistOpen(true);
+                  if (compact) openMobilePlaylist(true); else setPlaylistOpen(true);
                 }}><LinkIcon /> Open URL</Button>
               </div>
               <p className="mt-4 text-xs text-muted-foreground hidden sm:block">You can also drop video and subtitle files here.</p>
@@ -1010,18 +1018,18 @@ const LightBirdPlayer = () => {
         currentVideoIndex={playlist.currentIndex}
         onSelectVideo={(index) => { handleSelectVideo(index); if (compact) setMobilePlaylistOpen(false); }}
         onFilesAdded={(files) => { void handleFileChange(files); if (compact) setMobilePlaylistOpen(false); }}
-        onFolderFilesAdded={handleFolderFilesAdded}
+        onFolderFilesAdded={async (files) => { await handleFolderFilesAdded(files); if (compact) setMobilePlaylistOpen(false); }}
         onAddStream={(url, name) => { handleAddStream(url, name); if (compact) setMobilePlaylistOpen(false); }}
-        onAddMagnet={handleAddMagnet}
+        onAddMagnet={async (uri) => { const added = await handleAddMagnet(uri); if (added && compact) setMobilePlaylistOpen(false); return added; }}
         torrentStatus={magnet.torrentStatus}
         showMagnet={magnetLinkEnabled}
         onRemoveItem={handleRemoveItem}
         onReorder={handleReorder}
-        onImportM3U={handleImportM3U}
+        onImportM3U={(items) => { handleImportM3U(items); if (compact && items.length > 0) setMobilePlaylistOpen(false); }}
         compact={compact}
         sideSheet={!phone}
         focusUrl={focusUrl}
-        triggerRef={playlistTriggerRef}
+        triggerRef={playlistOpenerRef}
         isOpen={compact ? mobilePlaylistOpen : playlistOpen}
         isPinned={playlistPinned}
         size={playlistSize}

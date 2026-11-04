@@ -204,7 +204,8 @@ interface PlaylistPanelProps {
   compact?: boolean;
   sideSheet?: boolean;
   focusUrl?: boolean;
-  triggerRef?: React.RefObject<HTMLButtonElement | null>;
+  /** Element that opened the compact dialog; focus returns here on dismissal. */
+  triggerRef?: React.RefObject<HTMLElement | null>;
   onToggle: () => void;
   onTogglePin: () => void;
   onSizeChange: (size: PlaylistSize) => void;
@@ -661,7 +662,7 @@ const PlaylistPanel: React.FC<PlaylistPanelProps> = ({
           <DialogContent data-side={sideSheet} className="lb-playlist-sheet p-0 gap-0" onOpenAutoFocus={(event) => {
             if (focusUrl) { event.preventDefault(); streamInputRef.current?.focus(); }
           }} onCloseAutoFocus={(event) => {
-            if (triggerRef?.current) { event.preventDefault(); triggerRef.current.focus(); }
+            if (triggerRef?.current?.isConnected) { event.preventDefault(); triggerRef.current.focus(); }
           }}>
             <DialogTitle className="sr-only">Playlist</DialogTitle>
             <DialogDescription className="sr-only">Add videos or select a video to play.</DialogDescription>

@@ -51,6 +51,7 @@ async function upload(page, count = 1) {
     args: ['--no-sandbox'],
   });
   try {
+    let sheetMarkup;
     for (const [width, height] of viewports) {
       const page = await browser.newPage({ viewport: { width, height }, hasTouch: width < 1024, isMobile: width < 640 });
       const errors = [];
@@ -65,9 +66,10 @@ async function upload(page, count = 1) {
         await page.getByRole('button', { name: 'Open URL', exact: true }).click();
         await bounded(page.getByRole('dialog', { name: 'Playlist' }), page);
         assert(await page.getByRole('textbox', { name: 'Video URL' }).evaluate(el => el === document.activeElement), 'URL input not focused');
+        if (width === 320) sheetMarkup = await page.getByRole('dialog', { name: 'Playlist' }).evaluate(el => el.outerHTML);
         await page.keyboard.press('Escape');
-        await page.getByRole('dialog').waitFor({ state: 'hidden' });
-        await poll(() => page.locator('.lb-playlist-trigger').evaluate(el => el === document.activeElement), 'focus not restored');
+        await page.getByRole('dialog', { name: 'Playlist' }).waitFor({ state: 'hidden' });
+        await poll(() => page.getByRole('button', { name: 'Open URL', exact: true }).evaluate(el => el === document.activeElement), 'focus not restored to Open URL');
       }
       await upload(page);
       await page.locator('video').evaluate(video => video.pause());
@@ -103,6 +105,11 @@ async function upload(page, count = 1) {
       if (width < 1024) {
         // Pausing must not open a mobile playlist sheet.
         assert.equal(await page.getByRole('dialog', { name: 'Playlist' }).count(), 0);
+        const controlsOpener = page.getByRole('button', { name: 'Playlist (1 items)', exact: true });
+        await controlsOpener.click();
+        await page.getByRole('button', { name: 'Close', exact: true }).click();
+        await page.getByRole('dialog', { name: 'Playlist' }).waitFor({ state: 'hidden' });
+        await poll(() => controlsOpener.evaluate(el => el === document.activeElement), 'focus not restored to controls playlist button');
         await upload(page, 25);
         await page.locator('.lb-playlist-trigger').click();
         const dialog = page.getByRole('dialog', { name: 'Playlist' });
@@ -117,6 +124,13 @@ async function upload(page, count = 1) {
       console.log(`PASS ${width}x${height}: layout, sources, playback, rotation, menus${width < 1024 ? ', long playlist, focus' : ''}`);
       await page.close();
     }
+    // Exercise the published CSS without the app's separately imported overrides.
+    const packaged = await browser.newPage({ viewport: { width: 320, height: 568 } });
+    await packaged.setContent(`<style>${readFileSync(join(__dirname, '../packages/ui/dist/styles.css'), 'utf8')}</style>${sheetMarkup}`);
+    const sheet = await packaged.getByRole('dialog').boundingBox();
+    assert(sheet && Math.abs(sheet.x) < 1 && Math.abs(sheet.width - 320) < 1 && Math.abs(sheet.y + sheet.height - 568) < 1, 'packaged CSS did not render a full-width bottom sheet');
+    console.log('PASS packaged player stylesheet bottom sheet');
+    await packaged.close();
     // A narrow embed in a desktop browser must get the compact layout too.
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     page.setDefaultTimeout(15000);
@@ -127,9 +141,16 @@ async function upload(page, count = 1) {
     await page.locator('.lb-playlist-trigger').click();
     await bounded(page.getByRole('dialog', { name: 'Playlist' }), page);
     await page.getByRole('button', { name: 'Close', exact: true }).click();
-    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    await page.getByRole('dialog', { name: 'Playlist' }).waitFor({ state: 'hidden' });
     await upload(page);
     await page.locator('video').evaluate(video => video.pause());
+    await page.locator('.lb-player').evaluate(el => { el.style.width = '120px'; });
+    const seek = page.getByTestId('seek-bar');
+    const seekBox = await seek.boundingBox();
+    await seek.hover({ position: { x: seekBox.width - 1, y: seekBox.height / 2 } });
+    const preview = await page.getByTestId('seek-preview').boundingBox();
+    assert(preview && preview.x >= seekBox.x - 1 && preview.x + preview.width <= seekBox.x + seekBox.width + 1, 'seek preview overflowed a narrow bar');
+    console.log('PASS seek preview in a 120px embed');
     console.log('Checking fullscreen menus and subtitle upload');
     await page.locator('.lb-player').evaluate(el => { el.style.width = ''; el.style.flex = ''; });
     await poll(async () => (await page.locator('.lb-player').getAttribute('data-compact')) === 'false', 'desktop layout did not restore');

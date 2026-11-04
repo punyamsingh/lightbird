@@ -47,7 +47,7 @@
   ],
   "scripts": {
     "build": "tsup && pnpm run build:css",
-    "build:css": "tailwindcss -i ./src/styles/input.css -o ./dist/styles.css --minify && node -e \"require('node:fs').copyFileSync('src/styles/responsive.css', 'dist/responsive.css')\"",
+    "build:css": "tailwindcss -i ./src/styles/input.css -o ./dist/styles.css --minify && node scripts/finalize-styles.cjs",
     "dev": "tsup --watch",
     "test": "jest",
     "typecheck": "tsc --noEmit",
