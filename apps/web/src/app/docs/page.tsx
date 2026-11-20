@@ -1,14 +1,11 @@
-import type { Metadata } from "next";
+import { pageMetadata, pages } from "@/lib/site";
+import { DiscoveryLinks } from "@/components/discovery-links";
 import { CodeBlock } from "./code-block";
 import { DocsNav } from "./docs-nav";
 import { FadeSection } from "./fade-section";
 import { InstallTabs } from "./install-tabs";
 
-export const metadata: Metadata = {
-  title: "LightBird Docs",
-  description:
-    "Documentation for LightBird — a client-side video player engine.",
-};
+export const metadata = pageMetadata(pages.docs);
 
 /* ------------------------------------------------------------------ */
 /*  Static UI pieces                                                   */
@@ -367,11 +364,11 @@ export default function DocsPage() {
         <section id="overview" className="relative mb-24 scroll-mt-24">
           <div className="docs-hero-glow" />
           <div className="relative">
-            <h1 className="text-5xl sm:text-6xl font-headline font-black tracking-[0.2em] mb-5 text-[hsl(207,100%,60%)]">
-              LIGHTBIRD
+            <h1 className="text-4xl sm:text-5xl font-headline font-black tracking-tight mb-5 text-[hsl(207,100%,60%)]">
+              LightBird documentation
             </h1>
             <p className="text-xl sm:text-2xl text-muted-foreground mb-8 max-w-xl leading-relaxed">
-              Play everything. Entirely client-side.
+              A browser video engine, React player, and Web Component.
             </p>
             <div className="flex flex-wrap gap-3 mb-10">
               {[
@@ -585,6 +582,7 @@ export default function DocsPage() {
           </div>
           <p className="mb-6">Built by Punyam Singh</p>
         </footer>
+        <div className="mt-12 border-t border-border pt-8"><DiscoveryLinks /></div>
       </main>
     </>
   );

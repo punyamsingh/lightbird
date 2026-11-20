@@ -1,13 +1,17 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "../../../../packages/ui/src/styles/responsive.css";
+import { StructuredData } from "@/components/structured-data";
+import { isPreviewDeployment, pageMetadata, pages, projectStructuredData, SITE_URL } from "@/lib/site";
 import { Toaster, FeatureFlagsProvider } from "@lightbird/player-react";
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", interactiveWidget: "resizes-content" };
 
 export const metadata: Metadata = {
-  title: "LightBird",
-  description: "A modern, feature-rich video player.",
+  ...pageMetadata(pages.home),
+  metadataBase: new URL(SITE_URL),
+  applicationName: "LightBird",
+  robots: isPreviewDeployment() ? { index: false, follow: false } : { index: true, follow: true },
 };
 
 export default function RootLayout({
@@ -26,6 +30,7 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
+        <StructuredData data={projectStructuredData} />
         <FeatureFlagsProvider>
           {children}
           <Toaster />

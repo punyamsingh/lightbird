@@ -1,82 +1,98 @@
-# LightBird Video Player
+# LightBird — online video player and JavaScript video toolkit
 
-LightBird is a modern, lightweight, and feature-rich video player built with Next.js. It uses a smart two-player architecture: a simple native HTML5 player for common formats and an advanced FFmpeg.wasm-powered player specifically for complex containers like MKV with embedded tracks.
+**[Use the player](https://lightbird.vercel.app)** · **[Documentation](https://lightbird.vercel.app/docs)** · **[Integration playground](https://lightbird.vercel.app/playground)** · **[Contributing](CONTRIBUTING.md)**
 
-## Features
+LightBird is a free, open-source browser video player with local file playback,
+subtitles, playlists, MKV processing, and HLS streaming. It also provides a
+JavaScript engine, a ready-made React player, and a framework-independent
+`<lightbird-player>` Web Component for embedding video in your own application.
 
-- **Dual Player Architecture**: Smart format detection for optimal performance
-- **MKV Master**: Advanced MKV support with instant embedded track switching
-- **Universal Playback**: Native HTML5 support for MP4, WebM, AVI, and more
-- **External Subtitle Support**: Drag & drop .srt, .vtt subtitle files
-- **Instant Track Switching**: Zero-delay audio and subtitle track changes for MKV
-- **Advanced Player Controls**: Speed control, volume, fullscreen, frame stepping, looping
-- **Video Adjustments**: Brightness, contrast, saturation, hue, and zoom controls
-- **Playlist Management**: Local files and online streaming support
-- **Screenshot Capture**: One-click frame capture
-- **Keyboard Shortcuts**: Full keyboard control support
+## Watch videos in your browser
 
-## Use It Anywhere — Web Component
+Open **[LightBird](https://lightbird.vercel.app)** and choose **Open video** for a
+local file, or **Open URL** for an accessible remote video or stream. No account
+is required. Local files are read in the browser rather than uploaded to a video
+server. Remote streams, app assets, and optional online subtitle search use the
+network separately.
 
-LightBird ships a framework-agnostic `<lightbird-player>` custom element
-([`@lightbird/player`](packages/web-component)). It works in Vue, Svelte, Angular,
-Solid, or plain HTML — no React required.
+- **[MKV player](https://lightbird.vercel.app/mkv-player)** — browser-side media
+  processing with FFmpeg.wasm, embedded track selection, and chapters when available.
+- **MP4 and WebM** — native playback when the browser supports the file's codecs.
+- **[HLS / M3U8 player](https://lightbird.vercel.app/hls-player)** — accessible
+  streams, with quality selection when multiple renditions are available.
+- **Subtitles and controls** — SRT, VTT, ASS/SSA, playback speed, keyboard shortcuts,
+  fullscreen, video adjustments, and screenshots, subject to browser support.
+- **Responsive playlist** — local files, stream URLs, playlist import/export, and
+  controls that adapt to phones, tablets, and desktop screens.
+
+MKV is a container, not a codec. Remuxing does not make every codec playable;
+large files can exceed a device's memory. Remote sources need appropriate access
+and CORS headers. See the [browser requirements](https://lightbird.vercel.app/docs#browser-support).
+
+## Add a video player to your app
+
+| Package | Use it for | Start here |
+| --- | --- | --- |
+| [`@lightbird/core`](packages/lightbird) | Framework-independent engine and React hooks | [API documentation](https://lightbird.vercel.app/docs#api) |
+| [`@lightbird/player-react`](packages/ui) | Ready-made React controls and playlist | [React video player guide](https://lightbird.vercel.app/react-video-player) |
+| [`@lightbird/player`](packages/web-component) | Vue, Svelte, Angular, Solid, or plain HTML | [Web Component guide](https://lightbird.vercel.app/web-component-video-player) |
+
+### React
+
+```bash
+npm install @lightbird/core @lightbird/player-react
+```
+
+```tsx
+"use client";
+import { LightBirdPlayer } from '@lightbird/player-react';
+import '@lightbird/player-react/styles.css';
+
+export default function VideoPage() {
+  return <div style={{ height: '80dvh', minHeight: 320 }}><LightBirdPlayer /></div>;
+}
+```
+
+### Web Component
 
 ```bash
 npm install @lightbird/player
 ```
 
-```html
-<script type="module">
-  import '@lightbird/player';
-</script>
+Import the package in a browser entry point processed by your bundler:
 
-<lightbird-player src="video.mp4" controls poster="cover.jpg"></lightbird-player>
+```js
+import '@lightbird/player';
 ```
 
-MP4/WebM play natively; `.m3u8` (HLS) and `.mkv` sources lazy-load the core
-engine — and FFmpeg.wasm, for MKV — only when first encountered. See
-[`packages/web-component`](packages/web-component) for attributes, events, and
-Vue/Svelte examples.
+Then use the custom element in your HTML or framework template:
 
-## Tech Stack
+```html
+<lightbird-player src="/videos/example.mp4" controls></lightbird-player>
+```
 
-- **Framework**: [Next.js](https://nextjs.org/) (with React)
-- **Video Processing**:
-  - **Simple Player**: Native HTML5 `<video>` element for maximum compatibility
-  - **MKV Player**: [FFmpeg.wasm](https://ffmpegwasm.netlify.app/) for advanced container parsing
-- **UI**: [ShadCN UI](https://ui.shadcn.com/) & [Tailwind CSS](https://tailwindcss.com/)
-- **Icons**: [Lucide React](https://lucide.dev/guide/packages/lucide-react)
+The element lazy-loads the HLS or MKV engine when needed. See the
+[package README](packages/web-component/README.md) for attributes, events,
+control selection, and Vue/Svelte examples. Self-hosted MKV processing also
+requires the headers and assets described in the documentation.
 
-## Getting Started
+## Develop LightBird
 
-1.  **Install dependencies**:
-    ```bash
-    pnpm install
-    ```
+The monorepo uses pnpm 9.15.9, Turborepo, TypeScript, and Next.js for the website.
 
-2.  **Run the development server**:
-    ```bash
-    pnpm dev
-    ```
+```bash
+pnpm install --frozen-lockfile
+pnpm turbo build --filter=@lightbird/core --filter=@lightbird/player-react --filter=@lightbird/player
+pnpm dev
+```
 
-3.  Open [http://localhost:9002](http://localhost:9002) in your browser to see the result.
+The web app runs on port 9002. See [CONTRIBUTING.md](CONTRIBUTING.md) for the
+repository structure, tests, and release conventions. For site publication and
+Search Console follow-up, see the [discoverability checklist](docs/discoverability.md).
 
-## How It Works
+## License
 
-LightBird uses intelligent format detection to choose the optimal playback method:
-
-### Simple Player (MP4, WebM, AVI, etc.)
-- Uses native HTML5 `<video>` element for instant playback
-- Supports external subtitle files via drag & drop
-- Zero processing overhead, maximum compatibility
-
-### MKV Player (Advanced)
-- FFmpeg.wasm extracts all embedded track metadata (2-3 second initial load)
-- Pre-caches subtitle tracks for instant switching
-- Creates audio switching points for near-instant audio track changes
-- User Experience: Initial load ~2-3 seconds, then all track switching is instant
-
-The system automatically detects file format and routes to the appropriate player, giving you the best of both worlds: instant playback for common formats and advanced features for complex containers.
+[MIT](LICENSE). Review dependency licenses when distributing an application.
 
 ## Responsive UI checks
 
