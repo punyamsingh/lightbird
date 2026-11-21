@@ -1,12 +1,9 @@
-import type { Metadata } from "next";
+import { pageMetadata, pages } from "@/lib/site";
 import Link from "next/link";
+import { DiscoveryLinks } from "@/components/discovery-links";
 import { Playground } from "./playground";
 
-export const metadata: Metadata = {
-  title: "Playground · LightBird",
-  description:
-    "Try LightBird in your browser — drop a video, tweak the options live, and copy a ready-to-paste snippet for React or the Web Component.",
-};
+export const metadata = pageMetadata(pages.playground);
 
 export default function PlaygroundPage() {
   return (
@@ -31,13 +28,14 @@ export default function PlaygroundPage() {
 
       <div className="container mx-auto flex-1 px-4 py-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold tracking-tight">Playground</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Video player integration playground</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Load a video, change the options, and copy a snippet that reproduces exactly what you
             see. Everything runs client-side — your files never leave the browser.
           </p>
         </div>
         <Playground />
+        <div className="mt-12 border-t border-border pt-8"><DiscoveryLinks /></div>
       </div>
     </main>
   );

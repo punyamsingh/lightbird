@@ -6,6 +6,7 @@ import type { Config } from "jest";
  */
 const config: Config = {
   testEnvironment: "node",
+  moduleNameMapper: { "^@/(.*)$": "<rootDir>/src/$1" },
   roots: ["<rootDir>/__tests__"],
   transform: {
     "^.+\\.tsx?$": [

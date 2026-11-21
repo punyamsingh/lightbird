@@ -2,7 +2,7 @@
 
 import React, { useEffect } from "react";
 import { OpenFeatureProvider } from "@openfeature/react-sdk";
-import { initFeatureFlags } from "@lightbird/core";
+import { initFeatureFlags, LIGHTBIRD_FEATURE_DOMAIN } from "@lightbird/core";
 
 let started = false;
 
@@ -19,7 +19,7 @@ export function FeatureFlagsProvider({ children }: { children: React.ReactNode }
   // useBooleanFlagValue call until the provider is ready, so SSR and the first
   // client render stay identical.
   return (
-    <OpenFeatureProvider suspendUntilReady={false} suspendWhileReconciling={false}>
+    <OpenFeatureProvider domain={LIGHTBIRD_FEATURE_DOMAIN} suspendUntilReady={false} suspendWhileReconciling={false}>
       {children}
     </OpenFeatureProvider>
   );

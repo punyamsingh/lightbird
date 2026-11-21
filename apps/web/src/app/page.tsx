@@ -1,11 +1,13 @@
 import Link from "next/link";
+import { HomeIntroduction } from "@/components/home-introduction";
 import { LightBirdPlayer, PlayerErrorBoundary } from "@lightbird/player-react";
 
 export default function Home() {
   return (
-    <main className="flex flex-col h-[100dvh] bg-background text-foreground overflow-hidden">
+    <main className="bg-background text-foreground">
+      <section aria-label="Online video player" className="flex h-[100dvh] flex-col overflow-hidden">
       <header style={{ paddingTop: "max(.375rem, env(safe-area-inset-top))", paddingLeft: "max(.75rem, env(safe-area-inset-left))", paddingRight: "max(.75rem, env(safe-area-inset-right))" }} className="relative z-30 px-3 sm:px-6 py-1.5 sm:py-3 border-b border-border flex items-center justify-between shrink-0">
-        <h1 className="text-base sm:text-xl font-headline font-black tracking-widest" style={{color: 'hsl(var(--accent))'}}>LIGHTBIRD</h1>
+        <Link href="/" aria-label="LightBird home" className="text-base sm:text-xl font-headline font-black tracking-widest" style={{color: 'hsl(var(--accent))'}}>LIGHTBIRD</Link>
         <nav aria-label="Main navigation" className="hidden sm:flex items-center gap-5 [&_a]:min-h-11 [&_a]:inline-flex [&_a]:items-center">
           <Link
             href="/playground"
@@ -45,6 +47,8 @@ export default function Home() {
           <LightBirdPlayer />
         </PlayerErrorBoundary>
       </div>
+      </section>
+      <HomeIntroduction />
     </main>
   );
 }
