@@ -108,7 +108,7 @@ export const guides: readonly Guide[] = [
       },
       {
         heading: "Render a player with a bounded height",
-        code: `"use client";\n\nimport { LightBirdPlayer } from '@lightbird/player-react';\nimport '@lightbird/player-react/styles.css';\n\nexport default function VideoPage() {\n  return (\n    <div style={{ height: '80dvh', minHeight: 320 }}>\n      <LightBirdPlayer />\n    </div>\n  );\n}`,
+        code: `"use client";\n\nimport { FeatureFlagsProvider, LightBirdPlayer } from '@lightbird/player-react';\nimport '@lightbird/player-react/styles.css';\n\nexport default function VideoPage() {\n  return (\n    <FeatureFlagsProvider>\n      <div style={{ height: '80dvh', minHeight: 320 }}>\n        <LightBirdPlayer />\n      </div>\n    </FeatureFlagsProvider>\n  );\n}`,
         paragraphs: [
           "The component includes file opening and playlist management, so users can select local videos without your app uploading them to a server. Give the player a container with an explicit height; its compact controls and playlist presentation adapt to the available width.",
           "In Next.js, place browser integrations behind a client component and import global styles from an appropriate app entry point. If you generate your own Tailwind utilities instead, follow the documentation's content scanning setup and import the standalone responsive stylesheet.",

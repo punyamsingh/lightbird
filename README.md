@@ -45,11 +45,15 @@ npm install @lightbird/core @lightbird/player-react
 
 ```tsx
 "use client";
-import { LightBirdPlayer } from '@lightbird/player-react';
+import { FeatureFlagsProvider, LightBirdPlayer } from '@lightbird/player-react';
 import '@lightbird/player-react/styles.css';
 
 export default function VideoPage() {
-  return <div style={{ height: '80dvh', minHeight: 320 }}><LightBirdPlayer /></div>;
+  return (
+    <FeatureFlagsProvider>
+      <div style={{ height: '80dvh', minHeight: 320 }}><LightBirdPlayer /></div>
+    </FeatureFlagsProvider>
+  );
 }
 ```
 
