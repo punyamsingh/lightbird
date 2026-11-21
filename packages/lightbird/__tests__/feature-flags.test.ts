@@ -13,7 +13,7 @@ jest.mock("@openfeature/unleash-web-provider", () => ({
   },
 }));
 
-import { FLAG_MAGNET_LINK, initFeatureFlags } from "../src/feature-flags";
+import { FLAG_MAGNET_LINK, LIGHTBIRD_FEATURE_DOMAIN, initFeatureFlags } from "../src/feature-flags";
 
 const ORIGINAL_ENV = process.env;
 
@@ -45,6 +45,7 @@ describe("initFeatureFlags", () => {
       appName: "lightbird",
     });
     expect(setProviderAndWait).toHaveBeenCalledTimes(1);
+    expect(setProviderAndWait).toHaveBeenCalledWith(LIGHTBIRD_FEATURE_DOMAIN, expect.any(Object));
   });
 
   it("warns and skips provider setup when the URL is missing", async () => {

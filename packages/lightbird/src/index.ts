@@ -42,7 +42,7 @@ export {
 } from './magnet-player'
 
 // Feature flags (OpenFeature)
-export { FLAG_MAGNET_LINK, initFeatureFlags } from './feature-flags'
+export { FLAG_MAGNET_LINK, LIGHTBIRD_FEATURE_DOMAIN, initFeatureFlags } from './feature-flags'
 
 // Utilities
 export { parseMediaError, validateFile } from './utils/media-error'

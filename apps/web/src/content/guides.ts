@@ -111,6 +111,7 @@ export const guides: readonly Guide[] = [
         code: `"use client";\n\nimport { FeatureFlagsProvider, LightBirdPlayer } from '@lightbird/player-react';\nimport '@lightbird/player-react/styles.css';\n\nexport default function VideoPage() {\n  return (\n    <FeatureFlagsProvider>\n      <div style={{ height: '80dvh', minHeight: 320 }}>\n        <LightBirdPlayer />\n      </div>\n    </FeatureFlagsProvider>\n  );\n}`,
         paragraphs: [
           "The component includes file opening and playlist management, so users can select local videos without your app uploading them to a server. Give the player a container with an explicit height; its compact controls and playlist presentation adapt to the available width.",
+          "FeatureFlagsProvider initializes flags on the client through process.env.NEXT_PUBLIC_UNLEASH_URL and process.env.NEXT_PUBLIC_UNLEASH_CLIENT_KEY. Next.js supplies these replacements; Vite applications must explicitly define both expressions at build time, even as empty strings when remote flags are unused. See the repository README for the Vite configuration and OpenFeature domain compatibility notes.",
           "In Next.js, place browser integrations behind a client component and import global styles from an appropriate app entry point. If you generate your own Tailwind utilities instead, follow the documentation's content scanning setup and import the standalone responsive stylesheet.",
         ],
       },

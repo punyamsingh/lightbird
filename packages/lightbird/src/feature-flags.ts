@@ -3,16 +3,22 @@
 import { OpenFeature } from "@openfeature/web-sdk";
 import { UnleashWebProvider } from "@openfeature/unleash-web-provider";
 
+/** Dedicated SDK domain: never replace a host application's default provider. */
+export const LIGHTBIRD_FEATURE_DOMAIN = "lightbird";
+
 /**
  * Feature flag keys — use these constants everywhere instead of raw strings.
  */
 export const FLAG_MAGNET_LINK = "magnet-link-enabled";
 
 /**
- * Initialise the OpenFeature SDK with the Unleash Frontend API provider.
+ * Initialise LightBird's named OpenFeature domain with the Unleash provider.
  * Returns a promise that resolves once Unleash has fetched the initial flag
  * state. Each `useBooleanFlagValue` call supplies its own default, used while
  * the provider is loading or when no provider is configured.
+ *
+ * The process.env expressions must be replaced by the bundler or backed by a
+ * process global. Vite consumers must wire these public values explicitly.
  *
  * Requires the following environment variables (set in .env.local or Vercel):
  *   NEXT_PUBLIC_UNLEASH_URL        — Frontend API URL
@@ -35,6 +41,7 @@ export function initFeatureFlags(): Promise<void> {
   }
 
   return OpenFeature.setProviderAndWait(
+    LIGHTBIRD_FEATURE_DOMAIN,
     new UnleashWebProvider({ url, clientKey, appName: "lightbird" }),
   );
 }
